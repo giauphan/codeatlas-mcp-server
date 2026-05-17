@@ -1,0 +1,23 @@
+{
+  "name": "codeatlas-enterprise",
+  "version": "1.0.0",
+  "description": "Ultra-lightweight MCP Gateway for CodeAtlas Remote Enterprise Server",
+  "type": "module",
+  "bin": {
+    "codeatlas-mcp": "bin/codeatlas.js"
+  },
+  "scripts": {
+    "start": "node bin/codeatlas.js"
+  },
+  "keywords": [
+    "mcp",
+    "modelcontextprotocol",
+    "codeatlas",
+    "enterprise"
+  ],
+  "author": "giauphan",
+  "license": "UNLICENSED",
+  "dependencies": {
+    "@modelcontextprotocol/supergateway": "^0.2.0"
+  }
+}
