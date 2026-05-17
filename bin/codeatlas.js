@@ -56,7 +56,7 @@ try {
   child = spawn('supergateway', gatewayArgs, { stdio: 'inherit' });
 } catch (err) {
   // If global 'supergateway' is not found, spawn it via 'npx'
-  child = spawn('npx', ['-y', '@modelcontextprotocol/supergateway', ...gatewayArgs], { stdio: 'inherit' });
+  child = spawn('npx', ['-y', 'supergateway', ...gatewayArgs], { stdio: 'inherit' });
 }
 
 child.on('error', (err) => {

@@ -1,6 +1,6 @@
 {
   "name": "codeatlas-enterprise",
-  "version": "2.1.21",
+  "version": "2.1.22",
   "description": "Ultra-lightweight MCP Gateway for CodeAtlas Remote Enterprise Server",
   "type": "module",
   "bin": {
@@ -18,6 +18,6 @@
   "author": "giauphan",
   "license": "UNLICENSED",
   "dependencies": {
-    "@modelcontextprotocol/supergateway": "^0.2.0"
+    "supergateway": "^3.4.3"
   }
 }
