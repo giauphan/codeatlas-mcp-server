@@ -1,10 +1,10 @@
 {
   "name": "codeatlas-enterprise",
-  "version": "2.1.24",
+  "version": "2.1.25",
   "description": "Enterprise-grade local-first MCP server and gateway for CodeAtlas",
   "type": "module",
   "bin": {
-    "codeatlas-mcp": "dist/index.js"
+    "codeatlas-enterprise": "dist/index.js"
   },
   "files": [
     "dist",
