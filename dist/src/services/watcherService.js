@@ -16,26 +16,26 @@ export function startWatcher() {
     watcher.on('change', (filePath) => {
         const project = projects.find(p => filePath.startsWith(p.dir));
         const projectName = project ? project.name : 'Unknown';
-        console.log(`\n[Auto-Scan] ⚡ Change in [${projectName}]: ${filePath}`);
+        console.error(`\n[Auto-Scan] ⚡ Change in [${projectName}]: ${filePath}`);
         if (indexTimeout)
             clearTimeout(indexTimeout);
         indexTimeout = setTimeout(() => {
-            console.log(`[Auto-Scan] 🔄 Re-indexing [${projectName}]...`);
+            console.error(`[Auto-Scan] 🔄 Re-indexing [${projectName}]...`);
             const cwd = project?.dir || process.cwd();
             loadAnalysisAsync(cwd).then((loaded) => {
                 if (loaded) {
-                    console.log(`[Auto-Index] ✅ [${projectName}] re-indexed and synced successfully.`);
+                    console.error(`[Auto-Index] ✅ [${projectName}] re-indexed and synced successfully.`);
                 }
             }).catch((err) => {
                 console.error(`[Auto-Index] ❌ Error indexing [${projectName}]: ${err}`);
             });
         }, 2000);
     });
-    console.log(`\n${'='.repeat(50)}`);
-    console.log(`🚀 CODEATLAS ENTERPRISE ONLINE`);
-    console.log(`📡 Auto-Indexing: WATCHING ${watchPaths.length} PROJECTS`);
-    watchPaths.forEach(p => console.log(`   - ${p}`));
-    console.log(`🛡️  Security: SECURE Bearer Token Sync`);
-    console.log(`${'='.repeat(50)}\n`);
+    console.error(`\n${'='.repeat(50)}`);
+    console.error(`🚀 CODEATLAS ENTERPRISE ONLINE`);
+    console.error(`📡 Auto-Indexing: WATCHING ${watchPaths.length} PROJECTS`);
+    watchPaths.forEach(p => console.error(`   - ${p}`));
+    console.error(`🛡️  Security: SECURE Bearer Token Sync`);
+    console.error(`${'='.repeat(50)}\n`);
 }
 //# sourceMappingURL=watcherService.js.map

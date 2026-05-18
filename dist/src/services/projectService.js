@@ -153,7 +153,7 @@ export function loadAnalysis(projectDir) {
             if (!fs.existsSync(codeatlasDir)) {
                 fs.mkdirSync(codeatlasDir, { recursive: true });
             }
-            console.log(`[Auto-Scan] 🔄 Creating .codeatlas directory and scanning project dynamically (sync): ${target.dir}`);
+            console.error(`[Auto-Scan] 🔄 Creating .codeatlas directory and scanning project dynamically (sync): ${target.dir}`);
             const indexingScript = path.join(process.cwd(), 'run_indexing.ts');
             // Import child_process dynamically
             import("child_process").then(({ execSync }) => {
@@ -263,7 +263,7 @@ export async function loadAnalysisAsync(projectDir) {
             if (!await fileExists(codeatlasDir)) {
                 await fs.promises.mkdir(codeatlasDir, { recursive: true });
             }
-            console.log(`[Auto-Scan] 🔄 Scanning project dynamically (async): ${target.dir}`);
+            console.error(`[Auto-Scan] 🔄 Scanning project dynamically (async): ${target.dir}`);
             const analyzer = new CodeAnalyzer(target.dir, 5000);
             const result = await analyzer.analyzeProject();
             // Save locally
