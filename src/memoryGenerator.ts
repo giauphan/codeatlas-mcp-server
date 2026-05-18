@@ -225,7 +225,7 @@ export function generateMemory(workspaceRoot: string, analysis: AnalysisResult):
   // === 7. Auto-generate .agents/rules/ (only if not exists) ===
   generateRules(workspaceRoot);
 
-  console.log(`CodeAtlas: Memory & rules synced to ${path.join(workspaceRoot, '.agents')}`);
+  console.error(`CodeAtlas: Memory & rules synced to ${path.join(workspaceRoot, '.agents')}`);
 }
 
 /**
@@ -487,7 +487,7 @@ Add to \`.cursor/mcp.json\`:
 \`\`\`
 `;
       fs.writeFileSync(cursorRulePath, cursorRule);
-      console.log('CodeAtlas: Generated .cursor/rules/codeatlas.mdc');
+      console.error('CodeAtlas: Generated .cursor/rules/codeatlas.mdc');
     } catch {
       // Cursor not in use, skip silently
     }
@@ -505,7 +505,7 @@ claude mcp add codeatlas -- npx -y @giauphan/codeatlas-mcp
 \`\`\`
 `;
       fs.writeFileSync(claudeRulePath, claudeRule);
-      console.log('CodeAtlas: Generated CLAUDE.md');
+      console.error('CodeAtlas: Generated CLAUDE.md');
     } catch {
       // Skip silently
     }
@@ -516,7 +516,7 @@ claude mcp add codeatlas -- npx -y @giauphan/codeatlas-mcp
   if (!fs.existsSync(windsurfRulePath)) {
     try {
       fs.writeFileSync(windsurfRulePath, codeatlasRule);
-      console.log('CodeAtlas: Generated .windsurfrules');
+      console.error('CodeAtlas: Generated .windsurfrules');
     } catch {
       // Skip silently
     }
