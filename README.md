@@ -1,8 +1,8 @@
-# CodeAtlas Enterprise MCP Gateway
+# CodeAtlas Enterprise MCP Server
 
-An ultra-lightweight, high-performance Model Context Protocol (MCP) gateway that securely bridges your local AI editors (Cursor, Claude Code, Roo Code, VS Code) to the remote **CodeAtlas Enterprise Server**. 
+An ultra-lightweight, high-performance Model Context Protocol (MCP) server that securely indexes your local codebase and synchronizes codebase metadata with your remote **CodeAtlas Enterprise Server**.
 
-This client-only gateway requires no heavy database engines, AST parsers, or workspace indexers locally. All complex AI analysis and persistence run secure and isolated in the cloud, giving you instant, lightning-fast response times with zero local CPU overhead.
+This client package operates on a secure **Local-First** model. The AST (Abstract Syntax Tree) generation and codebase relationship intelligence are computed completely in-process on your local machine, keeping your proprietary code strictly under your control. The computed metadata structure is then securely synchronized to your central Enterprise VPS via HTTPS REST APIs using your personal API key, ensuring absolutely zero cloud credential leaks.
 
 ---
 
@@ -18,7 +18,7 @@ npm install -g codeatlas-enterprise
 
 ## 🔑 Authentication
 
-The gateway communicates securely with the CodeAtlas server using your personal **API Key**. You can provide the API Key in one of three ways:
+The server communicates securely with the remote CodeAtlas Enterprise Server using your personal **API Key**. You can provide the API Key in one of three ways:
 
 1. **Environment Variable**:
    ```bash
@@ -66,8 +66,9 @@ codeatlas-mcp --apiKey="YOUR_API_KEY_HERE"
 
 ## 🔒 Absolute Privacy & Security
 
-* **Zero Local Code Storage**: This client package contains only the necessary transport bridge code. Your intellectual property, credentials, and structural data are never saved on the local machine where this package is installed.
-* **Encrypted Transmission**: All data exchanged between your local editor and the server is fully encrypted via secure HTTPS/SSE channels.
+* **Local-First Parsing**: Source files are parsed completely on your local machine. No raw source files are ever uploaded or transmitted.
+* **No Database Credential Exposure**: This package contains zero SQL credentials, Firebase configs, or private server schemas. All synchronization uses standard secure HTTPS REST endpoints with Bearer Token validation.
+* **Encrypted Transmission**: All metadata synchronized with the Enterprise Server is fully encrypted over standard HTTPS.
 
 ---
 
