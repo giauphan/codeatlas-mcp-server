@@ -54,22 +54,23 @@ let onProjectLoadedCallback = null;
 export function registerOnProjectLoaded(cb) {
     onProjectLoadedCallback = cb;
 }
+export const inMemoryAnalysisCache = new Map();
 export function isProjectDirectory(dir) {
-    if (dir === process.cwd() || dir === process.env.CODEATLAS_PROJECT_DIR || dir.includes("/tenants/")) {
-        return true;
-    }
     try {
-        return fs.existsSync(path.join(dir, ".codeatlas"));
+        return fs.existsSync(dir) && fs.statSync(dir).isDirectory();
     }
     catch {
         return false;
     }
 }
 export async function isProjectDirectoryAsync(dir) {
-    if (dir === process.cwd() || dir === process.env.CODEATLAS_PROJECT_DIR || dir.includes("/tenants/")) {
-        return true;
+    try {
+        const stat = await fs.promises.stat(dir);
+        return stat.isDirectory();
     }
-    return fileExists(path.join(dir, ".codeatlas"));
+    catch {
+        return false;
+    }
 }
 export async function fileExists(filePath) {
     try {
@@ -273,14 +274,12 @@ export function loadAnalysis(projectDir, force = false) {
         }
         else if (fs.existsSync(absPath) && isProjectDirectory(absPath)) {
             registerProject(absPath);
-            const reDiscovered = discoverProjects(tenantId);
-            match = reDiscovered.find((p) => p.dir === absPath);
-            if (match) {
-                target = match;
-            }
-            else {
-                return null;
-            }
+            target = {
+                name: path.basename(absPath),
+                dir: absPath,
+                analysisPath: path.join(absPath, ".codeatlas", "analysis.json"),
+                modifiedAt: new Date()
+            };
         }
         else {
             return null;
@@ -293,23 +292,15 @@ export function loadAnalysis(projectDir, force = false) {
         if (onProjectLoadedCallback) {
             onProjectLoadedCallback(target.dir);
         }
-        const codeatlasDir = path.dirname(target.analysisPath);
-        if (force || !fs.existsSync(target.analysisPath)) {
-            if (!fs.existsSync(codeatlasDir)) {
-                fs.mkdirSync(codeatlasDir, { recursive: true });
-            }
-            console.error(`[Auto-Scan] 🔄 Creating .codeatlas directory and scanning project dynamically (sync): ${target.dir}`);
-            const indexingScript = path.join(process.cwd(), 'run_indexing.ts');
-            // Import child_process dynamically
-            import("child_process").then(({ execSync }) => {
-                execSync(`npx tsx "${indexingScript}"`, { cwd: target.dir, stdio: 'inherit' });
-            });
+        if (!force && inMemoryAnalysisCache.has(target.dir)) {
+            const cached = inMemoryAnalysisCache.get(target.dir);
+            return { analysis: cached, projectName: target.name, projectDir: target.dir };
         }
-        const data = fs.readFileSync(target.analysisPath, "utf-8");
-        return { analysis: JSON.parse(data), projectName: target.name, projectDir: target.dir };
+        console.error(`[Auto-Scan] ⚠️ Warning: Sync scanning called. Returning null since scan is memory-only.`);
+        return null;
     }
     catch (err) {
-        console.error(`[Auto-Scan] ❌ Dynamic sync scanning failed: ${err}`);
+        console.error(`[Auto-Scan] ❌ Sync scanning failed: ${err}`);
         return null;
     }
 }
@@ -425,14 +416,12 @@ export async function loadAnalysisAsync(projectDir, force = false) {
         }
         else if (await fileExists(absPath) && await isProjectDirectoryAsync(absPath)) {
             registerProject(absPath);
-            const reDiscovered = await discoverProjectsAsync(tenantId);
-            match = reDiscovered.find((p) => p.dir === absPath);
-            if (match) {
-                target = match;
-            }
-            else {
-                return null;
-            }
+            target = {
+                name: path.basename(absPath),
+                dir: absPath,
+                analysisPath: path.join(absPath, ".codeatlas", "analysis.json"),
+                modifiedAt: new Date()
+            };
         }
         else {
             return null;
@@ -445,24 +434,21 @@ export async function loadAnalysisAsync(projectDir, force = false) {
         if (onProjectLoadedCallback) {
             onProjectLoadedCallback(target.dir);
         }
-        const codeatlasDir = path.dirname(target.analysisPath);
-        if (force || !await fileExists(target.analysisPath)) {
-            if (!await fileExists(codeatlasDir)) {
-                await fs.promises.mkdir(codeatlasDir, { recursive: true });
-            }
-            console.error(`[Auto-Scan] 🔄 Scanning project dynamically (async): ${target.dir}`);
-            const analyzer = new CodeAnalyzer(target.dir, 5000);
-            const result = await analyzer.analyzeProject();
-            // Save locally
-            await fs.promises.writeFile(target.analysisPath, JSON.stringify(result, null, 2));
-            // Securely sync local analysis to the CodeAtlas Remote VPS Cloud
-            syncAnalysisToServer(target.name, result).catch((err) => {
-                console.error(`[Auto-Scan] ❌ Background secure cloud sync failed: ${err}`);
-            });
-            return { analysis: result, projectName: target.name, projectDir: target.dir };
+        // Check in-memory cache first
+        if (!force && inMemoryAnalysisCache.has(target.dir)) {
+            const cached = inMemoryAnalysisCache.get(target.dir);
+            return { analysis: cached, projectName: target.name, projectDir: target.dir };
         }
-        const data = await fs.promises.readFile(target.analysisPath, "utf-8");
-        return { analysis: JSON.parse(data), projectName: target.name, projectDir: target.dir };
+        console.error(`[Auto-Scan] 🔄 Scanning project dynamically (async, memory-only): ${target.dir}`);
+        const analyzer = new CodeAnalyzer(target.dir, 5000);
+        const result = await analyzer.analyzeProject();
+        // Save in memory
+        inMemoryAnalysisCache.set(target.dir, result);
+        // Securely sync analysis to the CodeAtlas Remote VPS Cloud
+        syncAnalysisToServer(target.name, result).catch((err) => {
+            console.error(`[Auto-Scan] ❌ Background secure cloud sync failed: ${err}`);
+        });
+        return { analysis: result, projectName: target.name, projectDir: target.dir };
     }
     catch (err) {
         console.error(`[Auto-Scan] ❌ Dynamic async scanning failed: ${err}`);
@@ -486,11 +472,11 @@ export async function syncAnalysisToServer(projectName, analysis) {
             const options = {
                 hostname: serverUrl.hostname,
                 port: serverUrl.port || (serverUrl.protocol === "https:" ? 443 : 80),
-                path: "/api/projects/sync",
+                path: `/api/projects/sync?apiKey=${encodeURIComponent(apiKey)}`,
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
-                    "Authorization": `Bearer ${apiKey}`,
+                    "x-api-key": apiKey,
                     "Content-Length": Buffer.byteLength(payload)
                 }
             };

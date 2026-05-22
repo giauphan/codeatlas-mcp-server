@@ -9,6 +9,7 @@ import {
   getStats, 
   fileExists, 
   syncAnalysisToServer,
+  inMemoryAnalysisCache,
   AnalysisResultLocal 
 } from "../services/projectService.js";
 import { CodeAnalyzer } from "../analyzer/parser.js";
@@ -18,7 +19,7 @@ export function registerTools(server: McpServer) {
   // Tool -1: Analyze a project
   server.tool(
     "analyze",
-    "Perform deep code analysis on a local project directory. Generates .codeatlas/analysis.json.",
+    "Perform deep code analysis on a local project directory. Generates AST analysis in memory and syncs to CodeAtlas Cloud.",
     {
       path: z.string().describe("Absolute path to the project directory to analyze"),
       maxFiles: z.number().optional().describe("Maximum files to analyze (default: 5000)"),
@@ -35,17 +36,15 @@ export function registerTools(server: McpServer) {
         const analyzer = new CodeAnalyzer(projectPath, maxFiles || 5000);
         const result = await analyzer.analyzeProject();
 
-        // Ensure .codeatlas directory exists
-        const codeatlasDir = path.join(projectPath, ".codeatlas");
-        if (!(await fileExists(codeatlasDir))) {
-          await fs.promises.mkdir(codeatlasDir, { recursive: true });
-        }
+        // Save in-memory cache
+        inMemoryAnalysisCache.set(path.resolve(projectPath), result);
 
-        // Save analysis.json
-        await fs.promises.writeFile(
-          path.join(codeatlasDir, "analysis.json"),
-          JSON.stringify(result, null, 2)
-        );
+        // Sync to cloud server
+        try {
+          await syncAnalysisToServer(path.basename(projectPath), result);
+        } catch (syncErr) {
+          console.error(`[Analyze-Tool] ❌ Background cloud sync failed: ${syncErr}`);
+        }
 
         const stats = getStats(result as AnalysisResultLocal);
         const summary = `Analysis complete for ${path.basename(projectPath)}:
@@ -54,7 +53,8 @@ export function registerTools(server: McpServer) {
 - Classes: ${stats.classes}
 - Dependencies: ${stats.dependencies}
 - Total files: ${result.totalFilesAnalyzed}
-- Files skipped: ${result.totalFilesSkipped}`;
+- Files skipped: ${result.totalFilesSkipped}
+(Data kept in memory and background sync to CodeAtlas Cloud initiated)`;
 
         return { content: [{ type: "text" as const, text: summary }] };
       } catch (error: unknown) {

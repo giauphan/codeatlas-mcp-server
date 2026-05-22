@@ -3,12 +3,12 @@ import { z } from "zod";
 import * as fs from "fs";
 import * as path from "path";
 import { checkAuth, logActivity } from "../services/authService.js";
-import { discoverProjectsAsync, loadAnalysisAsync, getStats, fileExists, syncAnalysisToServer } from "../services/projectService.js";
+import { discoverProjectsAsync, loadAnalysisAsync, getStats, fileExists, syncAnalysisToServer, inMemoryAnalysisCache } from "../services/projectService.js";
 import { CodeAnalyzer } from "../analyzer/parser.js";
 import { SecurityScanner } from "../securityScanner.js";
 export function registerTools(server) {
     // Tool -1: Analyze a project
-    server.tool("analyze", "Perform deep code analysis on a local project directory. Generates .codeatlas/analysis.json.", {
+    server.tool("analyze", "Perform deep code analysis on a local project directory. Generates AST analysis in memory and syncs to CodeAtlas Cloud.", {
         path: z.string().describe("Absolute path to the project directory to analyze"),
         maxFiles: z.number().optional().describe("Maximum files to analyze (default: 5000)"),
     }, async ({ path: projectPath, maxFiles }) => {
@@ -20,13 +20,15 @@ export function registerTools(server) {
         try {
             const analyzer = new CodeAnalyzer(projectPath, maxFiles || 5000);
             const result = await analyzer.analyzeProject();
-            // Ensure .codeatlas directory exists
-            const codeatlasDir = path.join(projectPath, ".codeatlas");
-            if (!(await fileExists(codeatlasDir))) {
-                await fs.promises.mkdir(codeatlasDir, { recursive: true });
+            // Save in-memory cache
+            inMemoryAnalysisCache.set(path.resolve(projectPath), result);
+            // Sync to cloud server
+            try {
+                await syncAnalysisToServer(path.basename(projectPath), result);
             }
-            // Save analysis.json
-            await fs.promises.writeFile(path.join(codeatlasDir, "analysis.json"), JSON.stringify(result, null, 2));
+            catch (syncErr) {
+                console.error(`[Analyze-Tool] ❌ Background cloud sync failed: ${syncErr}`);
+            }
             const stats = getStats(result);
             const summary = `Analysis complete for ${path.basename(projectPath)}:
 - Modules: ${stats.modules}
@@ -34,7 +36,8 @@ export function registerTools(server) {
 - Classes: ${stats.classes}
 - Dependencies: ${stats.dependencies}
 - Total files: ${result.totalFilesAnalyzed}
-- Files skipped: ${result.totalFilesSkipped}`;
+- Files skipped: ${result.totalFilesSkipped}
+(Data kept in memory and background sync to CodeAtlas Cloud initiated)`;
             return { content: [{ type: "text", text: summary }] };
         }
         catch (error) {
