@@ -4,7 +4,8 @@
   "description": "Enterprise-grade local-first MCP server and gateway for CodeAtlas",
   "type": "module",
   "bin": {
-    "codeatlas-enterprise": "dist/index.js"
+    "codeatlas-enterprise": "dist/index.js",
+    "codeatlas-mcp": "dist/index.js"
   },
   "files": [
     "dist",
