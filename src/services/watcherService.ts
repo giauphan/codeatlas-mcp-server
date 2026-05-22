@@ -10,22 +10,16 @@ export function startWatcher() {
   registerOnProjectLoaded(watchProject);
   const watchPaths: string[] = [];
   
-  // Default to process.cwd() (the active workspace of the IDE window)
-  const activeWorkspace = path.resolve(process.cwd());
-  watchPaths.push(activeWorkspace);
-  activeWatchedPaths.add(activeWorkspace);
-
-  // Also watch explicitly defined project directory if set
+  // Only watch explicitly defined project directory if set via env var
+  // Real workspace paths will be added dynamically via watchProject() after client handshake
   if (process.env.CODEATLAS_PROJECT_DIR) {
     const envPath = path.resolve(process.env.CODEATLAS_PROJECT_DIR);
-    if (!activeWatchedPaths.has(envPath)) {
-      watchPaths.push(envPath);
-      activeWatchedPaths.add(envPath);
-    }
+    watchPaths.push(envPath);
+    activeWatchedPaths.add(envPath);
   }
 
   watcher = chokidar.watch(watchPaths, {
-    ignored: [/(^|[\/\\])\../, '**/node_modules/**', '**/dist/**', '**/build/**', '**/.git/**'],
+    ignored: [/(^|[\/\\])\./, '**/node_modules/**', '**/dist/**', '**/build/**', '**/.git/**'],
     persistent: true,
     ignoreInitial: true
   });
@@ -61,9 +55,13 @@ export function startWatcher() {
 
   console.error(`\n${'='.repeat(50)}`);
   console.error(`🚀 CODEATLAS ENTERPRISE ONLINE`);
-  console.error(`📡 Auto-Indexing: WATCHING ACTIVE WORKSPACE`);
-  watchPaths.forEach(p => console.error(`   - ${p}`));
-  console.error(`🛡️  Security: SECURE Bearer Token Sync`);
+  console.error(`📡 Auto-Indexing: DYNAMIC WORKSPACE DISCOVERY MODE`);
+  if (watchPaths.length > 0) {
+    watchPaths.forEach(p => console.error(`   - ${p}`));
+  } else {
+    console.error(`   - Waiting for IDE workspace roots...`);
+  }
+  console.error(`🛡️  Security: SECURE API Key Sync`);
   console.error(`${'='.repeat(50)}\n`);
 }
 

@@ -414,17 +414,28 @@ export async function loadAnalysisAsync(projectDir, force = false) {
             target = match;
             registerProject(target.dir);
         }
-        else if (await fileExists(absPath) && await isProjectDirectoryAsync(absPath)) {
-            registerProject(absPath);
-            target = {
-                name: path.basename(absPath),
-                dir: absPath,
-                analysisPath: path.join(absPath, ".codeatlas", "analysis.json"),
-                modifiedAt: new Date()
-            };
-        }
         else {
-            return null;
+            // Accept any valid directory as a scannable project even without .codeatlas
+            try {
+                const stat = await fs.promises.stat(absPath);
+                if (stat.isDirectory()) {
+                    registerProject(absPath);
+                    target = {
+                        name: path.basename(absPath),
+                        dir: absPath,
+                        analysisPath: path.join(absPath, ".codeatlas", "analysis.json"),
+                        modifiedAt: new Date()
+                    };
+                }
+                else {
+                    console.error(`[Auto-Scan] ⚠️ Path is not a directory, skipping: ${absPath}`);
+                    return null;
+                }
+            }
+            catch {
+                console.error(`[Auto-Scan] ⚠️ Directory not accessible, skipping: ${absPath}`);
+                return null;
+            }
         }
     }
     else if (target) {
