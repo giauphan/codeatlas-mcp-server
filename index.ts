@@ -25,25 +25,15 @@ dotenv.config();
 async function main() {
   startWatcher();
 
-  // Trigger background scan of all discovered projects on startup
-  discoverProjectsAsync().then(async (projectsList) => {
-    console.error(`[Auto-Scan] 🔍 Discovered ${projectsList.length} potential projects on startup.`);
-    for (const p of projectsList) {
-      const hasAnalysis = await fileExists(p.analysisPath);
-      if (!hasAnalysis) {
-        console.error(`[Auto-Scan] 🔄 Triggering initial background scan for: ${p.name}`);
-        // Run in background without awaiting, so server startup is instantaneous!
-        loadAnalysisAsync(p.dir).then((loaded) => {
-          if (loaded) {
-            console.error(`[Auto-Scan] ✅ Initial background scan complete for: ${p.name}`);
-          }
-        }).catch((err) => {
-          console.error(`[Auto-Scan] ❌ Initial background scan failed for ${p.name}: ${err}`);
-        });
-      }
+  // Trigger background scan ONLY for the active workspace of the IDE on startup
+  const activeWorkspace = process.cwd();
+  console.error(`[Auto-Scan] 🔄 Triggering initial background scan for active workspace: ${activeWorkspace}`);
+  loadAnalysisAsync(activeWorkspace, true).then((loaded) => {
+    if (loaded) {
+      console.error(`[Auto-Scan] ✅ Initial background scan complete for: ${activeWorkspace}`);
     }
   }).catch((err) => {
-    console.error(`[Auto-Scan] ❌ Failed to discover projects for initial scan: ${err}`);
+    console.error(`[Auto-Scan] ❌ Initial background scan failed: ${err}`);
   });
 
   // Stdio Mode - for local use (e.g. Claude Desktop, Cursor)

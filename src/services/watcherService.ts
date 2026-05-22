@@ -1,15 +1,27 @@
 import chokidar from 'chokidar';
-import { discoverProjects, loadAnalysisAsync } from './projectService.js';
+import * as path from 'path';
+import { loadAnalysisAsync, registerOnProjectLoaded } from './projectService.js';
 
 export let indexTimeout: NodeJS.Timeout | null = null;
 export let watcher: any = null;
+export const activeWatchedPaths = new Set<string>();
 
 export function startWatcher() {
-  const projects = discoverProjects();
-  const watchPaths = projects.map(p => p.dir);
+  registerOnProjectLoaded(watchProject);
+  const watchPaths: string[] = [];
+  
+  // Default to process.cwd() (the active workspace of the IDE window)
+  const activeWorkspace = path.resolve(process.cwd());
+  watchPaths.push(activeWorkspace);
+  activeWatchedPaths.add(activeWorkspace);
 
-  if (watchPaths.length === 0) {
-    watchPaths.push(process.cwd());
+  // Also watch explicitly defined project directory if set
+  if (process.env.CODEATLAS_PROJECT_DIR) {
+    const envPath = path.resolve(process.env.CODEATLAS_PROJECT_DIR);
+    if (!activeWatchedPaths.has(envPath)) {
+      watchPaths.push(envPath);
+      activeWatchedPaths.add(envPath);
+    }
   }
 
   watcher = chokidar.watch(watchPaths, {
@@ -19,8 +31,16 @@ export function startWatcher() {
   });
 
   watcher.on('change', (filePath: string) => {
-    const project = projects.find(p => filePath.startsWith(p.dir));
-    const projectName = project ? project.name : 'Unknown';
+    // Find which watched directory this file belongs to
+    let matchedDir = '';
+    for (const dir of activeWatchedPaths) {
+      if (filePath.startsWith(dir)) {
+        matchedDir = dir;
+        break;
+      }
+    }
+    
+    const projectName = matchedDir ? path.basename(matchedDir) : 'Unknown';
     
     console.error(`\n[Auto-Scan] ⚡ Change in [${projectName}]: ${filePath}`);
     
@@ -28,8 +48,8 @@ export function startWatcher() {
     indexTimeout = setTimeout(() => {
       console.error(`[Auto-Scan] 🔄 Re-indexing [${projectName}]...`);
       
-      const cwd = project?.dir || process.cwd();
-      loadAnalysisAsync(cwd).then((loaded) => {
+      const cwd = matchedDir || process.cwd();
+      loadAnalysisAsync(cwd, true).then((loaded) => {
         if (loaded) {
           console.error(`[Auto-Index] ✅ [${projectName}] re-indexed and synced successfully.`);
         }
@@ -41,8 +61,18 @@ export function startWatcher() {
 
   console.error(`\n${'='.repeat(50)}`);
   console.error(`🚀 CODEATLAS ENTERPRISE ONLINE`);
-  console.error(`📡 Auto-Indexing: WATCHING ${watchPaths.length} PROJECTS`);
+  console.error(`📡 Auto-Indexing: WATCHING ACTIVE WORKSPACE`);
   watchPaths.forEach(p => console.error(`   - ${p}`));
   console.error(`🛡️  Security: SECURE Bearer Token Sync`);
   console.error(`${'='.repeat(50)}\n`);
+}
+
+export function watchProject(dir: string) {
+  const absPath = path.resolve(dir);
+  if (!watcher) return;
+  if (!activeWatchedPaths.has(absPath)) {
+    activeWatchedPaths.add(absPath);
+    watcher.add(absPath);
+    console.error(`[Watcher] ➕ Dynamically started watching: ${absPath}`);
+  }
 }
