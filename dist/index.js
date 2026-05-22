@@ -77,29 +77,24 @@ dotenv.config();
 // Start server
 async function main() {
     startWatcher();
-    // Trigger background scan ONLY for the active workspace of the IDE on startup
-    const activeWorkspace = process.cwd();
-    console.error(`[Auto-Scan] 🔄 Triggering initial background scan for active workspace: ${activeWorkspace}`);
-    loadAnalysisAsync(activeWorkspace, true).then((loaded) => {
-        if (loaded) {
-            console.error(`[Auto-Scan] ✅ Initial background scan complete for: ${activeWorkspace}`);
-        }
-    }).catch((err) => {
-        console.error(`[Auto-Scan] ❌ Initial background scan failed: ${err}`);
-    });
     // Function to scan workspace roots from the client
     async function scanRoots() {
+        let succeeded = false;
         try {
             const result = await server.server.listRoots();
             if (result && result.roots && result.roots.length > 0) {
+                succeeded = true;
                 console.error(`[Auto-Scan] 📂 Discovered ${result.roots.length} workspace root(s) from client.`);
                 for (const root of result.roots) {
                     if (root.uri.startsWith("file://")) {
-                        const workspacePath = fileURLToPath(root.uri);
+                        const workspacePath = fileURLToPath(root.uri).trim();
                         console.error(`[Auto-Scan] 🔄 Auto-indexing discovered workspace root: ${workspacePath}`);
                         loadAnalysisAsync(workspacePath, true).then((loaded) => {
                             if (loaded) {
                                 console.error(`[Auto-Scan] ✅ Auto-indexing complete for workspace root: ${workspacePath}`);
+                            }
+                            else {
+                                console.error(`[Auto-Scan] ⚠️ Auto-indexing skipped or directory not found for: ${workspacePath}`);
                             }
                         }).catch((err) => {
                             console.error(`[Auto-Scan] ❌ Auto-indexing failed for workspace root: ${workspacePath}: ${err}`);
@@ -111,11 +106,25 @@ async function main() {
                 }
             }
             else {
-                console.error("[Auto-Scan] ℹ️ No workspace roots returned by client.");
+                console.error("[Auto-Scan] ℹ️ No workspace roots returned by client. Falling back to active workspace.");
             }
         }
         catch (err) {
-            console.error(`[Auto-Scan] ⚠️ Failed to list workspace roots from client: ${err}`);
+            console.error(`[Auto-Scan] ⚠️ Failed to list workspace roots from client: ${err}. Falling back to active workspace.`);
+        }
+        if (!succeeded) {
+            const activeWorkspace = process.cwd();
+            console.error(`[Auto-Scan] 🔄 Triggering initial background scan for active workspace fallback: ${activeWorkspace}`);
+            loadAnalysisAsync(activeWorkspace, true).then((loaded) => {
+                if (loaded) {
+                    console.error(`[Auto-Scan] ✅ Initial background scan complete for fallback: ${activeWorkspace}`);
+                }
+                else {
+                    console.error(`[Auto-Scan] ⚠️ Initial background scan skipped or directory not found for fallback: ${activeWorkspace}`);
+                }
+            }).catch((err) => {
+                console.error(`[Auto-Scan] ❌ Initial background scan failed for fallback: ${err}`);
+            });
         }
     }
     // Hook into client initialized event to fetch and index workspace roots

@@ -277,9 +277,9 @@ export function loadAnalysis(projectDir?: string, force = false): { analysis: An
   let target: { name: string; dir: string; analysisPath: string; modifiedAt: Date } | undefined = projects[0];
 
   if (projectDir) {
-    const absPath = path.resolve(projectDir);
+    const absPath = path.resolve(projectDir.trim());
     let match = projects.find(
-      (p) => p.dir === absPath || p.name.toLowerCase() === projectDir.toLowerCase()
+      (p) => p.dir === absPath || p.name.toLowerCase() === projectDir.trim().toLowerCase()
     );
     if (match) {
       target = match;
@@ -421,9 +421,9 @@ export async function loadAnalysisAsync(projectDir?: string, force = false): Pro
   let target: { name: string; dir: string; analysisPath: string; modifiedAt: Date } | undefined = projects[0];
 
   if (projectDir) {
-    const absPath = path.resolve(projectDir);
+    const absPath = path.resolve(projectDir.trim());
     let match = projects.find(
-      (p) => p.dir === absPath || p.name.toLowerCase() === projectDir.toLowerCase()
+      (p) => p.dir === absPath || p.name.toLowerCase() === projectDir.trim().toLowerCase()
     );
     if (match) {
       target = match;

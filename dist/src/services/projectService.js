@@ -266,8 +266,8 @@ export function loadAnalysis(projectDir, force = false) {
         return null;
     let target = projects[0];
     if (projectDir) {
-        const absPath = path.resolve(projectDir);
-        let match = projects.find((p) => p.dir === absPath || p.name.toLowerCase() === projectDir.toLowerCase());
+        const absPath = path.resolve(projectDir.trim());
+        let match = projects.find((p) => p.dir === absPath || p.name.toLowerCase() === projectDir.trim().toLowerCase());
         if (match) {
             target = match;
             registerProject(target.dir);
@@ -408,8 +408,8 @@ export async function loadAnalysisAsync(projectDir, force = false) {
         return null;
     let target = projects[0];
     if (projectDir) {
-        const absPath = path.resolve(projectDir);
-        let match = projects.find((p) => p.dir === absPath || p.name.toLowerCase() === projectDir.toLowerCase());
+        const absPath = path.resolve(projectDir.trim());
+        let match = projects.find((p) => p.dir === absPath || p.name.toLowerCase() === projectDir.trim().toLowerCase());
         if (match) {
             target = match;
             registerProject(target.dir);
