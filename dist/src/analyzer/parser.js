@@ -18,6 +18,8 @@ export class CodeAnalyzer {
         this.excludedFiles = excludedFiles;
         this.fileExtensions = fileExtensions;
     }
+    allFiles = [];
+    totalSkippedCount = 0;
     async analyzeProject(onProgress) {
         this.nodes.clear();
         this.links = [];
@@ -26,6 +28,7 @@ export class CodeAnalyzer {
             console.warn(`[CodeAnalyzer] Workspace has ${files.length} files, which exceeds maxFiles (${this.maxFiles}). Truncating to ${this.maxFiles} files.`);
             files = files.slice(0, this.maxFiles);
         }
+        this.allFiles = [...files];
         const total = files.length;
         let totalSkipped = 0;
         let lastReportedPercent = 0;
@@ -42,6 +45,45 @@ export class CodeAnalyzer {
                 }
             }
         }
+        this.totalSkippedCount = totalSkipped;
+        return this.buildAnalysisResult();
+    }
+    async analyzeFileIncremental(filePath) {
+        const absPath = path.resolve(filePath);
+        // 1. Remove all existing nodes belonging to this file
+        const nodesToRemove = new Set();
+        this.nodes.forEach((node, id) => {
+            if (node.filePath && path.resolve(node.filePath) === absPath) {
+                nodesToRemove.add(id);
+            }
+        });
+        // Also remove module node matching this file's module ID
+        const relativePath = path.relative(this.workspaceRoot, absPath);
+        const normalizedRelativePath = relativePath.replace(/\\/g, '/');
+        const moduleId = `module:${normalizedRelativePath}`;
+        nodesToRemove.add(moduleId);
+        nodesToRemove.forEach(id => this.nodes.delete(id));
+        // 2. Remove all links associated with the removed nodes
+        this.links = this.links.filter(link => !nodesToRemove.has(link.source) && !nodesToRemove.has(link.target));
+        // 3. Re-analyze only if file exists
+        try {
+            if (fs.existsSync(absPath)) {
+                this.analyzeFile(absPath);
+                if (!this.allFiles.includes(absPath)) {
+                    this.allFiles.push(absPath);
+                }
+            }
+            else {
+                // File was deleted
+                this.allFiles = this.allFiles.filter(f => f !== absPath);
+            }
+        }
+        catch {
+            this.allFiles = this.allFiles.filter(f => f !== absPath);
+        }
+        return this.buildAnalysisResult();
+    }
+    buildAnalysisResult() {
         // Add graph layout sizes based on relationships
         this.nodes.forEach(node => {
             let degree = this.links.filter(l => l.source === node.id || l.target === node.id).length;
@@ -67,8 +109,8 @@ export class CodeAnalyzer {
             graph,
             insights,
             entityCounts: counts,
-            totalFilesAnalyzed: files.length - totalSkipped,
-            totalFilesSkipped: totalSkipped
+            totalFilesAnalyzed: this.allFiles.length - this.totalSkippedCount,
+            totalFilesSkipped: this.totalSkippedCount
         };
     }
     /**

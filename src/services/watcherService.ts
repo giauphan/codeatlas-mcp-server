@@ -24,7 +24,9 @@ export function startWatcher() {
     ignoreInitial: true
   });
 
-  watcher.on('change', (filePath: string) => {
+  watcher.on('all', (event: string, filePath: string) => {
+    if (event !== 'add' && event !== 'change' && event !== 'unlink') return;
+
     // Find which watched directory this file belongs to
     let matchedDir = '';
     for (const dir of activeWatchedPaths) {
@@ -35,22 +37,21 @@ export function startWatcher() {
     }
     
     const projectName = matchedDir ? path.basename(matchedDir) : 'Unknown';
+    const relPath = matchedDir ? path.relative(matchedDir, filePath) : filePath;
     
-    console.error(`\n[Auto-Scan] ⚡ Change in [${projectName}]: ${filePath}`);
+    console.error(`\n[Auto-Scan] ⚡ File ${event} in [${projectName}]: ${relPath}`);
     
     if (indexTimeout) clearTimeout(indexTimeout);
     indexTimeout = setTimeout(() => {
-      console.error(`[Auto-Scan] 🔄 Re-indexing [${projectName}]...`);
-      
       const cwd = matchedDir || process.cwd();
-      loadAnalysisAsync(cwd, true).then((loaded) => {
+      loadAnalysisAsync(cwd, false, filePath).then((loaded) => {
         if (loaded) {
-          console.error(`[Auto-Index] ✅ [${projectName}] re-indexed and synced successfully.`);
+          console.error(`[Auto-Index] ✅ [${projectName}] incremental sync complete.`);
         }
       }).catch((err) => {
-        console.error(`[Auto-Index] ❌ Error indexing [${projectName}]: ${err}`);
+        console.error(`[Auto-Index] ❌ Error in incremental sync for [${projectName}]: ${err}`);
       });
-    }, 2000);
+    }, 500); // reduced delay to 500ms for instant feel
   });
 
   console.error(`\n${'='.repeat(50)}`);

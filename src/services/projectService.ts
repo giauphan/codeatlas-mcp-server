@@ -411,7 +411,13 @@ export async function discoverProjectsAsync(tenantId?: string): Promise<{ name: 
   return projects;
 }
 
-export async function loadAnalysisAsync(projectDir?: string, force = false): Promise<{ analysis: AnalysisResult; projectName: string; projectDir: string } | null> {
+export const analyzerInstances = new Map<string, CodeAnalyzer>();
+
+export async function loadAnalysisAsync(
+  projectDir?: string, 
+  force = false, 
+  changedFilePath?: string
+): Promise<{ analysis: AnalysisResult; projectName: string; projectDir: string } | null> {
   const auth = authStorage.getStore();
   const tenantId = auth ? auth.uid : undefined;
   
@@ -459,27 +465,50 @@ export async function loadAnalysisAsync(projectDir?: string, force = false): Pro
     }
     
     // Check in-memory cache first
-    if (!force && inMemoryAnalysisCache.has(target.dir)) {
+    if (!force && !changedFilePath && inMemoryAnalysisCache.has(target.dir)) {
       const cached = inMemoryAnalysisCache.get(target.dir);
       return { analysis: cached, projectName: target.name, projectDir: target.dir };
     }
 
     const projectLabel = `[${target.name}]`;
-    console.error(`[Indexing] 🔍 ${projectLabel} Starting AST indexing: ${target.dir}`);
     const startTime = Date.now();
 
-    const analyzer = new CodeAnalyzer(target.dir, 5000);
-    const result = await analyzer.analyzeProject((percent, done, total) => {
-      console.error(`[Indexing] ⏳ ${projectLabel} ${percent}% (${done}/${total} files)`);
-    });
+    // Cache CodeAnalyzer instance for incremental updates
+    let analyzer = analyzerInstances.get(target.dir);
+    if (!analyzer) {
+      analyzer = new CodeAnalyzer(target.dir, 5000);
+      analyzerInstances.set(target.dir, analyzer);
+    }
+
+    let result: AnalysisResult;
+    
+    if (changedFilePath) {
+      const relPath = path.relative(target.dir, changedFilePath);
+      console.error(`[Indexing] ⚡ ${projectLabel} Incremental indexing file: ${relPath}`);
+      result = await analyzer.analyzeFileIncremental(changedFilePath);
+    } else {
+      console.error(`[Indexing] 🔍 ${projectLabel} Starting AST indexing: ${target.dir}`);
+      result = await analyzer.analyzeProject((percent, done, total) => {
+        console.error(`[Indexing] ⏳ ${projectLabel} ${percent}% (${done}/${total} files)`);
+      });
+    }
 
     const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
-    const { totalFilesAnalyzed, totalFilesSkipped, entityCounts } = result;
-    console.error(
-      `[Indexing] ✅ ${projectLabel} Done in ${elapsed}s — ` +
-      `${totalFilesAnalyzed} files | ${entityCounts.modules} modules | ` +
-      `${entityCounts.classes} classes | ${entityCounts.functions} functions`
-    );
+    const { totalFilesAnalyzed, entityCounts } = result;
+    
+    if (changedFilePath) {
+      console.error(
+        `[Indexing] ✅ ${projectLabel} Incremental re-indexed in ${elapsed}s — ` +
+        `Total: ${totalFilesAnalyzed} files | ${entityCounts.modules} modules | ` +
+        `${entityCounts.classes} classes | ${entityCounts.functions} functions`
+      );
+    } else {
+      console.error(
+        `[Indexing] ✅ ${projectLabel} Done in ${elapsed}s — ` +
+        `${totalFilesAnalyzed} files | ${entityCounts.modules} modules | ` +
+        `${entityCounts.classes} classes | ${entityCounts.functions} functions`
+      );
+    }
     
     // Save in memory
     inMemoryAnalysisCache.set(target.dir, result);

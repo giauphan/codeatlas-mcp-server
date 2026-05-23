@@ -1,6 +1,6 @@
 {
   "name": "codeatlas-enterprise",
-  "version": "2.1.35",
+  "version": "2.1.36",
   "description": "Enterprise-grade local-first MCP server and gateway for CodeAtlas",
   "type": "module",
   "bin": {
