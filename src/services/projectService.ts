@@ -525,19 +525,16 @@ export async function loadAnalysisAsync(
   }
 }
 
-/**
- * Securely syncs local AST analysis to the VPS remote server using a secure HTTPS POST API call
- */
-export async function syncAnalysisToServer(projectName: string, analysis: any): Promise<void> {
+export async function syncAnalysisToServer(projectName: string, analysis: any, businessRule?: string, changeDescription?: string): Promise<void> {
   const apiKey = process.env.CODEATLAS_API_KEY;
   if (!apiKey) {
     console.error("[Auto-Scan] ℹ️ CODEATLAS_API_KEY not set. Local analysis saved but cloud sync skipped.");
-    return;
+    throw new Error("CODEATLAS_API_KEY is not set.");
   }
 
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     try {
-      const payload = JSON.stringify({ projectName, analysis });
+      const payload = JSON.stringify({ projectName, analysis, businessRule, changeDescription });
       const serverUrlStr = process.env.CODEATLAS_API_URL || "https://atlas.genrostore.com";
       const serverUrl = new URL(serverUrlStr);
       
@@ -559,23 +556,27 @@ export async function syncAnalysisToServer(projectName: string, analysis: any): 
         res.on("end", () => {
           if (res.statusCode && res.statusCode >= 200 && res.statusCode < 300) {
             console.error(`[Auto-Scan] ✅ Securely synced ${projectName} AST analysis to CodeAtlas Cloud!`);
+            resolve();
           } else {
-            console.error(`[Auto-Scan] ❌ Secure Cloud Sync failed with status ${res.statusCode}: ${data}`);
+            const errMsg = `Secure Cloud Sync failed with status ${res.statusCode}: ${data}`;
+            console.error(`[Auto-Scan] ❌ ${errMsg}`);
+            reject(new Error(errMsg));
           }
-          resolve();
         });
       });
 
       req.on("error", (e) => {
-        console.error(`[Auto-Scan] ❌ Secure Cloud Sync Network Error: ${e.message}`);
-        resolve();
+        const errMsg = `Secure Cloud Sync Network Error: ${e.message}`;
+        console.error(`[Auto-Scan] ❌ ${errMsg}`);
+        reject(new Error(errMsg));
       });
 
       req.write(payload);
       req.end();
     } catch (err: unknown) {
-      console.error(`[Auto-Scan] ❌ Secure Cloud Sync Initialization Error: ${(err instanceof Error ? err.message : String(err))}`);
-      resolve();
+      const errMsg = `Secure Cloud Sync Initialization Error: ${(err instanceof Error ? err.message : String(err))}`;
+      console.error(`[Auto-Scan] ❌ ${errMsg}`);
+      reject(new Error(errMsg));
     }
   });
 }
