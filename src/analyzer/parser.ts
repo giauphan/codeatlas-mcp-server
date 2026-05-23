@@ -70,7 +70,7 @@ export class CodeAnalyzer {
     // 1. Remove all existing nodes belonging to this file
     const nodesToRemove = new Set<string>();
     this.nodes.forEach((node, id) => {
-      if (node.filePath && path.resolve(node.filePath) === absPath) {
+      if (node.filePath && path.resolve(this.workspaceRoot, node.filePath) === absPath) {
         nodesToRemove.add(id);
       }
     });
@@ -159,7 +159,9 @@ export class CodeAnalyzer {
     for (const node of result.graph.nodes) {
       let folder = '.'; // root
       if (node.filePath) {
-        const rel = path.relative(this.workspaceRoot, node.filePath);
+        const rel = path.isAbsolute(node.filePath)
+          ? path.relative(this.workspaceRoot, node.filePath)
+          : node.filePath;
         folder = path.dirname(rel).replace(/\\/g, '/');
       } else if (node.id.startsWith('module:')) {
         const rel = node.id.replace('module:', '');
@@ -998,6 +1000,9 @@ export class CodeAnalyzer {
   }
 
   private addNode(node: GraphNode) {
+    if (node.filePath && path.isAbsolute(node.filePath)) {
+      node.filePath = path.relative(this.workspaceRoot, node.filePath).replace(/\\/g, '/');
+    }
     if (!this.nodes.has(node.id)) {
       this.nodes.set(node.id, node);
     }
