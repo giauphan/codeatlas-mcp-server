@@ -28,7 +28,7 @@ export class CodeAnalyzer {
     this.fileExtensions = fileExtensions;
   }
 
-  public async analyzeProject(): Promise<AnalysisResult> {
+  public async analyzeProject(onProgress?: (percent: number, done: number, total: number) => void): Promise<AnalysisResult> {
     this.nodes.clear();
     this.links = [];
 
@@ -38,11 +38,21 @@ export class CodeAnalyzer {
       files = files.slice(0, this.maxFiles);
     }
     
+    const total = files.length;
     let totalSkipped = 0;
-    for (const file of files) {
-      const success = this.analyzeFile(file);
-      if (!success) {
-        totalSkipped++;
+    let lastReportedPercent = 0;
+
+    for (let i = 0; i < total; i++) {
+      const success = this.analyzeFile(files[i]);
+      if (!success) totalSkipped++;
+
+      if (onProgress && total > 0) {
+        const percent = Math.floor(((i + 1) / total) * 100);
+        // Report every 10% milestone to avoid log spam
+        if (percent >= lastReportedPercent + 10 || percent === 100) {
+          lastReportedPercent = percent;
+          onProgress(percent, i + 1, total);
+        }
       }
     }
 

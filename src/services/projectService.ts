@@ -464,9 +464,22 @@ export async function loadAnalysisAsync(projectDir?: string, force = false): Pro
       return { analysis: cached, projectName: target.name, projectDir: target.dir };
     }
 
-    console.error(`[Auto-Scan] 🔄 Scanning project dynamically (async, memory-only): ${target.dir}`);
+    const projectLabel = `[${target.name}]`;
+    console.error(`[Indexing] 🔍 ${projectLabel} Starting AST indexing: ${target.dir}`);
+    const startTime = Date.now();
+
     const analyzer = new CodeAnalyzer(target.dir, 5000);
-    const result = await analyzer.analyzeProject();
+    const result = await analyzer.analyzeProject((percent, done, total) => {
+      console.error(`[Indexing] ⏳ ${projectLabel} ${percent}% (${done}/${total} files)`);
+    });
+
+    const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+    const { totalFilesAnalyzed, totalFilesSkipped, entityCounts } = result;
+    console.error(
+      `[Indexing] ✅ ${projectLabel} Done in ${elapsed}s — ` +
+      `${totalFilesAnalyzed} files | ${entityCounts.modules} modules | ` +
+      `${entityCounts.classes} classes | ${entityCounts.functions} functions`
+    );
     
     // Save in memory
     inMemoryAnalysisCache.set(target.dir, result);
