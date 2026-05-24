@@ -12,8 +12,9 @@ export function startWatcher() {
   
   // Only watch explicitly defined project directory if set via env var
   // Real workspace paths will be added dynamically via watchProject() after client handshake
-  if (process.env.CODEATLAS_PROJECT_DIR) {
-    const envPath = path.resolve(process.env.CODEATLAS_PROJECT_DIR);
+  const defaultProjDir = process.env.CODEATLAS_PROJECT_DIR || process.env.GEMINI_CLI_IDE_WORKSPACE_PATH;
+  if (defaultProjDir) {
+    const envPath = path.resolve(defaultProjDir);
     watchPaths.push(envPath);
     activeWatchedPaths.add(envPath);
   }
@@ -43,7 +44,7 @@ export function startWatcher() {
     
     if (indexTimeout) clearTimeout(indexTimeout);
     indexTimeout = setTimeout(() => {
-      const cwd = matchedDir || process.cwd();
+      const cwd = matchedDir || process.env.CODEATLAS_PROJECT_DIR || process.env.GEMINI_CLI_IDE_WORKSPACE_PATH || process.cwd();
       loadAnalysisAsync(cwd, false, filePath).then((loaded) => {
         if (loaded) {
           console.error(`[Auto-Index] ✅ [${projectName}] incremental sync complete.`);

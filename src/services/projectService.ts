@@ -201,25 +201,28 @@ export function discoverProjects(tenantId?: string): { name: string; dir: string
         } catch { /* skip */ }
       }
     } else if (isSystemAdmin) {
-      if (process.env.CODEATLAS_PROJECT_DIR) {
-        searchDirs.push(process.env.CODEATLAS_PROJECT_DIR);
+      const defaultProjDir = process.env.CODEATLAS_PROJECT_DIR || process.env.GEMINI_CLI_IDE_WORKSPACE_PATH;
+      if (defaultProjDir) {
+        searchDirs.push(defaultProjDir);
       }
       searchDirs.push(process.cwd());
     } else {
       return [];
     }
   } else {
-    if (process.env.CODEATLAS_PROJECT_DIR) {
-      searchDirs.push(process.env.CODEATLAS_PROJECT_DIR);
+    const defaultProjDir = process.env.CODEATLAS_PROJECT_DIR || process.env.GEMINI_CLI_IDE_WORKSPACE_PATH;
+    if (defaultProjDir) {
+      searchDirs.push(defaultProjDir);
     }
     
-    // Dynamically search process.cwd() for any projects configured with .codeatlas
-    const localProjects = scanForCodeatlasProjects(process.cwd());
+    // Dynamically search defaultProjDir || process.cwd() for any projects configured with .codeatlas
+    const baseDir = defaultProjDir || process.cwd();
+    const localProjects = scanForCodeatlasProjects(baseDir);
     searchDirs.push(...localProjects);
     
-    // Fallback to process.cwd() if no subprojects were found with .codeatlas configuration
-    if (!searchDirs.includes(process.cwd())) {
-      searchDirs.push(process.cwd());
+    // Fallback to active workspace if no subprojects were found with .codeatlas configuration
+    if (!searchDirs.includes(baseDir)) {
+      searchDirs.push(baseDir);
     }
 
     // Load globally registered projects
@@ -344,25 +347,28 @@ export async function discoverProjectsAsync(tenantId?: string): Promise<{ name: 
         } catch { /* skip */ }
       }
     } else if (isSystemAdmin) {
-      if (process.env.CODEATLAS_PROJECT_DIR) {
-        searchDirs.push(process.env.CODEATLAS_PROJECT_DIR);
+      const defaultProjDir = process.env.CODEATLAS_PROJECT_DIR || process.env.GEMINI_CLI_IDE_WORKSPACE_PATH;
+      if (defaultProjDir) {
+        searchDirs.push(defaultProjDir);
       }
       searchDirs.push(process.cwd());
     } else {
       return [];
     }
   } else {
-    if (process.env.CODEATLAS_PROJECT_DIR) {
-      searchDirs.push(process.env.CODEATLAS_PROJECT_DIR);
+    const defaultProjDir = process.env.CODEATLAS_PROJECT_DIR || process.env.GEMINI_CLI_IDE_WORKSPACE_PATH;
+    if (defaultProjDir) {
+      searchDirs.push(defaultProjDir);
     }
     
-    // Dynamically search process.cwd() for any projects configured with .codeatlas
-    const localProjects = await scanForCodeatlasProjectsAsync(process.cwd());
+    // Dynamically search defaultProjDir || process.cwd() for any projects configured with .codeatlas
+    const baseDir = defaultProjDir || process.cwd();
+    const localProjects = await scanForCodeatlasProjectsAsync(baseDir);
     searchDirs.push(...localProjects);
     
-    // Fallback to process.cwd() if no subprojects were found with .codeatlas configuration
-    if (!searchDirs.includes(process.cwd())) {
-      searchDirs.push(process.cwd());
+    // Fallback to active workspace if no subprojects were found with .codeatlas configuration
+    if (!searchDirs.includes(baseDir)) {
+      searchDirs.push(baseDir);
     }
 
     // Load globally registered projects

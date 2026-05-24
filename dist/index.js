@@ -128,7 +128,7 @@ async function main() {
             console.error(`[Auto-Scan] ⚠️ Failed to list workspace roots from client: ${err}. Falling back to active workspace.`);
         }
         if (!succeeded) {
-            const activeWorkspace = process.env.CODEATLAS_PROJECT_DIR || process.cwd();
+            const activeWorkspace = process.env.CODEATLAS_PROJECT_DIR || process.env.GEMINI_CLI_IDE_WORKSPACE_PATH || process.cwd();
             console.error(`[Auto-Scan] 🔄 Triggering initial background scan for active workspace fallback: ${activeWorkspace}`);
             loadAnalysisAsync(activeWorkspace, true).then((loaded) => {
                 if (loaded) {
