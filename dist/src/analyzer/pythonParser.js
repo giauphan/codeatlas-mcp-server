@@ -11,39 +11,42 @@ export class PythonParser {
             const traverse = (node) => {
                 if (!node || typeof node !== 'object')
                     return;
-                if (node.type === 'ClassDef') {
+                const type = node.type || node.nodeType;
+                if (type === 'ClassDef') {
                     classes.push({
                         name: node.name,
                         parents: node.bases.map((b) => b.id || 'object'),
                         line: node.lineno
                     });
                 }
-                if (node.type === 'FunctionDef' || node.type === 'AsyncFunctionDef') {
+                if (type === 'FunctionDef' || type === 'AsyncFunctionDef') {
                     functions.push({
                         name: node.name,
                         line: node.lineno,
                         indent: node.col_offset
                     });
                 }
-                if (node.type === 'Assign') {
-                    node.targets.forEach((target) => {
-                        if (target.type === 'Name') {
+                if (type === 'Assign') {
+                    node.targets?.forEach((target) => {
+                        const targetType = target.type || target.nodeType;
+                        if (targetType === 'Name') {
                             variables.push({ name: target.id, line: node.lineno });
                         }
                     });
                 }
-                if (node.type === 'Import' || node.type === 'ImportFrom') {
+                if (type === 'Import' || type === 'ImportFrom') {
                     imports.push({
                         source: node.module || '',
-                        names: node.names.map((n) => n.name),
+                        names: node.names?.map((n) => n.name) || [],
                         line: node.lineno
                     });
                 }
-                if (node.type === 'Call') {
-                    if (node.func.type === 'Name') {
+                if (type === 'Call') {
+                    const funcType = node.func?.type || node.func?.nodeType;
+                    if (funcType === 'Name') {
                         calls.push({ name: node.func.id, line: node.lineno });
                     }
-                    else if (node.func.type === 'Attribute') {
+                    else if (funcType === 'Attribute') {
                         calls.push({ name: node.func.attr, line: node.lineno });
                     }
                 }

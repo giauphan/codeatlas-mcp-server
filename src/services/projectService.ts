@@ -666,8 +666,9 @@ export async function loadAnalysisAsync(
       result = await analyzer.analyzeFileIncremental(changedFilePath);
     } else {
       console.error(`[Indexing] 🔍 ${projectLabel} Starting AST indexing: ${target.dir}`);
-      result = await analyzer.analyzeProject((percent, done, total) => {
-        console.error(`[Indexing] ⏳ ${projectLabel} ${percent}% (${done}/${total} files)`);
+      result = await analyzer.analyzeProject((percent, done, total, currentFile) => {
+        const fileMsg = currentFile ? ` — current: ${currentFile}` : '';
+        console.error(`[Indexing] ⏳ ${projectLabel} ${percent}% (${done}/${total} files)${fileMsg}`);
       });
     }
 

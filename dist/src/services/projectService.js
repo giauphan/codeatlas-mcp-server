@@ -641,8 +641,9 @@ export async function loadAnalysisAsync(projectDir, force = false, changedFilePa
         }
         else {
             console.error(`[Indexing] 🔍 ${projectLabel} Starting AST indexing: ${target.dir}`);
-            result = await analyzer.analyzeProject((percent, done, total) => {
-                console.error(`[Indexing] ⏳ ${projectLabel} ${percent}% (${done}/${total} files)`);
+            result = await analyzer.analyzeProject((percent, done, total, currentFile) => {
+                const fileMsg = currentFile ? ` — current: ${currentFile}` : '';
+                console.error(`[Indexing] ⏳ ${projectLabel} ${percent}% (${done}/${total} files)${fileMsg}`);
             });
         }
         const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);

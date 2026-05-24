@@ -20,7 +20,9 @@ export class PythonParser {
       const traverse = (node: any) => {
         if (!node || typeof node !== 'object') return;
 
-        if (node.type === 'ClassDef') {
+        const type = node.type || node.nodeType;
+
+        if (type === 'ClassDef') {
           classes.push({
             name: node.name,
             parents: node.bases.map((b: any) => b.id || 'object'),
@@ -28,7 +30,7 @@ export class PythonParser {
           });
         }
 
-        if (node.type === 'FunctionDef' || node.type === 'AsyncFunctionDef') {
+        if (type === 'FunctionDef' || type === 'AsyncFunctionDef') {
           functions.push({
             name: node.name,
             line: node.lineno,
@@ -36,26 +38,28 @@ export class PythonParser {
           });
         }
 
-        if (node.type === 'Assign') {
-          node.targets.forEach((target: any) => {
-            if (target.type === 'Name') {
+        if (type === 'Assign') {
+          node.targets?.forEach((target: any) => {
+            const targetType = target.type || target.nodeType;
+            if (targetType === 'Name') {
               variables.push({ name: target.id, line: node.lineno });
             }
           });
         }
 
-        if (node.type === 'Import' || node.type === 'ImportFrom') {
+        if (type === 'Import' || type === 'ImportFrom') {
           imports.push({
             source: node.module || '',
-            names: node.names.map((n: any) => n.name),
+            names: node.names?.map((n: any) => n.name) || [],
             line: node.lineno
           });
         }
 
-        if (node.type === 'Call') {
-          if (node.func.type === 'Name') {
+        if (type === 'Call') {
+          const funcType = node.func?.type || node.func?.nodeType;
+          if (funcType === 'Name') {
             calls.push({ name: node.func.id, line: node.lineno });
-          } else if (node.func.type === 'Attribute') {
+          } else if (funcType === 'Attribute') {
             calls.push({ name: node.func.attr, line: node.lineno });
           }
         }

@@ -1,6 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { parse } from '@typescript-eslint/typescript-estree';
+import ignore from 'ignore';
 import { PythonParser } from './pythonParser.js';
 import { PhpParser } from './phpParser.js';
 export class CodeAnalyzer {
@@ -11,12 +12,45 @@ export class CodeAnalyzer {
     excludedDirectories;
     excludedFiles;
     fileExtensions;
+    ignoreFilter = null;
     constructor(workspaceRoot, maxFiles = 5000, excludedDirectories = ['node_modules', 'dist', 'out', '.git', '__pycache__', '.venv', 'venv', 'env', '.env', 'vendor', 'build', '.tox', '.mypy_cache', '.pytest_cache', 'coverage', '.next', '.nuxt'], fileExtensions = ['.ts', '.tsx', '.js', '.jsx', '.py', '.php'], excludedFiles = ['_ide_helper.php', '_ide_helper_models.php', '.phpstorm.meta.php']) {
         this.workspaceRoot = workspaceRoot;
         this.maxFiles = maxFiles;
         this.excludedDirectories = excludedDirectories;
         this.excludedFiles = excludedFiles;
         this.fileExtensions = fileExtensions;
+    }
+    getIgnoreFilter() {
+        if (this.ignoreFilter) {
+            return this.ignoreFilter;
+        }
+        const ig = ignore();
+        // Excluded dirs/files will match relative paths correctly
+        ig.add(this.excludedDirectories);
+        ig.add(this.excludedFiles);
+        const gitignorePath = path.join(this.workspaceRoot, '.gitignore');
+        if (fs.existsSync(gitignorePath)) {
+            try {
+                const gitignoreContent = fs.readFileSync(gitignorePath, 'utf-8');
+                ig.add(gitignoreContent);
+            }
+            catch (e) {
+                console.warn(`[CodeAnalyzer] Failed to read .gitignore at ${gitignorePath}`, e);
+            }
+        }
+        this.ignoreFilter = ig;
+        return ig;
+    }
+    isIgnored(absolutePath, isDirectory) {
+        const relPath = path.relative(this.workspaceRoot, absolutePath);
+        if (!relPath || relPath === '.' || relPath.startsWith('..')) {
+            return false;
+        }
+        let normalizedPath = relPath.replace(/\\/g, '/');
+        if (isDirectory && !normalizedPath.endsWith('/')) {
+            normalizedPath += '/';
+        }
+        return this.getIgnoreFilter().ignores(normalizedPath);
     }
     allFiles = [];
     totalSkippedCount = 0;
@@ -30,18 +64,23 @@ export class CodeAnalyzer {
         }
         this.allFiles = [...files];
         const total = files.length;
+        // Log the files to be indexed
+        const relativeFiles = files.map(f => path.relative(this.workspaceRoot, f));
+        console.error(`[Indexing] 📋 Discovered ${relativeFiles.length} files to index:\n` + relativeFiles.map(f => `  - ${f}`).join('\n'));
         let totalSkipped = 0;
         let lastReportedPercent = 0;
         for (let i = 0; i < total; i++) {
-            const success = this.analyzeFile(files[i]);
+            const filePath = files[i];
+            const success = this.analyzeFile(filePath);
             if (!success)
                 totalSkipped++;
             if (onProgress && total > 0) {
                 const percent = Math.floor(((i + 1) / total) * 100);
+                const relPath = path.relative(this.workspaceRoot, filePath);
                 // Report every 10% milestone to avoid log spam
                 if (percent >= lastReportedPercent + 10 || percent === 100) {
                     lastReportedPercent = percent;
-                    onProgress(percent, i + 1, total);
+                    onProgress(percent, i + 1, total, relPath);
                 }
             }
         }
@@ -65,16 +104,16 @@ export class CodeAnalyzer {
         nodesToRemove.forEach(id => this.nodes.delete(id));
         // 2. Remove all links associated with the removed nodes
         this.links = this.links.filter(link => !nodesToRemove.has(link.source) && !nodesToRemove.has(link.target));
-        // 3. Re-analyze only if file exists
+        // 3. Re-analyze only if file exists and is NOT ignored
         try {
-            if (fs.existsSync(absPath)) {
+            if (fs.existsSync(absPath) && !this.isIgnored(absPath, false)) {
                 this.analyzeFile(absPath);
                 if (!this.allFiles.includes(absPath)) {
                     this.allFiles.push(absPath);
                 }
             }
             else {
-                // File was deleted
+                // File was deleted or is ignored
                 this.allFiles = this.allFiles.filter(f => f !== absPath);
             }
         }
@@ -316,22 +355,39 @@ export class CodeAnalyzer {
     getFiles(dir, fileList = []) {
         if (!fs.existsSync(dir))
             return fileList;
-        const files = fs.readdirSync(dir);
+        // Check if current directory itself is ignored
+        if (dir !== this.workspaceRoot && this.isIgnored(dir, true)) {
+            return fileList;
+        }
+        let files;
+        try {
+            files = fs.readdirSync(dir);
+        }
+        catch {
+            return fileList;
+        }
         for (const file of files) {
-            // Skip excluded directories and hidden directories
-            if (this.excludedDirectories.includes(file) || file.startsWith('.')) {
+            // Keep safety check for hidden files/folders (starting with .)
+            if (file.startsWith('.')) {
                 continue;
             }
             const filePath = path.join(dir, file);
-            const stat = fs.statSync(filePath);
-            if (stat.isDirectory()) {
+            let stat;
+            try {
+                stat = fs.statSync(filePath);
+            }
+            catch {
+                continue;
+            }
+            const isDirectory = stat.isDirectory();
+            // Check if file/directory is ignored via .gitignore or default rules
+            if (this.isIgnored(filePath, isDirectory)) {
+                continue;
+            }
+            if (isDirectory) {
                 this.getFiles(filePath, fileList);
             }
             else if (this.fileExtensions.some(ext => file.endsWith(ext))) {
-                // Skip excluded files
-                if (this.excludedFiles.includes(file)) {
-                    continue;
-                }
                 fileList.push(filePath);
             }
         }
@@ -467,19 +523,25 @@ export class CodeAnalyzer {
             });
         }
         for (const imp of result.imports) {
-            const importSourceId = `external:${imp.source || imp.names[0]}`;
+            const importPathName = imp.source || imp.names[0];
+            if (!importPathName)
+                continue;
+            const resolvedModuleId = this.resolvePythonImportPath(importPathName, filePath);
+            const targetId = resolvedModuleId || `external:${importPathName}`;
             this.addLink({
                 source: moduleId,
-                target: importSourceId,
+                target: targetId,
                 type: 'import'
             });
-            if (!this.nodes.has(importSourceId)) {
-                this.addNode({
-                    id: importSourceId,
-                    label: imp.source || imp.names[0],
-                    type: 'module',
-                    color: '#7209b7'
-                });
+            if (!resolvedModuleId) {
+                if (!this.nodes.has(targetId)) {
+                    this.addNode({
+                        id: targetId,
+                        label: importPathName,
+                        type: 'module',
+                        color: '#7209b7'
+                    });
+                }
             }
         }
         // Build a simple scope tracker from functions list
@@ -895,7 +957,42 @@ export class CodeAnalyzer {
         }
         return `external:${importPath}`;
     }
+    resolvePythonImportPath(importPath, currentFilePath) {
+        let leadingDots = '';
+        let rest = importPath;
+        while (rest.startsWith('.')) {
+            leadingDots += '.';
+            rest = rest.substring(1);
+        }
+        let searchDirs = [];
+        if (leadingDots.length > 0) {
+            let targetDir = path.dirname(currentFilePath);
+            for (let i = 1; i < leadingDots.length; i++) {
+                targetDir = path.dirname(targetDir);
+            }
+            searchDirs = [targetDir];
+        }
+        else {
+            searchDirs = [this.workspaceRoot, path.dirname(currentFilePath)];
+        }
+        const subPath = rest.replace(/\./g, '/');
+        for (const baseDir of searchDirs) {
+            const targetPath = path.join(baseDir, subPath);
+            const pyPath = `${targetPath}.py`;
+            if (fs.existsSync(pyPath)) {
+                return `module:${path.relative(this.workspaceRoot, pyPath).replace(/\\/g, '/')}`;
+            }
+            const initPyPath = path.join(targetPath, '__init__.py');
+            if (fs.existsSync(initPyPath)) {
+                return `module:${path.relative(this.workspaceRoot, initPyPath).replace(/\\/g, '/')}`;
+            }
+        }
+        return null;
+    }
     addNode(node) {
+        if (node.id.startsWith('external:') || node.id.includes(':external:')) {
+            return;
+        }
         if (node.filePath && path.isAbsolute(node.filePath)) {
             node.filePath = path.relative(this.workspaceRoot, node.filePath).replace(/\\/g, '/');
         }
@@ -904,6 +1001,12 @@ export class CodeAnalyzer {
         }
     }
     addLink(link) {
+        if (link.source.startsWith('external:') ||
+            link.target.startsWith('external:') ||
+            link.source.includes(':external:') ||
+            link.target.includes(':external:')) {
+            return;
+        }
         this.links.push(link);
     }
     generateAIInsights(graph) {

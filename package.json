@@ -1,6 +1,6 @@
 {
   "name": "codeatlas-enterprise",
-  "version": "2.1.45",
+  "version": "2.1.47",
   "description": "Enterprise-grade local-first MCP server and gateway for CodeAtlas",
   "type": "module",
   "bin": {
@@ -39,6 +39,7 @@
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
     "glob": "^10.3.10",
+    "ignore": "^7.0.5",
     "py-ast": "^1.9.0",
     "supergateway": "^3.4.3",
     "zod": "^3.22.4"
