@@ -124,6 +124,47 @@ describe("Workspace Path Resolution & Discovery Tests", () => {
                 restore();
             }
         });
+        it("should resolve workspace path from a sibling process (e.g. language server)", () => {
+            const restore = stubFsWrapper({
+                existsSync: (p) => {
+                    if (p === "/proc" || p === "/proc/9999/status" || p === "/proc/5000/status" || p === "/proc/5001/status" || p === "/proc/5001/cmdline")
+                        return true;
+                    const norm = p.replace(/\\/g, "/");
+                    return norm === "/" || norm === "/home" || norm === "/home/biibon" || norm === "/home/biibon/auto-edit-video-reup-tool";
+                },
+                readdirSync: (p) => {
+                    const norm = p.replace(/\\/g, "/");
+                    if (norm === "/proc")
+                        return ["9999", "5000", "5001"];
+                    if (norm === "/")
+                        return ["home"];
+                    if (norm === "/home")
+                        return ["biibon"];
+                    if (norm === "/home/biibon")
+                        return ["auto-edit-video-reup-tool"];
+                    return [];
+                },
+                readFileSync: (p, enc) => {
+                    if (p === "/proc/9999/status")
+                        return "PPid: 5000\n";
+                    if (p === "/proc/5000/status")
+                        return "PPid: 1\n";
+                    if (p === "/proc/5001/status")
+                        return "PPid: 5000\n"; // sibling!
+                    if (p === "/proc/5001/cmdline")
+                        return "--workspace_id\0file_home_biibon_auto_edit_video_reup_tool\0";
+                    return "";
+                }
+            });
+            try {
+                const res = getWorkspaceFromAncestors(9999);
+                assert.ok(res !== null, "Should resolve a path");
+                assert.ok(res.endsWith("auto-edit-video-reup-tool"), `Expected path to end with auto-edit-video-reup-tool, got: ${res}`);
+            }
+            finally {
+                restore();
+            }
+        });
     });
     describe("getWorkspaceFromAncestors traversal loop protection", () => {
         it("should prevent infinite loops and break on matching parent-child loops", () => {

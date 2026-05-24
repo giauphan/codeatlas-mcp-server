@@ -98,6 +98,35 @@ function findDirMatchingNormalized(normalized) {
  */
 export function getWorkspaceFromAncestors(startPid = process.pid) {
     try {
+        // 1. Build a map of PPID -> children PIDs by scanning /proc once.
+        // This allows us to inspect siblings of processes in the ancestor chain.
+        const ppidToChildren = new Map();
+        if (fsWrapper.existsSync('/proc')) {
+            const files = fsWrapper.readdirSync('/proc');
+            for (const file of files) {
+                if (/^\d+$/.test(file)) {
+                    const pid = parseInt(file, 10);
+                    const statusPath = `/proc/${pid}/status`;
+                    try {
+                        if (fsWrapper.existsSync(statusPath)) {
+                            const statusContent = fsWrapper.readFileSync(statusPath, 'utf8');
+                            const ppidMatch = statusContent.match(/^PPid:\s+(\d+)/m);
+                            if (ppidMatch) {
+                                const ppid = parseInt(ppidMatch[1], 10);
+                                if (!ppidToChildren.has(ppid)) {
+                                    ppidToChildren.set(ppid, []);
+                                }
+                                ppidToChildren.get(ppid).push(pid);
+                            }
+                        }
+                    }
+                    catch {
+                        // Ignore access errors on individual processes
+                    }
+                }
+            }
+        }
+        // 2. Traverse up the ancestor chain
         let currentPid = startPid;
         let iterations = 0;
         while (currentPid > 1 && iterations < 100) {
@@ -112,16 +141,40 @@ export function getWorkspaceFromAncestors(startPid = process.pid) {
             const ppid = parseInt(ppidMatch[1], 10);
             if (ppid <= 1 || ppid === currentPid)
                 break;
-            const cmdlinePath = `/proc/${ppid}/cmdline`;
-            if (fsWrapper.existsSync(cmdlinePath)) {
-                const cmdline = fsWrapper.readFileSync(cmdlinePath, 'utf8');
+            // First check: does the parent process itself have the workspace ID?
+            const parentCmdlinePath = `/proc/${ppid}/cmdline`;
+            if (fsWrapper.existsSync(parentCmdlinePath)) {
+                const cmdline = fsWrapper.readFileSync(parentCmdlinePath, 'utf8');
                 const args = cmdline.split('\0');
                 const workspaceIdIndex = args.indexOf('--workspace_id');
                 if (workspaceIdIndex !== -1 && workspaceIdIndex + 1 < args.length) {
                     const workspaceId = args[workspaceIdIndex + 1];
                     if (workspaceId.startsWith('file_')) {
                         const normalized = workspaceId.substring(5);
-                        return findDirMatchingNormalized(normalized);
+                        const dir = findDirMatchingNormalized(normalized);
+                        if (dir)
+                            return dir;
+                    }
+                }
+            }
+            // Second check: check all siblings (other children of ppid)
+            const siblings = ppidToChildren.get(ppid) || [];
+            for (const siblingPid of siblings) {
+                if (siblingPid === currentPid)
+                    continue; // Skip self
+                const cmdlinePath = `/proc/${siblingPid}/cmdline`;
+                if (fsWrapper.existsSync(cmdlinePath)) {
+                    const cmdline = fsWrapper.readFileSync(cmdlinePath, 'utf8');
+                    const args = cmdline.split('\0');
+                    const workspaceIdIndex = args.indexOf('--workspace_id');
+                    if (workspaceIdIndex !== -1 && workspaceIdIndex + 1 < args.length) {
+                        const workspaceId = args[workspaceIdIndex + 1];
+                        if (workspaceId.startsWith('file_')) {
+                            const normalized = workspaceId.substring(5);
+                            const dir = findDirMatchingNormalized(normalized);
+                            if (dir)
+                                return dir;
+                        }
                     }
                 }
             }
