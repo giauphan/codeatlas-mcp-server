@@ -86,7 +86,7 @@ import { server } from "./src/presentation/mcpServer.js";
 // Import Domain / Application Services
 import { checkAuth } from "./src/services/authService.js";
 import { getStats, discoverProjects, loadAnalysis, discoverProjectsAsync, loadAnalysisAsync, getWorkspaceFromAncestors, isSystemIdeDirectory } from "./src/services/projectService.js";
-import { startWatcher } from "./src/services/watcherService.js";
+import { startWatcher, isIndexingEnabledForProject } from "./src/services/watcherService.js";
 // Load environment variables
 dotenv.config();
 // Start server
@@ -107,16 +107,25 @@ async function main() {
                             console.error(`[Auto-Scan] 🛡️ Ignored IDE system/extensions directory from workspace indexing: ${workspacePath}`);
                             continue;
                         }
-                        console.error(`[Auto-Scan] 🔄 Auto-indexing discovered workspace root: ${workspacePath}`);
-                        loadAnalysisAsync(workspacePath, true).then((loaded) => {
-                            if (loaded) {
-                                console.error(`[Auto-Scan] ✅ Auto-indexing complete for workspace root: ${workspacePath}`);
+                        const projectName = path.basename(workspacePath);
+                        isIndexingEnabledForProject(projectName).then((enabled) => {
+                            if (!enabled) {
+                                console.error(`[Auto-Scan] ⏸️  Auto-indexing is disabled on server for project [${projectName}]. Skipping initial scan.`);
+                                return;
                             }
-                            else {
-                                console.error(`[Auto-Scan] ⚠️ Auto-indexing skipped or directory not found for: ${workspacePath}`);
-                            }
+                            console.error(`[Auto-Scan] 🔄 Auto-indexing discovered workspace root: ${workspacePath}`);
+                            loadAnalysisAsync(workspacePath, true).then((loaded) => {
+                                if (loaded) {
+                                    console.error(`[Auto-Scan] ✅ Auto-indexing complete for workspace root: ${workspacePath}`);
+                                }
+                                else {
+                                    console.error(`[Auto-Scan] ⚠️ Auto-indexing skipped or directory not found for: ${workspacePath}`);
+                                }
+                            }).catch((err) => {
+                                console.error(`[Auto-Scan] ❌ Auto-indexing failed for workspace root: ${workspacePath}: ${err}`);
+                            });
                         }).catch((err) => {
-                            console.error(`[Auto-Scan] ❌ Auto-indexing failed for workspace root: ${workspacePath}: ${err}`);
+                            console.error(`[Auto-Scan] ⚠️ Failed to verify indexing status: ${err}. Skipping initial scan.`);
                         });
                     }
                     else {
@@ -137,16 +146,25 @@ async function main() {
                 console.error(`[Auto-Scan] 🛡️ Ignored IDE system/extensions directory from workspace indexing fallback: ${activeWorkspace}`);
             }
             else {
-                console.error(`[Auto-Scan] 🔄 Triggering initial background scan for active workspace fallback: ${activeWorkspace}`);
-                loadAnalysisAsync(activeWorkspace, true).then((loaded) => {
-                    if (loaded) {
-                        console.error(`[Auto-Scan] ✅ Initial background scan complete for fallback: ${activeWorkspace}`);
+                const projectName = path.basename(activeWorkspace);
+                isIndexingEnabledForProject(projectName).then((enabled) => {
+                    if (!enabled) {
+                        console.error(`[Auto-Scan] ⏸️  Auto-indexing is disabled on server for project [${projectName}]. Skipping fallback scan.`);
+                        return;
                     }
-                    else {
-                        console.error(`[Auto-Scan] ⚠️ Initial background scan skipped or directory not found for fallback: ${activeWorkspace}`);
-                    }
+                    console.error(`[Auto-Scan] 🔄 Triggering initial background scan for active workspace fallback: ${activeWorkspace}`);
+                    loadAnalysisAsync(activeWorkspace, true).then((loaded) => {
+                        if (loaded) {
+                            console.error(`[Auto-Scan] ✅ Initial background scan complete for fallback: ${activeWorkspace}`);
+                        }
+                        else {
+                            console.error(`[Auto-Scan] ⚠️ Initial background scan skipped or directory not found for fallback: ${activeWorkspace}`);
+                        }
+                    }).catch((err) => {
+                        console.error(`[Auto-Scan] ❌ Initial background scan failed for fallback: ${err}`);
+                    });
                 }).catch((err) => {
-                    console.error(`[Auto-Scan] ❌ Initial background scan failed for fallback: ${err}`);
+                    console.error(`[Auto-Scan] ⚠️ Failed to verify indexing status: ${err}. Skipping fallback scan.`);
                 });
             }
         }
