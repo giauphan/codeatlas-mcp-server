@@ -85,7 +85,7 @@ console.error = (...args) => {
 import { server } from "./src/presentation/mcpServer.js";
 // Import Domain / Application Services
 import { checkAuth } from "./src/services/authService.js";
-import { getStats, discoverProjects, loadAnalysis, discoverProjectsAsync, loadAnalysisAsync } from "./src/services/projectService.js";
+import { getStats, discoverProjects, loadAnalysis, discoverProjectsAsync, loadAnalysisAsync, getWorkspaceFromAncestors } from "./src/services/projectService.js";
 import { startWatcher } from "./src/services/watcherService.js";
 // Load environment variables
 dotenv.config();
@@ -128,7 +128,7 @@ async function main() {
             console.error(`[Auto-Scan] ⚠️ Failed to list workspace roots from client: ${err}. Falling back to active workspace.`);
         }
         if (!succeeded) {
-            const activeWorkspace = process.env.CODEATLAS_PROJECT_DIR || process.env.GEMINI_CLI_IDE_WORKSPACE_PATH || process.cwd();
+            const activeWorkspace = process.env.CODEATLAS_PROJECT_DIR || getWorkspaceFromAncestors() || process.env.GEMINI_CLI_IDE_WORKSPACE_PATH || process.cwd();
             console.error(`[Auto-Scan] 🔄 Triggering initial background scan for active workspace fallback: ${activeWorkspace}`);
             loadAnalysisAsync(activeWorkspace, true).then((loaded) => {
                 if (loaded) {

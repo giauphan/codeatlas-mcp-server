@@ -96,7 +96,8 @@ import {
   loadAnalysis, 
   discoverProjectsAsync, 
   loadAnalysisAsync, 
-  fileExists 
+  fileExists,
+  getWorkspaceFromAncestors
 } from "./src/services/projectService.js";
 import { startWatcher } from "./src/services/watcherService.js";
 
@@ -140,7 +141,7 @@ async function main() {
     }
 
     if (!succeeded) {
-      const activeWorkspace = process.env.CODEATLAS_PROJECT_DIR || process.env.GEMINI_CLI_IDE_WORKSPACE_PATH || process.cwd();
+      const activeWorkspace = process.env.CODEATLAS_PROJECT_DIR || getWorkspaceFromAncestors() || process.env.GEMINI_CLI_IDE_WORKSPACE_PATH || process.cwd();
       console.error(`[Auto-Scan] 🔄 Triggering initial background scan for active workspace fallback: ${activeWorkspace}`);
       loadAnalysisAsync(activeWorkspace, true).then((loaded) => {
         if (loaded) {

@@ -10,6 +10,12 @@ export interface AnalysisResultLocal extends AnalysisResult {
   stats?: { files: number; functions: number; classes: number; dependencies: number; circularDeps: number; deadCode: number };
 }
 
+export const fsWrapper = {
+  existsSync: (p: string) => fs.existsSync(p),
+  readFileSync: (p: string, encoding: "utf8") => fs.readFileSync(p, encoding),
+  readdirSync: (p: string) => fs.readdirSync(p)
+};
+
 /** Unified stats helper */
 export function getStats(analysis: AnalysisResultLocal) {
   const ec = analysis.entityCounts;
@@ -23,6 +29,119 @@ export function getStats(analysis: AnalysisResultLocal) {
     circularDeps: ec?.circularDeps ?? st?.circularDeps ?? 0,
     deadCode: ec?.deadCode ?? st?.deadCode ?? 0,
   };
+}
+
+function findDirMatchingNormalized(normalized: string): string | null {
+  if (!/^[a-zA-Z0-9_]+$/.test(normalized)) {
+    return null;
+  }
+
+  const directPath = "/" + normalized.replace(/_/g, "/");
+  if (fsWrapper.existsSync(directPath)) {
+    return directPath;
+  }
+  
+  const parts = normalized.split("_").filter(Boolean);
+  if (parts.length === 0) return null;
+  
+  let currentPath = "/";
+  for (let i = 0; i < parts.length; i++) {
+    if (!fsWrapper.existsSync(currentPath)) return null;
+    
+    try {
+      const files = fsWrapper.readdirSync(currentPath);
+      let matchedEntry = "";
+      let matchedPartCount = 0;
+      let matchedIsExactCase = false;
+      
+      for (const file of files) {
+        const normFile = file.replace(/[^a-zA-Z0-9]/g, "_");
+        const normFileParts = normFile.split("_").filter(Boolean);
+        if (normFileParts.length === 0) continue;
+        
+        let match = true;
+        let isExactCase = true;
+        for (let j = 0; j < normFileParts.length; j++) {
+          if (i + j >= parts.length) {
+            match = false;
+            break;
+          }
+          const partA = parts[i + j];
+          const partB = normFileParts[j];
+          if (partA.toLowerCase() !== partB.toLowerCase()) {
+            match = false;
+            break;
+          }
+          if (partA !== partB) {
+            isExactCase = false;
+          }
+        }
+        
+        if (match) {
+          if (normFileParts.length > matchedPartCount || (normFileParts.length === matchedPartCount && isExactCase && !matchedIsExactCase)) {
+            matchedEntry = file;
+            matchedPartCount = normFileParts.length;
+            matchedIsExactCase = isExactCase;
+          }
+        }
+      }
+      
+      if (matchedEntry) {
+        currentPath = path.join(currentPath, matchedEntry);
+        i += matchedPartCount - 1;
+      } else {
+        currentPath = path.join(currentPath, parts[i]);
+      }
+    } catch {
+      return null;
+    }
+  }
+  
+  if (fsWrapper.existsSync(currentPath)) {
+    return currentPath;
+  }
+  return null;
+}
+
+/**
+ * Discovers workspace directory by traversing ancestor processes via /proc.
+ * @param startPid - Process ID to start traversal from (defaults to current process)
+ * @returns Resolved workspace directory path, or null if not found or on unsupported platforms
+ * @platform Linux only - requires /proc filesystem
+ */
+export function getWorkspaceFromAncestors(startPid: number = process.pid): string | null {
+  try {
+    let currentPid = startPid;
+    let iterations = 0;
+    while (currentPid > 1 && iterations < 100) {
+      iterations++;
+      const statusPath = `/proc/${currentPid}/status`;
+      if (!fsWrapper.existsSync(statusPath)) break;
+      const statusContent = fsWrapper.readFileSync(statusPath, 'utf8');
+      const ppidMatch = statusContent.match(/^PPid:\s+(\d+)/m);
+      if (!ppidMatch) break;
+      const ppid = parseInt(ppidMatch[1], 10);
+      if (ppid <= 1 || ppid === currentPid) break;
+
+      const cmdlinePath = `/proc/${ppid}/cmdline`;
+      if (fsWrapper.existsSync(cmdlinePath)) {
+        const cmdline = fsWrapper.readFileSync(cmdlinePath, 'utf8');
+        const args = cmdline.split('\0');
+        const workspaceIdIndex = args.indexOf('--workspace_id');
+        if (workspaceIdIndex !== -1 && workspaceIdIndex + 1 < args.length) {
+          const workspaceId = args[workspaceIdIndex + 1];
+          if (workspaceId.startsWith('file_')) {
+            const normalized = workspaceId.substring(5);
+            return findDirMatchingNormalized(normalized);
+          }
+        }
+      }
+      currentPid = ppid;
+    }
+  } catch {
+    // Ignore and fallback
+  }
+  return null;
 }
 
 export function registerProject(dir: string): void {
@@ -201,7 +320,7 @@ export function discoverProjects(tenantId?: string): { name: string; dir: string
         } catch { /* skip */ }
       }
     } else if (isSystemAdmin) {
-      const defaultProjDir = process.env.CODEATLAS_PROJECT_DIR || process.env.GEMINI_CLI_IDE_WORKSPACE_PATH;
+      const defaultProjDir = process.env.CODEATLAS_PROJECT_DIR || getWorkspaceFromAncestors() || process.env.GEMINI_CLI_IDE_WORKSPACE_PATH;
       if (defaultProjDir) {
         searchDirs.push(defaultProjDir);
       }
@@ -210,7 +329,7 @@ export function discoverProjects(tenantId?: string): { name: string; dir: string
       return [];
     }
   } else {
-    const defaultProjDir = process.env.CODEATLAS_PROJECT_DIR || process.env.GEMINI_CLI_IDE_WORKSPACE_PATH;
+    const defaultProjDir = process.env.CODEATLAS_PROJECT_DIR || getWorkspaceFromAncestors() || process.env.GEMINI_CLI_IDE_WORKSPACE_PATH;
     if (defaultProjDir) {
       searchDirs.push(defaultProjDir);
     }
@@ -347,7 +466,7 @@ export async function discoverProjectsAsync(tenantId?: string): Promise<{ name: 
         } catch { /* skip */ }
       }
     } else if (isSystemAdmin) {
-      const defaultProjDir = process.env.CODEATLAS_PROJECT_DIR || process.env.GEMINI_CLI_IDE_WORKSPACE_PATH;
+      const defaultProjDir = process.env.CODEATLAS_PROJECT_DIR || getWorkspaceFromAncestors() || process.env.GEMINI_CLI_IDE_WORKSPACE_PATH;
       if (defaultProjDir) {
         searchDirs.push(defaultProjDir);
       }
@@ -356,7 +475,7 @@ export async function discoverProjectsAsync(tenantId?: string): Promise<{ name: 
       return [];
     }
   } else {
-    const defaultProjDir = process.env.CODEATLAS_PROJECT_DIR || process.env.GEMINI_CLI_IDE_WORKSPACE_PATH;
+    const defaultProjDir = process.env.CODEATLAS_PROJECT_DIR || getWorkspaceFromAncestors() || process.env.GEMINI_CLI_IDE_WORKSPACE_PATH;
     if (defaultProjDir) {
       searchDirs.push(defaultProjDir);
     }
