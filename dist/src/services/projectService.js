@@ -249,6 +249,23 @@ export async function fileExists(filePath) {
         return false;
     }
 }
+export function isSystemIdeDirectory(dir) {
+    try {
+        const absPath = path.resolve(dir.trim());
+        if (absPath === "/config/Downloads/Antigravity" || absPath.startsWith("/config/Downloads/Antigravity/")) {
+            return true;
+        }
+        // Check if it's the IDE resources directory
+        if (fsWrapper.existsSync(path.join(absPath, "resources", "app", "extensions")) ||
+            fsWrapper.existsSync(path.join(absPath, "resources", "app", "out", "vs"))) {
+            return true;
+        }
+    }
+    catch {
+        // Ignore errors
+    }
+    return false;
+}
 export function scanForCodeatlasProjects(parentDir) {
     const discovered = [];
     try {
@@ -406,6 +423,8 @@ export function discoverProjects(tenantId) {
         if (seen.has(dir))
             continue;
         seen.add(dir);
+        if (isSystemIdeDirectory(dir))
+            continue;
         if (isProjectDirectory(dir)) {
             try {
                 const analysisPath = path.join(dir, ".codeatlas", "analysis.json");
@@ -438,6 +457,10 @@ export function loadAnalysis(projectDir, force = false) {
     let target = projects[0];
     if (projectDir) {
         const absPath = path.resolve(projectDir.trim());
+        if (isSystemIdeDirectory(absPath)) {
+            console.warn(`[Auto-Scan] 🛡️ Ignored IDE system/extensions directory from workspace indexing: ${absPath}`);
+            return null;
+        }
         let match = projects.find((p) => p.dir === absPath || p.name.toLowerCase() === projectDir.trim().toLowerCase());
         if (match) {
             target = match;
@@ -551,6 +574,8 @@ export async function discoverProjectsAsync(tenantId) {
         if (seen.has(dir))
             continue;
         seen.add(dir);
+        if (isSystemIdeDirectory(dir))
+            continue;
         if (await isProjectDirectoryAsync(dir)) {
             try {
                 const analysisPath = path.join(dir, ".codeatlas", "analysis.json");
@@ -584,6 +609,10 @@ export async function loadAnalysisAsync(projectDir, force = false, changedFilePa
     let target = projects[0];
     if (projectDir) {
         const absPath = path.resolve(projectDir.trim());
+        if (isSystemIdeDirectory(absPath)) {
+            console.warn(`[Auto-Scan] 🛡️ Ignored IDE system/extensions directory from workspace indexing: ${absPath}`);
+            return null;
+        }
         let match = projects.find((p) => p.dir === absPath || p.name.toLowerCase() === projectDir.trim().toLowerCase());
         if (match) {
             target = match;

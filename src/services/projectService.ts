@@ -261,6 +261,23 @@ export async function fileExists(filePath: string): Promise<boolean> {
   }
 }
 
+export function isSystemIdeDirectory(dir: string): boolean {
+  try {
+    const absPath = path.resolve(dir.trim());
+    if (absPath === "/config/Downloads/Antigravity" || absPath.startsWith("/config/Downloads/Antigravity/")) {
+      return true;
+    }
+    // Check if it's the IDE resources directory
+    if (fsWrapper.existsSync(path.join(absPath, "resources", "app", "extensions")) ||
+        fsWrapper.existsSync(path.join(absPath, "resources", "app", "out", "vs"))) {
+      return true;
+    }
+  } catch {
+    // Ignore errors
+  }
+  return false;
+}
+
 export function scanForCodeatlasProjects(parentDir: string): string[] {
   const discovered: string[] = [];
   try {
@@ -418,6 +435,7 @@ export function discoverProjects(tenantId?: string): { name: string; dir: string
   for (const dir of searchDirs) {
     if (seen.has(dir)) continue;
     seen.add(dir);
+    if (isSystemIdeDirectory(dir)) continue;
 
     if (isProjectDirectory(dir)) {
       try {
@@ -453,6 +471,10 @@ export function loadAnalysis(projectDir?: string, force = false): { analysis: An
 
   if (projectDir) {
     const absPath = path.resolve(projectDir.trim());
+    if (isSystemIdeDirectory(absPath)) {
+      console.warn(`[Auto-Scan] 🛡️ Ignored IDE system/extensions directory from workspace indexing: ${absPath}`);
+      return null;
+    }
     let match = projects.find(
       (p) => p.dir === absPath || p.name.toLowerCase() === projectDir.trim().toLowerCase()
     );
@@ -565,6 +587,7 @@ export async function discoverProjectsAsync(tenantId?: string): Promise<{ name: 
   for (const dir of searchDirs) {
     if (seen.has(dir)) continue;
     seen.add(dir);
+    if (isSystemIdeDirectory(dir)) continue;
 
     if (await isProjectDirectoryAsync(dir)) {
       try {
@@ -606,6 +629,10 @@ export async function loadAnalysisAsync(
 
   if (projectDir) {
     const absPath = path.resolve(projectDir.trim());
+    if (isSystemIdeDirectory(absPath)) {
+      console.warn(`[Auto-Scan] 🛡️ Ignored IDE system/extensions directory from workspace indexing: ${absPath}`);
+      return null;
+    }
     let match = projects.find(
       (p) => p.dir === absPath || p.name.toLowerCase() === projectDir.trim().toLowerCase()
     );

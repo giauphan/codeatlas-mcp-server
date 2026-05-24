@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import * as assert from "node:assert";
-import { getWorkspaceFromAncestors, fsWrapper } from "./projectService.js";
+import { getWorkspaceFromAncestors, fsWrapper, isSystemIdeDirectory } from "./projectService.js";
 
 // Helper to temporarily stub fsWrapper functions
 function stubFsWrapper(stubs: { existsSync?: (p: string) => boolean; readFileSync?: (p: string, encoding: any) => string; readdirSync?: (p: string) => string[] }) {
@@ -162,6 +162,29 @@ describe("Workspace Path Resolution & Discovery Tests", () => {
       try {
         const res = getWorkspaceFromAncestors(9999);
         assert.strictEqual(res, null, "Should break immediately on self-loop PPid");
+      } finally {
+        restore();
+      }
+    });
+  });
+
+  describe("isSystemIdeDirectory exclusion checks", () => {
+    it("should flag system IDE directories and subdirectories", () => {
+      assert.strictEqual(isSystemIdeDirectory("/config/Downloads/Antigravity"), true);
+      assert.strictEqual(isSystemIdeDirectory("/config/Downloads/Antigravity/resources/app"), true);
+      assert.strictEqual(isSystemIdeDirectory("/home/biibon/codeatlas-mcp-enterprise"), false);
+    });
+
+    it("should detect IDE resources directory content structure", () => {
+      const restore = stubFsWrapper({
+        existsSync: (p: string) => {
+          const norm = p.replace(/\\/g, "/");
+          return norm === "/some/custom/path/resources/app/extensions" || norm === "/some/custom/path/resources/app/out/vs";
+        }
+      });
+      try {
+        assert.strictEqual(isSystemIdeDirectory("/some/custom/path"), true);
+        assert.strictEqual(isSystemIdeDirectory("/other/path"), false);
       } finally {
         restore();
       }

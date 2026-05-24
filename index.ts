@@ -97,7 +97,8 @@ import {
   discoverProjectsAsync, 
   loadAnalysisAsync, 
   fileExists,
-  getWorkspaceFromAncestors
+  getWorkspaceFromAncestors,
+  isSystemIdeDirectory
 } from "./src/services/projectService.js";
 import { startWatcher } from "./src/services/watcherService.js";
 
@@ -119,6 +120,10 @@ async function main() {
         for (const root of result.roots) {
           if (root.uri.startsWith("file://")) {
             const workspacePath = fileURLToPath(root.uri).trim();
+            if (isSystemIdeDirectory(workspacePath)) {
+              console.error(`[Auto-Scan] 🛡️ Ignored IDE system/extensions directory from workspace indexing: ${workspacePath}`);
+              continue;
+            }
             console.error(`[Auto-Scan] 🔄 Auto-indexing discovered workspace root: ${workspacePath}`);
             loadAnalysisAsync(workspacePath, true).then((loaded) => {
               if (loaded) {
@@ -142,16 +147,20 @@ async function main() {
 
     if (!succeeded) {
       const activeWorkspace = process.env.CODEATLAS_PROJECT_DIR || getWorkspaceFromAncestors() || process.env.GEMINI_CLI_IDE_WORKSPACE_PATH || process.cwd();
-      console.error(`[Auto-Scan] 🔄 Triggering initial background scan for active workspace fallback: ${activeWorkspace}`);
-      loadAnalysisAsync(activeWorkspace, true).then((loaded) => {
-        if (loaded) {
-          console.error(`[Auto-Scan] ✅ Initial background scan complete for fallback: ${activeWorkspace}`);
-        } else {
-          console.error(`[Auto-Scan] ⚠️ Initial background scan skipped or directory not found for fallback: ${activeWorkspace}`);
-        }
-      }).catch((err) => {
-        console.error(`[Auto-Scan] ❌ Initial background scan failed for fallback: ${err}`);
-      });
+      if (isSystemIdeDirectory(activeWorkspace)) {
+        console.error(`[Auto-Scan] 🛡️ Ignored IDE system/extensions directory from workspace indexing fallback: ${activeWorkspace}`);
+      } else {
+        console.error(`[Auto-Scan] 🔄 Triggering initial background scan for active workspace fallback: ${activeWorkspace}`);
+        loadAnalysisAsync(activeWorkspace, true).then((loaded) => {
+          if (loaded) {
+            console.error(`[Auto-Scan] ✅ Initial background scan complete for fallback: ${activeWorkspace}`);
+          } else {
+            console.error(`[Auto-Scan] ⚠️ Initial background scan skipped or directory not found for fallback: ${activeWorkspace}`);
+          }
+        }).catch((err) => {
+          console.error(`[Auto-Scan] ❌ Initial background scan failed for fallback: ${err}`);
+        });
+      }
     }
   }
 
