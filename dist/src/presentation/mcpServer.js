@@ -955,7 +955,7 @@ export function registerTools(server) {
 // Create the global MCP server instance
 export const server = new McpServer({
     name: "CodeAtlas",
-    version: "2.1.41",
+    version: "2.1.42",
 }, {
     capabilities: {
         resources: {},

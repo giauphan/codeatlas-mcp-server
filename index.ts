@@ -37,6 +37,21 @@ if (apiKeyArgIndex !== -1) {
   }
 }
 
+// Parse command line arguments for projectDir
+const projectDirArgIndex = process.argv.findIndex(arg => arg.startsWith('--projectDir'));
+if (projectDirArgIndex !== -1) {
+  const arg = process.argv[projectDirArgIndex];
+  let val = '';
+  if (arg.includes('=')) {
+    val = arg.split('=')[1];
+  } else if (projectDirArgIndex + 1 < process.argv.length) {
+    val = process.argv[projectDirArgIndex + 1];
+  }
+  if (val) {
+    process.env.CODEATLAS_PROJECT_DIR = val;
+  }
+}
+
 // Async logging queue to prevent blocking the Event Loop on console.error
 const logQueue: string[] = [];
 let isWritingLogs = false;
@@ -125,7 +140,7 @@ async function main() {
     }
 
     if (!succeeded) {
-      const activeWorkspace = process.cwd();
+      const activeWorkspace = process.env.CODEATLAS_PROJECT_DIR || process.cwd();
       console.error(`[Auto-Scan] 🔄 Triggering initial background scan for active workspace fallback: ${activeWorkspace}`);
       loadAnalysisAsync(activeWorkspace, true).then((loaded) => {
         if (loaded) {
