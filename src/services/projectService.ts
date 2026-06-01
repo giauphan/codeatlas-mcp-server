@@ -267,6 +267,14 @@ export function isSystemIdeDirectory(dir: string): boolean {
     if (absPath === "/config/Downloads/Antigravity" || absPath.startsWith("/config/Downloads/Antigravity/")) {
       return true;
     }
+    
+    // Dynamically resolve ~/.gemini/antigravity across operating systems
+    const homeDir = os.homedir();
+    const dynamicAntigravityPath = path.resolve(path.join(homeDir, ".gemini", "antigravity"));
+    if (absPath === dynamicAntigravityPath || absPath.startsWith(dynamicAntigravityPath + path.sep)) {
+      return true;
+    }
+
     // Check if it's the IDE resources directory
     if (fsWrapper.existsSync(path.join(absPath, "resources", "app", "extensions")) ||
         fsWrapper.existsSync(path.join(absPath, "resources", "app", "out", "vs"))) {
@@ -731,8 +739,54 @@ export async function loadAnalysisAsync(
   }
 }
 
+export function getResolvedApiKey(): string | undefined {
+  let key = process.env.CODEATLAS_API_KEY;
+  if (key && (key.startsWith("ca_") || key.startsWith("test-"))) {
+    return key;
+  }
+
+  const homeDir = os.homedir();
+  const pathsToTry = [
+    path.join(homeDir, ".gemini", "antigravity", "mcp_config.json"),
+    path.join(homeDir, ".cursor", "mcp.json"),
+    path.join(homeDir, ".codeatlas", "config.json"),
+    path.join(homeDir, ".config", "Claude", "claude_desktop_config.json"),
+    path.join(homeDir, "Library", "Application Support", "Claude", "claude_desktop_config.json"),
+    path.join(homeDir, "AppData", "Roaming", "Claude", "claude_desktop_config.json"),
+  ];
+
+  for (const filePath of pathsToTry) {
+    try {
+      if (fs.existsSync(filePath)) {
+        const content = fs.readFileSync(filePath, "utf8");
+        const parsed = JSON.parse(content);
+        
+        if (parsed.mcpServers?.codeatlas?.env?.CODEATLAS_API_KEY) {
+          const foundKey = parsed.mcpServers.codeatlas.env.CODEATLAS_API_KEY;
+          if (foundKey && typeof foundKey === 'string' && foundKey.trim().length > 0) {
+            return foundKey.trim();
+          }
+        }
+        
+        for (const serverName of Object.keys(parsed.mcpServers || {})) {
+          if (serverName.toLowerCase().includes("codeatlas")) {
+            const foundKey = parsed.mcpServers[serverName]?.env?.CODEATLAS_API_KEY;
+            if (foundKey && typeof foundKey === 'string' && foundKey.trim().length > 0) {
+              return foundKey.trim();
+            }
+          }
+        }
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  return undefined;
+}
+
 export async function syncAnalysisToServer(projectName: string, analysis: any, businessRule?: string, changeDescription?: string): Promise<void> {
-  const apiKey = process.env.CODEATLAS_API_KEY;
+  const apiKey = getResolvedApiKey();
   if (!apiKey) {
     console.error("[Auto-Scan] ℹ️ CODEATLAS_API_KEY not set. Local analysis saved but cloud sync skipped.");
     throw new Error("CODEATLAS_API_KEY is not set.");

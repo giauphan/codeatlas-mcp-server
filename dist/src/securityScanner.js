@@ -5,10 +5,26 @@ export class SecurityScanner {
     static scan(analysis) {
         const findings = [];
         const nodes = analysis.graph.nodes;
+        // Helper to identify test, mock or diagnostic files
+        const isTestOrMockFile = (filePath) => {
+            const fp = filePath.toLowerCase().replace(/\\/g, "/");
+            return (fp.includes("/tests/") ||
+                fp.includes("/test/") ||
+                fp.includes("/__tests__/") ||
+                fp.includes(".test.") ||
+                fp.includes(".spec.") ||
+                fp.includes("/mocks/") ||
+                fp.includes("/mock/") ||
+                fp.includes("/scratch/") ||
+                fp.includes("/diagnostic/"));
+        };
         // 1. Detect Hardcoded Secrets
         const secretKeywords = ["api_key", "secret", "password", "token", "private_key", "access_key"];
-        nodes.forEach(node => {
+        nodes.forEach((node) => {
             if (node.type === "variable") {
+                if (node.filePath && isTestOrMockFile(node.filePath)) {
+                    return;
+                }
                 const name = node.label.toLowerCase();
                 if (secretKeywords.some(k => name.includes(k))) {
                     findings.push({
@@ -23,8 +39,11 @@ export class SecurityScanner {
         });
         // 2. Detect Unsafe Functions (eval, exec, etc.)
         const unsafeFuncs = ["eval", "exec", "system", "child_process", "spawn", "shell_exec"];
-        nodes.forEach(node => {
+        nodes.forEach((node) => {
             if (node.type === "function") {
+                if (node.filePath && isTestOrMockFile(node.filePath)) {
+                    return;
+                }
                 const name = node.label.toLowerCase();
                 if (unsafeFuncs.includes(name)) {
                     findings.push({
@@ -40,9 +59,15 @@ export class SecurityScanner {
         // 3. Detect Potential SQL Injection
         // Look for functions containing "query" or "execute" that are connected to variables
         // (Simplified heuristic for static analysis)
-        nodes.forEach(node => {
+        nodes.forEach((node) => {
             if (node.type === "function" && (node.label.includes("Query") || node.label.includes("execute"))) {
-                // If it's a dynamic query (heuristic)
+                if (node.filePath && isTestOrMockFile(node.filePath)) {
+                    return;
+                }
+                // Avoid UseCase classes (Command pattern)
+                if (node.label === "execute" || node.label.endsWith("UseCase")) {
+                    return;
+                }
                 findings.push({
                     severity: "MEDIUM",
                     type: "SQL_INJECTION_RISK",

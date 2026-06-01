@@ -1,7 +1,7 @@
 import chokidar from 'chokidar';
 import * as path from 'path';
 import * as https from 'https';
-import { loadAnalysisAsync, registerOnProjectLoaded, getWorkspaceFromAncestors } from './projectService.js';
+import { loadAnalysisAsync, registerOnProjectLoaded, getWorkspaceFromAncestors, getResolvedApiKey } from './projectService.js';
 
 export const httpsWrapper = {
   request: https.request
@@ -12,7 +12,7 @@ export let watcher: any = null;
 export const activeWatchedPaths = new Set<string>();
 
 export async function isIndexingEnabledForProject(projectName: string): Promise<boolean> {
-  const apiKey = process.env.CODEATLAS_API_KEY;
+  const apiKey = getResolvedApiKey();
   if (!apiKey) return true;
 
   return new Promise<boolean>((resolve) => {
