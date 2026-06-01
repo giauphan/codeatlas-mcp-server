@@ -2,7 +2,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import * as path from "path";
 import { checkAuth, logActivity } from "../services/authService.js";
-import { discoverProjectsAsync, loadAnalysisAsync, getStats, fileExists, syncAnalysisToServer, inMemoryAnalysisCache } from "../services/projectService.js";
+import { discoverProjectsAsync, loadAnalysisAsync, getStats, fileExists, syncAnalysisToServer, getEpisodicMemoriesFromServer, inMemoryAnalysisCache } from "../services/projectService.js";
 import { CodeAnalyzer } from "../analyzer/parser.js";
 import { SecurityScanner } from "../securityScanner.js";
 export function registerTools(server) {
@@ -443,6 +443,32 @@ export function registerTools(server) {
                 : `System memory sync failed or skipped: ${syncError}`,
         };
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+    });
+    // Tool 7.5: Get System Memory (Episodic memories like business rules and change logs)
+    server.tool("get_system_memory", "Retrieve the auto-generated system documentation and episodic memories (business rules and change logs) for a project from CodeAtlas Cloud / Oracle 26ai.", {
+        project: z.string().optional().describe("Project name or path"),
+        eventType: z.enum(["all", "BUSINESS_RULE", "CHANGE_LOG"]).optional().default("all").describe("Filter by event type"),
+    }, async ({ project, eventType }) => {
+        const auth = await checkAuth();
+        await logActivity(auth, "get_system_memory", { project, eventType });
+        const loaded = await loadAnalysisAsync(project);
+        if (!loaded) {
+            return { content: [{ type: "text", text: "No analysis data found. Run 'analyze' tool first." }] };
+        }
+        try {
+            const filterType = eventType === "all" ? undefined : eventType;
+            const memories = await getEpisodicMemoriesFromServer(loaded.projectName, filterType);
+            const result = {
+                success: true,
+                project: loaded.projectName,
+                count: memories.length,
+                memories: memories
+            };
+            return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+        }
+        catch (err) {
+            return { content: [{ type: "text", text: `Failed to retrieve system memory: ${err instanceof Error ? err.message : String(err)}` }], isError: true };
+        }
     });
     // Tool 8: Trace Feature Flow
     server.tool("trace_feature_flow", "Trace the complete flow of a feature through the codebase. Given a keyword (e.g. 'login', 'payment', 'crawl'), finds all related files, classes, and functions, then orders them by dependency chain to show the execution flow. This helps AI understand which files to read when working on a feature.", {
@@ -955,7 +981,7 @@ export function registerTools(server) {
 // Create the global MCP server instance
 export const server = new McpServer({
     name: "CodeAtlas",
-    version: "2.1.53",
+    version: "2.2.0",
 }, {
     capabilities: {
         resources: {},

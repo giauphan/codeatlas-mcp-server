@@ -9,6 +9,7 @@ import {
   getStats,
   fileExists,
   syncAnalysisToServer,
+  getEpisodicMemoriesFromServer,
   inMemoryAnalysisCache,
   AnalysisResultLocal
 } from "../services/projectService.js";
@@ -545,6 +546,40 @@ export function registerTools(server: McpServer) {
       };
 
       return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
+    }
+  );
+
+  // Tool 7.5: Get System Memory (Episodic memories like business rules and change logs)
+  server.tool(
+    "get_system_memory",
+    "Retrieve the auto-generated system documentation and episodic memories (business rules and change logs) for a project from CodeAtlas Cloud / Oracle 26ai.",
+    {
+      project: z.string().optional().describe("Project name or path"),
+      eventType: z.enum(["all", "BUSINESS_RULE", "CHANGE_LOG"]).optional().default("all").describe("Filter by event type"),
+    },
+    async ({ project, eventType }: { project?: string; eventType?: "all" | "BUSINESS_RULE" | "CHANGE_LOG" }) => {
+      const auth = await checkAuth();
+      await logActivity(auth, "get_system_memory", { project, eventType });
+      const loaded = await loadAnalysisAsync(project);
+      if (!loaded) {
+        return { content: [{ type: "text" as const, text: "No analysis data found. Run 'analyze' tool first." }] };
+      }
+
+      try {
+        const filterType = eventType === "all" ? undefined : eventType;
+        const memories = await getEpisodicMemoriesFromServer(loaded.projectName, filterType);
+
+        const result = {
+          success: true,
+          project: loaded.projectName,
+          count: memories.length,
+          memories: memories
+        };
+
+        return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
+      } catch (err: any) {
+        return { content: [{ type: "text" as const, text: `Failed to retrieve system memory: ${err instanceof Error ? err.message : String(err)}` }], isError: true };
+      }
     }
   );
 
@@ -1143,7 +1178,7 @@ export function registerTools(server: McpServer) {
 export const server = new McpServer(
   {
     name: "CodeAtlas",
-    version: "2.1.53",
+    version: "2.2.0",
   },
   {
     capabilities: {

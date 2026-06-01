@@ -840,3 +840,61 @@ export async function syncAnalysisToServer(projectName: string, analysis: any, b
     }
   });
 }
+
+export async function getEpisodicMemoriesFromServer(projectName: string, eventType?: "BUSINESS_RULE" | "CHANGE_LOG"): Promise<any[]> {
+  const apiKey = getResolvedApiKey();
+  if (!apiKey) {
+    console.error("[Auto-Scan] ℹ️ CODEATLAS_API_KEY not set. Cannot fetch episodic memory from cloud.");
+    throw new Error("CODEATLAS_API_KEY is not set.");
+  }
+
+  return new Promise((resolve, reject) => {
+    try {
+      const serverUrlStr = process.env.CODEATLAS_API_URL || "https://atlas.genrostore.com";
+      const serverUrl = new URL(serverUrlStr);
+      
+      let pathStr = `/api/projects/memory?projectName=${encodeURIComponent(projectName)}&apiKey=${encodeURIComponent(apiKey)}`;
+      if (eventType) {
+        pathStr += `&eventType=${encodeURIComponent(eventType)}`;
+      }
+
+      const options = {
+        hostname: serverUrl.hostname,
+        port: serverUrl.port || (serverUrl.protocol === "https:" ? 443 : 80),
+        path: pathStr,
+        method: "GET",
+        headers: {
+          "x-api-key": apiKey
+        }
+      };
+
+      const req = https.request(options, (res) => {
+        let data = "";
+        res.on("data", (chunk) => { data += chunk; });
+        res.on("end", () => {
+          if (res.statusCode && res.statusCode >= 200 && res.statusCode < 300) {
+            try {
+              const responseObj = JSON.parse(data);
+              resolve(responseObj.memories || []);
+            } catch (err) {
+              reject(new Error(`Failed to parse memory response: ${data}`));
+            }
+          } else {
+            const errMsg = `Failed to get episodic memory from cloud: status ${res.statusCode}: ${data}`;
+            reject(new Error(errMsg));
+          }
+        });
+      });
+
+      req.on("error", (e) => {
+        const errMsg = `Memory Retrieval Network Error: ${e.message}`;
+        reject(new Error(errMsg));
+      });
+
+      req.end();
+    } catch (error) {
+      reject(error);
+    }
+  });
+}
+
