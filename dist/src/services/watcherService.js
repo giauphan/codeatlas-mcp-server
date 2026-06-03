@@ -1,7 +1,7 @@
 import chokidar from 'chokidar';
 import * as path from 'path';
 import * as https from 'https';
-import { loadAnalysisAsync, registerOnProjectLoaded, getWorkspaceFromAncestors, getResolvedApiKey } from './projectService.js';
+import { loadAnalysisAsync, registerOnProjectLoaded, getWorkspaceFromAncestors, getResolvedApiKey, isSystemIdeDirectory } from './projectService.js';
 export const httpsWrapper = {
     request: https.request
 };
@@ -60,13 +60,16 @@ export async function isIndexingEnabledForProject(projectName) {
 export function startWatcher() {
     registerOnProjectLoaded(watchProject);
     const watchPaths = [];
-    // Only watch explicitly defined project directory if set via env var
-    // Real workspace paths will be added dynamically via watchProject() after client handshake
     const defaultProjDir = process.env.CODEATLAS_PROJECT_DIR || getWorkspaceFromAncestors() || process.env.GEMINI_CLI_IDE_WORKSPACE_PATH;
     if (defaultProjDir) {
         const envPath = path.resolve(defaultProjDir);
-        watchPaths.push(envPath);
-        activeWatchedPaths.add(envPath);
+        if (!isSystemIdeDirectory(envPath)) {
+            watchPaths.push(envPath);
+            activeWatchedPaths.add(envPath);
+        }
+        else {
+            console.error(`[Watcher] 🛡️ Ignored watching system IDE directory at startup: ${envPath}`);
+        }
     }
     watcher = chokidar.watch(watchPaths, {
         ignored: [/(^|[\/\\])\./, '**/node_modules/**', '**/dist/**', '**/build/**', '**/.git/**'],
@@ -124,6 +127,10 @@ export function watchProject(dir) {
     const absPath = path.resolve(dir);
     if (!watcher)
         return;
+    if (isSystemIdeDirectory(absPath)) {
+        console.error(`[Watcher] 🛡️ Ignored watching system IDE directory dynamically: ${absPath}`);
+        return;
+    }
     if (!activeWatchedPaths.has(absPath)) {
         activeWatchedPaths.add(absPath);
         watcher.add(absPath);

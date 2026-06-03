@@ -208,6 +208,9 @@ export function registerProject(dir) {
             projects = [];
         }
         const absPath = path.resolve(dir);
+        if (isSystemIdeDirectory(absPath)) {
+            return;
+        }
         if (!projects.includes(absPath)) {
             projects.push(absPath);
             fs.writeFileSync(regPath, JSON.stringify(projects, null, 2));
@@ -223,18 +226,102 @@ export function registerOnProjectLoaded(cb) {
     onProjectLoadedCallback = cb;
 }
 export const inMemoryAnalysisCache = new Map();
-export function isProjectDirectory(dir) {
+export function getOpenIdeForDir(dir) {
     try {
-        return fs.existsSync(dir) && fs.statSync(dir).isDirectory();
+        const absPath = path.resolve(dir.trim());
+        if (!fs.existsSync('/proc'))
+            return null;
+        const files = fs.readdirSync('/proc');
+        for (const file of files) {
+            if (/^\d+$/.test(file)) {
+                const pid = file;
+                const cmdlinePath = `/proc/${pid}/cmdline`;
+                try {
+                    if (fs.existsSync(cmdlinePath)) {
+                        const cmdline = fs.readFileSync(cmdlinePath, 'utf8');
+                        const args = cmdline.split('\0').filter(Boolean);
+                        if (args.length === 0)
+                            continue;
+                        const hasDirArg = args.some(arg => {
+                            try {
+                                return path.resolve(arg) === absPath;
+                            }
+                            catch {
+                                return false;
+                            }
+                        });
+                        if (hasDirArg) {
+                            const exePath = args[0].toLowerCase();
+                            const ideKeywords = ['code', 'vscode', 'cursor', 'windsurf', 'intellij', 'webstorm', 'phpstorm', 'idea', 'eclipse', 'sublime', 'gemini-cli'];
+                            for (const keyword of ideKeywords) {
+                                if (exePath.includes(keyword)) {
+                                    return path.basename(args[0]);
+                                }
+                            }
+                        }
+                    }
+                }
+                catch {
+                    // ignore
+                }
+            }
+        }
+    }
+    catch {
+        // ignore
+    }
+    return null;
+}
+export function isProjectDirectory(dir) {
+    if (isSystemIdeDirectory(dir)) {
+        return false;
+    }
+    try {
+        if (!fs.existsSync(dir) || !fs.statSync(dir).isDirectory()) {
+            return false;
+        }
+        const gitPath = path.join(dir, ".git");
+        if (fs.existsSync(gitPath)) {
+            return true;
+        }
+        const codeatlasPath = path.join(dir, ".codeatlas");
+        if (fs.existsSync(codeatlasPath)) {
+            return true;
+        }
+        const openIde = getOpenIdeForDir(dir);
+        if (openIde) {
+            console.error(`[Project-Discovery] 🖥️ Project ${dir} is active in IDE: ${openIde}`);
+            return true;
+        }
+        return false;
     }
     catch {
         return false;
     }
 }
 export async function isProjectDirectoryAsync(dir) {
+    if (isSystemIdeDirectory(dir)) {
+        return false;
+    }
     try {
         const stat = await fs.promises.stat(dir);
-        return stat.isDirectory();
+        if (!stat.isDirectory()) {
+            return false;
+        }
+        const gitPath = path.join(dir, ".git");
+        if (await fileExists(gitPath)) {
+            return true;
+        }
+        const codeatlasPath = path.join(dir, ".codeatlas");
+        if (await fileExists(codeatlasPath)) {
+            return true;
+        }
+        const openIde = getOpenIdeForDir(dir);
+        if (openIde) {
+            console.error(`[Project-Discovery] 🖥️ Project ${dir} is active in IDE: ${openIde}`);
+            return true;
+        }
+        return false;
     }
     catch {
         return false;
@@ -259,6 +346,16 @@ export function isSystemIdeDirectory(dir) {
         const homeDir = os.homedir();
         const dynamicAntigravityPath = path.resolve(path.join(homeDir, ".gemini", "antigravity"));
         if (absPath === dynamicAntigravityPath || absPath.startsWith(dynamicAntigravityPath + path.sep)) {
+            return true;
+        }
+        // Ignore home directory itself, system root, or /config root
+        if (absPath === homeDir || absPath === "/" || absPath === "/config") {
+            return true;
+        }
+        // Ignore system/IDE configuration folders starting with a dot (e.g. .codeium, .vscode, .cursor)
+        // but allow double-dot prefixes (like ..projectA)
+        const parts = absPath.split(path.sep);
+        if (parts.some(part => part.startsWith('.') && !part.startsWith('..') && part !== '.codeatlas')) {
             return true;
         }
         // Check if it's the IDE resources directory
@@ -414,7 +511,18 @@ export function discoverProjects(tenantId) {
             if (fs.existsSync(regPath)) {
                 const registered = JSON.parse(fs.readFileSync(regPath, "utf-8"));
                 if (Array.isArray(registered)) {
-                    for (const dir of registered) {
+                    let updated = false;
+                    const filtered = registered.filter((dir) => {
+                        if (isSystemIdeDirectory(dir)) {
+                            updated = true;
+                            return false;
+                        }
+                        return true;
+                    });
+                    if (updated) {
+                        fs.writeFileSync(regPath, JSON.stringify(filtered, null, 2));
+                    }
+                    for (const dir of filtered) {
                         if (fs.existsSync(dir)) {
                             searchDirs.push(dir);
                         }
@@ -565,7 +673,18 @@ export async function discoverProjectsAsync(tenantId) {
                 const data = await fs.promises.readFile(regPath, "utf-8");
                 const registered = JSON.parse(data);
                 if (Array.isArray(registered)) {
-                    for (const dir of registered) {
+                    let updated = false;
+                    const filtered = registered.filter((dir) => {
+                        if (isSystemIdeDirectory(dir)) {
+                            updated = true;
+                            return false;
+                        }
+                        return true;
+                    });
+                    if (updated) {
+                        await fs.promises.writeFile(regPath, JSON.stringify(filtered, null, 2));
+                    }
+                    for (const dir of filtered) {
                         if (await fileExists(dir)) {
                             searchDirs.push(dir);
                         }
@@ -624,28 +743,18 @@ export async function loadAnalysisAsync(projectDir, force = false, changedFilePa
             target = match;
             registerProject(target.dir);
         }
+        else if (await isProjectDirectoryAsync(absPath)) {
+            registerProject(absPath);
+            target = {
+                name: path.basename(absPath),
+                dir: absPath,
+                analysisPath: path.join(absPath, ".codeatlas", "analysis.json"),
+                modifiedAt: new Date()
+            };
+        }
         else {
-            // Accept any valid directory as a scannable project even without .codeatlas
-            try {
-                const stat = await fs.promises.stat(absPath);
-                if (stat.isDirectory()) {
-                    registerProject(absPath);
-                    target = {
-                        name: path.basename(absPath),
-                        dir: absPath,
-                        analysisPath: path.join(absPath, ".codeatlas", "analysis.json"),
-                        modifiedAt: new Date()
-                    };
-                }
-                else {
-                    console.error(`[Auto-Scan] ⚠️ Path is not a directory, skipping: ${absPath}`);
-                    return null;
-                }
-            }
-            catch {
-                console.error(`[Auto-Scan] ⚠️ Directory not accessible, skipping: ${absPath}`);
-                return null;
-            }
+            console.error(`[Auto-Scan] ⚠️ Path is not a valid project directory, skipping: ${absPath}`);
+            return null;
         }
     }
     else if (target) {
