@@ -14,6 +14,7 @@ import {
   inMemoryAnalysisCache,
   AnalysisResultLocal
 } from "../services/projectService.js";
+import { saveDreamMemory, queryDreamMemories } from "../services/dreamingService.js";
 import { CodeAnalyzer } from "../analyzer/parser.js";
 import { SecurityScanner } from "../securityScanner.js";
 
@@ -591,7 +592,97 @@ export function registerTools(server: McpServer) {
     }
   );
 
-  // Tool 8: Trace Feature Flow
+  // Tool 8a: Save Dream Memory
+  server.tool(
+    "save_dream_memory",
+    "Save a dream memory (mistake, preference, knowledge, or pattern) to CodeAtlas Cloud for long-term AI recall. The AI uses this to persist learnings across conversations.",
+    {
+      memory_type: z.enum(["MISTAKE", "PREFERENCE", "KNOWLEDGE", "PATTERN"]).describe("Category of the memory"),
+      content: z.string().describe("The actual memory content or insight"),
+      importance: z.number().min(1).max(10).optional().describe("Importance level from 1 (low) to 10 (critical). Defaults to 5."),
+      session_id: z.string().optional().describe("Optional session identifier for grouping related memories"),
+      project: z.string().optional().describe("Optional project name to associate this memory with"),
+    },
+    async ({ memory_type, content, importance, session_id, project }: { memory_type: "MISTAKE" | "PREFERENCE" | "KNOWLEDGE" | "PATTERN"; content: string; importance?: number; session_id?: string; project?: string }) => {
+      const auth = await checkAuth();
+      await logActivity(auth, "save_dream_memory", { memory_type, content: content.substring(0, 100), importance, session_id, project });
+
+      try {
+        const result = await saveDreamMemory({
+          memory_type,
+          content,
+          importance: importance || 5,
+          session_id,
+          project,
+        });
+
+        return {
+          content: [{
+            type: "text" as const,
+            text: JSON.stringify({
+              success: result.success,
+              id: result.id,
+              memory_type,
+              message: `Dream memory saved successfully with id: ${result.id}`,
+            }, null, 2),
+          }],
+        };
+      } catch (err: unknown) {
+        return {
+          content: [{
+            type: "text" as const,
+            text: `Failed to save dream memory: ${err instanceof Error ? err.message : String(err)}`,
+          }],
+          isError: true,
+        };
+      }
+    }
+  );
+
+  // Tool 8b: Query Dream Memories
+  server.tool(
+    "query_dream_memories",
+    "Query previously saved dream memories from CodeAtlas Cloud. Uses semantic search to find relevant memories based on the query text. Returns memories with relevance scores.",
+    {
+      query: z.string().describe("Natural language query to search for relevant memories"),
+      project: z.string().optional().describe("Optional project name filter to scope the search"),
+      limit: z.number().min(1).max(100).optional().default(10).describe("Maximum number of results to return (default: 10, max: 100)"),
+    },
+    async ({ query, project, limit }: { query: string; project?: string; limit?: number }) => {
+      const auth = await checkAuth();
+      await logActivity(auth, "query_dream_memories", { query: query.substring(0, 100), project, limit });
+
+      try {
+        const memories = await queryDreamMemories({
+          query,
+          project,
+          limit: limit || 10,
+        });
+
+        return {
+          content: [{
+            type: "text" as const,
+            text: JSON.stringify({
+              success: true,
+              count: memories.length,
+              query,
+              memories,
+            }, null, 2),
+          }],
+        };
+      } catch (err: unknown) {
+        return {
+          content: [{
+            type: "text" as const,
+            text: `Failed to query dream memories: ${err instanceof Error ? err.message : String(err)}`,
+          }],
+          isError: true,
+        };
+      }
+    }
+  );
+
+  // Tool 8c: Trace Feature Flow
   server.tool(
     "trace_feature_flow",
     "Trace the complete flow of a feature through the codebase. Given a keyword (e.g. 'login', 'payment', 'crawl'), finds all related files, classes, and functions, then orders them by dependency chain to show the execution flow. This helps AI understand which files to read when working on a feature.",
