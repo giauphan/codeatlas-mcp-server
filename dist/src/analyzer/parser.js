@@ -13,7 +13,9 @@ export class CodeAnalyzer {
     excludedFiles;
     fileExtensions;
     ignoreFilter = null;
-    constructor(workspaceRoot, maxFiles = 5000, excludedDirectories = ['node_modules', 'dist', 'out', '.git', '__pycache__', '.venv', 'venv', 'env', '.env', 'vendor', 'build', '.tox', '.mypy_cache', '.pytest_cache', 'coverage', '.next', '.nuxt'], fileExtensions = ['.ts', '.tsx', '.js', '.jsx', '.py', '.php'], excludedFiles = ['_ide_helper.php', '_ide_helper_models.php', '.phpstorm.meta.php']) {
+    constructor(workspaceRoot, maxFiles = 5000, excludedDirectories = ['node_modules', 'dist', 'out', '.git', '__pycache__', '.venv', 'venv', 'env', '.env', 'vendor', 'build', '.tox', '.mypy_cache', '.pytest_cache', 'coverage', '.next', '.nuxt',
+        // Common user home subdirectories — prevent accidental full-home scans
+        'Downloads', 'Desktop', 'Documents', 'Pictures', 'Music', 'Videos', 'snap', 'go', 'AppData', 'Applications', 'Public', 'Templates'], fileExtensions = ['.ts', '.tsx', '.js', '.jsx', '.py', '.php'], excludedFiles = ['_ide_helper.php', '_ide_helper_models.php', '.phpstorm.meta.php']) {
         this.workspaceRoot = workspaceRoot;
         this.maxFiles = maxFiles;
         this.excludedDirectories = excludedDirectories;
@@ -352,9 +354,15 @@ export class CodeAnalyzer {
         }
         return cycles;
     }
-    getFiles(dir, fileList = []) {
+    getFiles(dir, fileList = [], depth = 0) {
         if (!fs.existsSync(dir))
             return fileList;
+        // Safety: max recursion depth = 20 levels (prevents runaway on broad paths)
+        const MAX_DEPTH = 20;
+        if (depth > MAX_DEPTH) {
+            console.warn(`[CodeAnalyzer] Max depth (${MAX_DEPTH}) reached at ${dir}. Stopping recursion.`);
+            return fileList;
+        }
         // Check if current directory itself is ignored
         if (dir !== this.workspaceRoot && this.isIgnored(dir, true)) {
             return fileList;
@@ -385,7 +393,7 @@ export class CodeAnalyzer {
                 continue;
             }
             if (isDirectory) {
-                this.getFiles(filePath, fileList);
+                this.getFiles(filePath, fileList, depth + 1);
             }
             else if (this.fileExtensions.some(ext => file.endsWith(ext))) {
                 fileList.push(filePath);

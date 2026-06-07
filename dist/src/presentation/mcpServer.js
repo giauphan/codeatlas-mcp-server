@@ -1,6 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import * as path from "path";
+import * as os from "os";
 import { checkAuth, logActivity } from "../services/authService.js";
 import { discoverProjectsAsync, loadAnalysisAsync, getStats, fileExists, syncAnalysisToServer, getEpisodicMemoriesFromServer, inMemoryAnalysisCache } from "../services/projectService.js";
 import { CodeAnalyzer } from "../analyzer/parser.js";
@@ -15,6 +16,12 @@ export function registerTools(server) {
         await logActivity(auth, "analyze", { path: projectPath, maxFiles });
         if (!(await fileExists(projectPath))) {
             return { content: [{ type: "text", text: `Error: Directory does not exist: ${projectPath}` }] };
+        }
+        // Safety: reject paths that are the user's home directory or system roots
+        const resolvedPath = path.resolve(projectPath);
+        const homeDir = os.homedir();
+        if (resolvedPath === homeDir || resolvedPath === "/" || resolvedPath === "/home") {
+            return { content: [{ type: "text", text: `Error: Refusing to analyze '${resolvedPath}' — path is too broad. Please specify a project subdirectory.` }] };
         }
         try {
             const analyzer = new CodeAnalyzer(projectPath, maxFiles || 5000);
