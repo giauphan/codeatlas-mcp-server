@@ -15,7 +15,7 @@
     "build": "tsc",
     "start": "node dist/index.js",
     "dev": "tsx index.ts",
-    "test": "npm run build && node --test \"dist/src/**/*.test.js\"",
+    "test": "npm run build && node --experimental-test-module-mocks --test \"dist/src/**/*.test.js\"",
     "prepublishOnly": "npm run build"
   },
   "keywords": [
