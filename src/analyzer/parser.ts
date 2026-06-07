@@ -20,7 +20,9 @@ export class CodeAnalyzer {
   constructor(
     workspaceRoot: string,
     maxFiles: number = 5000,
-    excludedDirectories: string[] = ['node_modules', 'dist', 'out', '.git', '__pycache__', '.venv', 'venv', 'env', '.env', 'vendor', 'build', '.tox', '.mypy_cache', '.pytest_cache', 'coverage', '.next', '.nuxt'],
+    excludedDirectories: string[] = ['node_modules', 'dist', 'out', '.git', '__pycache__', '.venv', 'venv', 'env', '.env', 'vendor', 'build', '.tox', '.mypy_cache', '.pytest_cache', 'coverage', '.next', '.nuxt',
+      // Common user home subdirectories — prevent accidental full-home scans
+      'Downloads', 'Desktop', 'Documents', 'Pictures', 'Music', 'Videos', 'snap', 'go', 'AppData', 'Applications', 'Public', 'Templates'],
     fileExtensions: string[] = ['.ts', '.tsx', '.js', '.jsx', '.py', '.php'],
     excludedFiles: string[] = ['_ide_helper.php', '_ide_helper_models.php', '.phpstorm.meta.php']
   ) {
@@ -416,8 +418,15 @@ export class CodeAnalyzer {
     return cycles;
   }
 
-  private getFiles(dir: string, fileList: string[] = []): string[] {
+  private getFiles(dir: string, fileList: string[] = [], depth: number = 0): string[] {
     if (!fs.existsSync(dir)) return fileList;
+    
+    // Safety: max recursion depth = 20 levels (prevents runaway on broad paths)
+    const MAX_DEPTH = 20;
+    if (depth > MAX_DEPTH) {
+      console.warn(`[CodeAnalyzer] Max depth (${MAX_DEPTH}) reached at ${dir}. Stopping recursion.`);
+      return fileList;
+    }
     
     // Check if current directory itself is ignored
     if (dir !== this.workspaceRoot && this.isIgnored(dir, true)) {
@@ -453,7 +462,7 @@ export class CodeAnalyzer {
       }
       
       if (isDirectory) {
-        this.getFiles(filePath, fileList);
+        this.getFiles(filePath, fileList, depth + 1);
       } else if (this.fileExtensions.some(ext => file.endsWith(ext))) {
         fileList.push(filePath);
       }
