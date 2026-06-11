@@ -22,7 +22,7 @@ export async function isIndexingEnabledForProject(projectName: string): Promise<
       const options = {
         hostname: serverUrl.hostname,
         port: serverUrl.port || (serverUrl.protocol === "https:" ? 443 : 80),
-        path: `/api/projects/settings?apiKey=${encodeURIComponent(apiKey)}&projectName=${encodeURIComponent(projectName)}`,
+        path: `/api/projects/settings?projectName=${encodeURIComponent(projectName)}`,
         method: "GET",
         headers: {
           "x-api-key": apiKey
@@ -60,6 +60,19 @@ export async function isIndexingEnabledForProject(projectName: string): Promise<
       resolve(true);
     }
   });
+}
+
+export function stopWatcher() {
+  if (indexTimeout) {
+    clearTimeout(indexTimeout);
+    indexTimeout = null;
+  }
+  if (watcher) {
+    watcher.close();
+    watcher = null;
+  }
+  activeWatchedPaths.clear();
+  console.error("[Watcher] 🛑 File watcher stopped.");
 }
 
 export function startWatcher() {

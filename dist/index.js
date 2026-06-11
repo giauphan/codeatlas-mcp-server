@@ -10,6 +10,7 @@ import * as os from "os";
 const homeDir = os.homedir();
 const logDir = path.join(homeDir, ".codeatlas");
 const logFilePath = path.join(logDir, "mcp.log");
+const pidFilePath = path.join(logDir, "mcp.pid");
 try {
     if (!fs.existsSync(logDir)) {
         fs.mkdirSync(logDir, { recursive: true });
@@ -18,22 +19,41 @@ try {
 catch (err) {
     // Ignore directory creation errors
 }
-// Parse command line arguments (e.g. --apiKey <key> or --apiKey=<key>)
-const apiKeyArgIndex = process.argv.findIndex(arg => arg.startsWith('--apiKey'));
-if (apiKeyArgIndex !== -1) {
-    const arg = process.argv[apiKeyArgIndex];
-    let val = '';
-    if (arg.includes('=')) {
-        val = arg.split('=')[1];
+// ── Single-instance PID guard ──────────────────────────────────────────
+// Prevents duplicate MCP server processes from consuming excessive memory.
+try {
+    if (fs.existsSync(pidFilePath)) {
+        const existingPid = parseInt(fs.readFileSync(pidFilePath, "utf-8").trim(), 10);
+        if (!isNaN(existingPid) && existingPid > 0) {
+            try {
+                process.kill(existingPid, 0); // Check if alive (no-op if alive, throws if dead)
+                console.error(`[PID-Guard] ⚠️ Another CodeAtlas MCP server is already running (PID: ${existingPid}). Exiting.`);
+                process.exit(0);
+            }
+            catch (e) {
+                if (e?.code === 'ESRCH') {
+                    // Process not running — stale PID file
+                    console.error(`[PID-Guard] 🧹 Removed stale PID file (PID: ${existingPid} no longer running).`);
+                }
+                else {
+                    // Can't check (permissions?), treat as running
+                    console.error(`[PID-Guard] ⚠️ Cannot verify PID ${existingPid}. Exiting to be safe.`);
+                    process.exit(0);
+                }
+            }
+        }
     }
-    else if (apiKeyArgIndex + 1 < process.argv.length) {
-        val = process.argv[apiKeyArgIndex + 1];
-    }
-    if (val) {
-        process.env.CODEATLAS_API_KEY = val;
-    }
+    fs.writeFileSync(pidFilePath, String(process.pid));
+    console.error(`[PID-Guard] 🔒 Lock acquired (PID: ${process.pid})`);
 }
-// Parse command line arguments for projectDir
+catch (err) {
+    console.error(`[PID-Guard] ⚠️ Could not write PID file — running without guard: ${err}`);
+}
+// ────────────────────────────────────────────────────────────────────────
+// ⚠️ NOTE: API key must be set via CODEATLAS_API_KEY environment variable or .env file.
+// Passing API keys via command-line arguments is NOT supported — they are visible
+// to all users on the system via `ps aux`. Use environment variables instead.
+// Parse command line arguments for projectDir (safe directory path, not a secret)
 const projectDirArgIndex = process.argv.findIndex(arg => arg.startsWith('--projectDir'));
 if (projectDirArgIndex !== -1) {
     const arg = process.argv[projectDirArgIndex];
@@ -74,6 +94,10 @@ console.error = (...args) => {
     try {
         const message = args.map(arg => typeof arg === 'object' ? JSON.stringify(arg) : String(arg)).join(' ');
         const timestamp = new Date().toISOString();
+        // Cap log queue at 1000 entries to prevent unbounded memory growth
+        if (logQueue.length >= 1000) {
+            logQueue.shift();
+        }
         logQueue.push(`[${timestamp}] ${message}\n`);
         flushLogQueue().catch(() => { });
     }
@@ -85,8 +109,8 @@ console.error = (...args) => {
 import { server } from "./src/presentation/mcpServer.js";
 // Import Domain / Application Services
 import { checkAuth } from "./src/services/authService.js";
-import { getStats, discoverProjects, loadAnalysis, discoverProjectsAsync, loadAnalysisAsync, getWorkspaceFromAncestors, isSystemIdeDirectory } from "./src/services/projectService.js";
-import { startWatcher, isIndexingEnabledForProject } from "./src/services/watcherService.js";
+import { getStats, discoverProjects, loadAnalysis, discoverProjectsAsync, loadAnalysisAsync, getWorkspaceFromAncestors, isSystemIdeDirectory, discoverGitSubProjects } from "./src/services/projectService.js";
+import { startWatcher, stopWatcher, isIndexingEnabledForProject } from "./src/services/watcherService.js";
 // Load environment variables
 dotenv.config();
 // Start server
@@ -104,29 +128,35 @@ async function main() {
                     if (root.uri.startsWith("file://")) {
                         const workspacePath = fileURLToPath(root.uri).trim();
                         if (isSystemIdeDirectory(workspacePath)) {
-                            console.error(`[Auto-Scan] 🛡️ Ignored IDE system/extensions directory from workspace indexing: ${workspacePath}`);
+                            console.error(`[Auto-Scan] 🛡️ Ignored IDE system/extensions directory: ${workspacePath}`);
                             continue;
                         }
-                        const projectName = path.basename(workspacePath);
-                        isIndexingEnabledForProject(projectName).then((enabled) => {
-                            if (!enabled) {
-                                console.error(`[Auto-Scan] ⏸️  Auto-indexing is disabled on server for project [${projectName}]. Skipping initial scan.`);
-                                return;
+                        // Scan subdirectories for .git projects
+                        const subProjects = await discoverGitSubProjects(workspacePath, true);
+                        if (subProjects.length > 0) {
+                            console.error(`[Auto-Scan] 📦 Found ${subProjects.length} project(s) with .git and open in IDE inside ${path.basename(workspacePath)}`);
+                            for (const subDir of subProjects) {
+                                const subName = path.basename(subDir);
+                                isIndexingEnabledForProject(subName).then((enabled) => {
+                                    if (!enabled) {
+                                        console.error(`[Auto-Scan] ⏸️  Auto-indexing disabled for [${subName}]. Skipping.`);
+                                        return;
+                                    }
+                                    console.error(`[Auto-Scan] 🔄 Indexing sub-project: ${subDir}`);
+                                    loadAnalysisAsync(subDir, true).then((loaded) => {
+                                        if (loaded)
+                                            console.error(`[Auto-Scan] ✅ Indexed: ${subDir}`);
+                                        else
+                                            console.error(`[Auto-Scan] ⚠️ Skipped: ${subDir}`);
+                                    }).catch((err) => {
+                                        console.error(`[Auto-Scan] ❌ Failed: ${subDir}: ${err}`);
+                                    });
+                                }).catch(() => { });
                             }
-                            console.error(`[Auto-Scan] 🔄 Auto-indexing discovered workspace root: ${workspacePath}`);
-                            loadAnalysisAsync(workspacePath, true).then((loaded) => {
-                                if (loaded) {
-                                    console.error(`[Auto-Scan] ✅ Auto-indexing complete for workspace root: ${workspacePath}`);
-                                }
-                                else {
-                                    console.error(`[Auto-Scan] ⚠️ Auto-indexing skipped or directory not found for: ${workspacePath}`);
-                                }
-                            }).catch((err) => {
-                                console.error(`[Auto-Scan] ❌ Auto-indexing failed for workspace root: ${workspacePath}: ${err}`);
-                            });
-                        }).catch((err) => {
-                            console.error(`[Auto-Scan] ⚠️ Failed to verify indexing status: ${err}. Skipping initial scan.`);
-                        });
+                        }
+                        else {
+                            console.error(`[Auto-Scan] ℹ️ No .git projects found under container root: ${workspacePath}`);
+                        }
                     }
                     else {
                         console.error(`[Auto-Scan] ⚠️ Ignored non-file URI root: ${root.uri}`);
@@ -138,34 +168,28 @@ async function main() {
             }
         }
         catch (err) {
-            console.error(`[Auto-Scan] ⚠️ Failed to list workspace roots from client: ${err}. Falling back to active workspace.`);
+            console.error(`[Auto-Scan] ⚠️ Failed to list workspace roots: ${err}. Falling back to active workspace.`);
         }
         if (!succeeded) {
             const activeWorkspace = process.env.CODEATLAS_PROJECT_DIR || getWorkspaceFromAncestors() || process.env.GEMINI_CLI_IDE_WORKSPACE_PATH || process.cwd();
             if (isSystemIdeDirectory(activeWorkspace)) {
-                console.error(`[Auto-Scan] 🛡️ Ignored IDE system/extensions directory from workspace indexing fallback: ${activeWorkspace}`);
+                console.error(`[Auto-Scan] 🛡️ Ignored IDE system directory fallback: ${activeWorkspace}`);
+                return;
+            }
+            const subProjects = await discoverGitSubProjects(activeWorkspace, true);
+            if (subProjects.length > 0) {
+                console.error(`[Auto-Scan] 📦 Fallback: found ${subProjects.length} IDE-open .git project(s) in ${activeWorkspace}`);
+                for (const subDir of subProjects) {
+                    const subName = path.basename(subDir);
+                    isIndexingEnabledForProject(subName).then((enabled) => {
+                        if (!enabled)
+                            return;
+                        loadAnalysisAsync(subDir, true).catch(() => { });
+                    }).catch(() => { });
+                }
             }
             else {
-                const projectName = path.basename(activeWorkspace);
-                isIndexingEnabledForProject(projectName).then((enabled) => {
-                    if (!enabled) {
-                        console.error(`[Auto-Scan] ⏸️  Auto-indexing is disabled on server for project [${projectName}]. Skipping fallback scan.`);
-                        return;
-                    }
-                    console.error(`[Auto-Scan] 🔄 Triggering initial background scan for active workspace fallback: ${activeWorkspace}`);
-                    loadAnalysisAsync(activeWorkspace, true).then((loaded) => {
-                        if (loaded) {
-                            console.error(`[Auto-Scan] ✅ Initial background scan complete for fallback: ${activeWorkspace}`);
-                        }
-                        else {
-                            console.error(`[Auto-Scan] ⚠️ Initial background scan skipped or directory not found for fallback: ${activeWorkspace}`);
-                        }
-                    }).catch((err) => {
-                        console.error(`[Auto-Scan] ❌ Initial background scan failed for fallback: ${err}`);
-                    });
-                }).catch((err) => {
-                    console.error(`[Auto-Scan] ⚠️ Failed to verify indexing status: ${err}. Skipping fallback scan.`);
-                });
+                console.error(`[Auto-Scan] ℹ️ No .git projects found in workspace fallback: ${activeWorkspace}`);
             }
         }
     }
@@ -185,6 +209,35 @@ async function main() {
     console.error("CodeAtlas MCP server running on stdio");
 }
 main().catch(console.error);
+// ── Graceful shutdown handlers ─────────────────────────────────────────
+// Prevent zombie processes by cleaning up watchers, cache, and PID file.
+function cleanup(signal) {
+    console.error(`[Cleanup] 🧹 Received ${signal}. Shutting down...`);
+    try {
+        stopWatcher();
+    }
+    catch (e) {
+        console.error(`[Cleanup] ⚠️ Watcher cleanup error: ${e}`);
+    }
+    try {
+        if (fs.existsSync(pidFilePath)) {
+            fs.unlinkSync(pidFilePath);
+            console.error(`[Cleanup] 🗑️ PID file removed.`);
+        }
+    }
+    catch (e) {
+        console.error(`[Cleanup] ⚠️ PID file cleanup error: ${e}`);
+    }
+    process.exit(0);
+}
+process.on("SIGTERM", () => cleanup("SIGTERM"));
+process.on("SIGINT", () => cleanup("SIGINT"));
+process.on("SIGQUIT", () => cleanup("SIGQUIT"));
+process.on("uncaughtException", (err) => {
+    console.error(`[Fatal] 💥 Uncaught exception: ${err}`);
+    cleanup("uncaughtException");
+});
+// ────────────────────────────────────────────────────────────────────────
 // Re-export core modules/helpers to maintain compatibility with test suite
 export { server, checkAuth, getStats, discoverProjects, loadAnalysis, discoverProjectsAsync, loadAnalysisAsync };
 //# sourceMappingURL=index.js.map

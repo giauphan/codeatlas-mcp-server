@@ -225,7 +225,62 @@ let onProjectLoadedCallback = null;
 export function registerOnProjectLoaded(cb) {
     onProjectLoadedCallback = cb;
 }
-export const inMemoryAnalysisCache = new Map();
+/**
+ * LRU cache that evicts oldest entries when exceeding maxSize.
+ * On eviction, also cleans up the corresponding CodeAnalyzer instance.
+ */
+class LRUCache {
+    map = new Map();
+    maxSize;
+    evictionLog;
+    constructor(maxSize, name = "cache") {
+        this.maxSize = maxSize;
+        this.evictionLog = `[${name}]`;
+    }
+    has(key) {
+        return this.map.has(key);
+    }
+    get(key) {
+        if (!this.map.has(key))
+            return undefined;
+        // Move to end (most recently used)
+        const value = this.map.get(key);
+        this.map.delete(key);
+        this.map.set(key, value);
+        return value;
+    }
+    set(key, value) {
+        this.map.delete(key); // Remove if exists, re-add at end
+        this.map.set(key, value);
+        this.evict();
+        return this;
+    }
+    delete(key) {
+        return this.map.delete(key);
+    }
+    get size() {
+        return this.map.size;
+    }
+    keys() {
+        return this.map.keys();
+    }
+    evict() {
+        while (this.map.size > this.maxSize) {
+            const oldestKey = this.map.keys().next().value;
+            if (oldestKey !== undefined) {
+                this.map.delete(oldestKey);
+                // Also cleanup the CodeAnalyzer instance to free memory
+                const hadAnalyzer = analyzerInstances.delete(oldestKey);
+                console.error(`${this.evictionLog} 🗑️ Evicted cache for: ${oldestKey}${hadAnalyzer ? ' (analyzer also freed)' : ''}`);
+            }
+        }
+    }
+    [Symbol.iterator]() {
+        return this.map[Symbol.iterator]();
+    }
+}
+export const inMemoryAnalysisCache = new LRUCache(3, "Cache");
+export const analyzerInstances = new LRUCache(5, "Analyzer");
 export function getOpenIdeForDir(dir) {
     try {
         const absPath = path.resolve(dir.trim());
@@ -453,6 +508,56 @@ export async function scanForCodeatlasProjectsAsync(parentDir) {
     catch (err) {
         console.error(`[Project-Discovery] ❌ Failed async scan for .codeatlas projects: ${err}`);
     }
+    return discovered;
+}
+/**
+ * Scans a parent directory for sub-projects with .git directories,
+ * optionally filtering to only those currently open in an IDE.
+ * Scans up to 3 levels deep and skips node_modules / hidden dirs.
+ */
+export async function discoverGitSubProjects(parentDir, onlyIdeOpen = false) {
+    const discovered = [];
+    const seen = new Set();
+    async function walk(dir, depth) {
+        if (depth > 3)
+            return;
+        let entries;
+        try {
+            entries = await fs.promises.readdir(dir, { withFileTypes: true });
+        }
+        catch {
+            return;
+        }
+        for (const entry of entries) {
+            if (!entry.isDirectory())
+                continue;
+            if (entry.name === 'node_modules' || entry.name === '.git' || entry.name.startsWith('.'))
+                continue;
+            const fullPath = path.join(dir, entry.name);
+            const resolved = path.resolve(fullPath);
+            if (seen.has(resolved))
+                continue;
+            seen.add(resolved);
+            if (await fileExists(path.join(resolved, '.git'))) {
+                if (onlyIdeOpen) {
+                    const ide = getOpenIdeForDir(resolved);
+                    if (ide) {
+                        console.error(`[SubProject] 🖥️ Found project "${entry.name}" — open in IDE: ${ide}`);
+                        discovered.push(resolved);
+                    }
+                    // else: skip — no IDE has this open
+                }
+                else {
+                    console.error(`[SubProject] 📂 Found project: ${entry.name}`);
+                    discovered.push(resolved);
+                }
+            }
+            else if (depth < 3) {
+                await walk(resolved, depth + 1);
+            }
+        }
+    }
+    await walk(parentDir, 0);
     return discovered;
 }
 export function discoverProjects(tenantId) {
@@ -724,7 +829,6 @@ export async function discoverProjectsAsync(tenantId) {
     projects.sort((a, b) => b.modifiedAt.getTime() - a.modifiedAt.getTime());
     return projects;
 }
-export const analyzerInstances = new Map();
 export async function loadAnalysisAsync(projectDir, force = false, changedFilePath) {
     const auth = authStorage.getStore();
     const tenantId = auth ? auth.uid : undefined;
@@ -870,7 +974,7 @@ export async function syncAnalysisToServer(projectName, analysis, businessRule, 
             const options = {
                 hostname: serverUrl.hostname,
                 port: serverUrl.port || (serverUrl.protocol === "https:" ? 443 : 80),
-                path: `/api/projects/sync?apiKey=${encodeURIComponent(apiKey)}`,
+                path: `/api/projects/sync`,
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
@@ -918,7 +1022,7 @@ export async function getEpisodicMemoriesFromServer(projectName, eventType) {
         try {
             const serverUrlStr = process.env.CODEATLAS_API_URL || "https://atlas.genrostore.com";
             const serverUrl = new URL(serverUrlStr);
-            let pathStr = `/api/projects/memory?projectName=${encodeURIComponent(projectName)}&apiKey=${encodeURIComponent(apiKey)}`;
+            let pathStr = `/api/projects/memory?projectName=${encodeURIComponent(projectName)}`;
             if (eventType) {
                 pathStr += `&eventType=${encodeURIComponent(eventType)}`;
             }
