@@ -91,10 +91,22 @@ export function startWatcher() {
   }
 
   watcher = chokidar.watch(watchPaths, {
-    ignored: [/(^|[\/\\])\./, '**/node_modules/**', '**/dist/**', '**/build/**', '**/.git/**'],
-    persistent: true,
-    ignoreInitial: true
-  });
+      ignored: [
+        /(^|[\\/\\\\])\\./,
+        '**/node_modules/**',
+        '**/dist/**',
+        '**/build/**',
+        '**/.git/**',
+        '**/logs/**',
+        '**/*.log',
+        '**/__pycache__/**',
+        '**/*.pyc',
+        '**/.venv/**',
+        '**/.env'
+      ],
+      persistent: true,
+      ignoreInitial: true
+    });
 
   watcher.on('all', (event: string, filePath: string) => {
     if (event !== 'add' && event !== 'change' && event !== 'unlink') return;

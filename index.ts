@@ -25,30 +25,41 @@ try {
 
 // ── Single-instance PID guard ──────────────────────────────────────────
 // Prevents duplicate MCP server processes from consuming excessive memory.
-try {
-  if (fs.existsSync(pidFilePath)) {
-    const existingPid = parseInt(fs.readFileSync(pidFilePath, "utf-8").trim(), 10);
-    if (!isNaN(existingPid) && existingPid > 0) {
-      try {
-        process.kill(existingPid, 0); // Check if alive (no-op if alive, throws if dead)
-        console.error(`[PID-Guard] ⚠️ Another CodeAtlas MCP server is already running (PID: ${existingPid}). Exiting.`);
-        process.exit(0);
-      } catch (e: any) {
-        if (e?.code === 'ESRCH') {
-          // Process not running — stale PID file
-          console.error(`[PID-Guard] 🧹 Removed stale PID file (PID: ${existingPid} no longer running).`);
-        } else {
-          // Can't check (permissions?), treat as running
-          console.error(`[PID-Guard] ⚠️ Cannot verify PID ${existingPid}. Exiting to be safe.`);
-          process.exit(0);
+// But allow --version and --help flags to pass through.
+
+// Handle --version before PID guard
+if (process.argv.includes('--version') || process.argv.includes('-v')) {
+  // Try both relative locations (source: index.ts, dist: dist/index.js)
+  let pkg: any;
+  for (const p of ['./package.json', '../package.json']) {
+    try { pkg = JSON.parse(fs.readFileSync(new URL(p, import.meta.url), 'utf-8')); break; } catch {}
+  }
+  if (pkg) console.log(pkg.version);
+  process.exit(0);
+}
+
+if (!process.argv.includes('--help') && !process.argv.includes('-h')) {
+  try {
+    if (fs.existsSync(pidFilePath)) {
+      const existingPid = parseInt(fs.readFileSync(pidFilePath, "utf-8").trim(), 10);
+      if (!isNaN(existingPid) && existingPid > 0) {
+        try {
+          process.kill(existingPid, 0); // Check if alive
+          // For stdio MCP mode, multiple instances can coexist peacefully.
+          // Just warn and continue, so Hermes sessions can each spawn their own.
+          console.error(`[PID-Guard] ⚠️ Another instance running (PID: ${existingPid}). Overwriting PID file — stdio instances are independent.`);
+        } catch (e: any) {
+          if (e?.code !== 'ESRCH') {
+            console.error(`[PID-Guard] ⚠️ Cannot verify PID ${existingPid}. Will overwrite.`);
+          }
         }
       }
     }
+    fs.writeFileSync(pidFilePath, String(process.pid));
+    console.error(`[PID-Guard] 🔒 Lock acquired (PID: ${process.pid})`);
+  } catch (err) {
+    console.error(`[PID-Guard] ⚠️ Could not write PID file — running without guard: ${err}`);
   }
-  fs.writeFileSync(pidFilePath, String(process.pid));
-  console.error(`[PID-Guard] 🔒 Lock acquired (PID: ${process.pid})`);
-} catch (err) {
-  console.error(`[PID-Guard] ⚠️ Could not write PID file — running without guard: ${err}`);
 }
 // ────────────────────────────────────────────────────────────────────────
 

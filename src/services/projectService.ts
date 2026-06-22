@@ -308,11 +308,12 @@ export function getOpenIdeForDir(dir: string): string | null {
     const absPath = path.resolve(dir.trim());
     if (!fs.existsSync('/proc')) return null;
     const files = fs.readdirSync('/proc');
-    for (const file of files) {
-      if (/^\d+$/.test(file)) {
-        const pid = file;
-        const cmdlinePath = `/proc/${pid}/cmdline`;
-        try {
+    // Safety: only scan up to 500 process entries to prevent abuse
+    const pidEntries = files.filter(f => /^\d+$/.test(f)).slice(0, 500);
+    for (const file of pidEntries) {
+      const pid = file;
+      const cmdlinePath = `/proc/${pid}/cmdline`;
+      try {
           if (fs.existsSync(cmdlinePath)) {
             const cmdline = fs.readFileSync(cmdlinePath, 'utf8');
             const args = cmdline.split('\0').filter(Boolean);
@@ -339,7 +340,6 @@ export function getOpenIdeForDir(dir: string): string | null {
         } catch {
           // ignore
         }
-      }
     }
   } catch {
     // ignore

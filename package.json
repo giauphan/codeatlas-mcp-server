@@ -1,6 +1,6 @@
 {
   "name": "codeatlas-enterprise",
-  "version": "2.16.1",
+  "version": "2.17.4",
   "description": "Enterprise-grade local-first MCP server and gateway for CodeAtlas",
   "type": "module",
   "bin": {
@@ -25,7 +25,7 @@
     "enterprise"
   ],
   "author": "giauphan",
-  "license": "UNLICENSED",
+  "license": "MIT",
   "devDependencies": {
     "@types/express": "^4.17.21",
     "@types/node": "^20.0.0",

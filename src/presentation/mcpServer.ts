@@ -1271,6 +1271,423 @@ export function registerTools(server: McpServer) {
       };
     }
   );
+
+  // Tool 13: code_search — Full-text search across source files
+  server.tool(
+    "code_search",
+    "Search source FILE CONTENTS across the entire project for any text string. Unlike 'search_entities' (which only searches entity names), this searches the actual code — comments, strings, variable names, function bodies, etc.",
+    {
+      project: z.string().optional().describe("Project name or path (auto-detects if omitted)"),
+      query: z.string().describe("Text to search for in source file contents (case-insensitive)"),
+      filePattern: z.string().optional().describe("Optional file glob pattern to narrow search (e.g. '*.ts', '*.py'). Default: all supported files"),
+      maxResults: z.number().optional().describe("Maximum results to return (default: 30, max: 100)"),
+      contextLines: z.number().optional().describe("Number of context lines around each match (default: 2)"),
+    },
+    async ({ project, query, filePattern, maxResults, contextLines }: { project?: string; query: string; filePattern?: string; maxResults?: number; contextLines?: number }) => {
+      const auth = await checkAuth();
+      await logActivity(auth, "code_search", { project, query: query.substring(0, 100), filePattern, maxResults, contextLines });
+      const loaded = await loadAnalysisAsync(project);
+      if (!loaded) {
+        return { content: [{ type: "text" as const, text: "No analysis data found. Run 'analyze' tool first." }] };
+      }
+
+      const maxRes = Math.min(maxResults || 30, 100);
+      const ctx = contextLines || 2;
+      const q = query.toLowerCase();
+      const allFiles: string[] = [];
+      const extSet = new Set([".ts", ".tsx", ".js", ".jsx", ".py", ".php", ".json", ".yaml", ".yml", ".md", ".css", ".scss", ".html"]);
+
+      try {
+        const walkDir = (dir: string, depth: number) => {
+          if (depth > 8) return;
+          try {
+            const entries = fs.readdirSync(dir, { withFileTypes: true });
+            for (const entry of entries) {
+              if (entry.name.startsWith(".") || entry.name === "node_modules" || entry.name === "dist" || entry.name === "build" || entry.name === "venv" || entry.name === ".venv") continue;
+              const fullPath = path.join(dir, entry.name);
+              if (entry.isDirectory()) walkDir(fullPath, depth + 1);
+              else if (entry.isFile()) {
+                const ext = path.extname(entry.name).toLowerCase();
+                if (extSet.has(ext)) allFiles.push(fullPath);
+              }
+            }
+          } catch { /* skip */ }
+        };
+        walkDir(loaded.projectDir, 0);
+      } catch { /* fallback */ }
+
+      const results: Array<{ file: string; line: number; content: string; contextBefore: string[]; contextAfter: string[] }> = [];
+      for (const filePath of allFiles) {
+        if (results.length >= maxRes) break;
+        try {
+          const content = fs.readFileSync(filePath, "utf-8");
+          const lines = content.split("\n");
+          for (let i = 0; i < lines.length; i++) {
+            if (results.length >= maxRes) break;
+            if (lines[i].toLowerCase().includes(q)) {
+              results.push({
+                file: path.relative(loaded.projectDir, filePath),
+                line: i + 1,
+                content: lines[i].trim(),
+                contextBefore: lines.slice(Math.max(0, i - ctx), i).map(l => l.trim()).filter(Boolean),
+                contextAfter: lines.slice(i + 1, i + 1 + ctx).map(l => l.trim()).filter(Boolean),
+              });
+            }
+          }
+        } catch { /* skip */ }
+      }
+
+      return {
+        content: [{ type: "text" as const, text: JSON.stringify({ query, project: loaded.projectName, matchCount: results.length, truncated: results.length >= maxRes, files: [...new Set(results.map(r => r.file))], results: results.slice(0, maxRes) }, null, 2) }],
+      };
+    }
+  );
+
+  // Tool 14: get_callers — Find all callers of a function/class
+  server.tool(
+    "get_callers",
+    "Find ALL functions, methods, or classes that call or reference a specific symbol. The 'reverse dependency' view — given a function/class name, trace everything that depends on it. Use before refactoring or deleting code.",
+    {
+      project: z.string().optional().describe("Project name or path"),
+      symbol: z.string().describe("Function or class name to find callers (case-insensitive, partial match)"),
+      maxResults: z.number().optional().describe("Maximum callers to return (default: 30)"),
+      depth: z.number().optional().describe("How many levels deep (default: 1, max: 5)"),
+    },
+    async ({ project, symbol, maxResults, depth }: { project?: string; symbol: string; maxResults?: number; depth?: number }) => {
+      const auth = await checkAuth();
+      await logActivity(auth, "get_callers", { project, symbol, maxResults, depth });
+      const loaded = await loadAnalysisAsync(project);
+      if (!loaded) return { content: [{ type: "text" as const, text: "No analysis found. Run 'analyze' first." }] };
+
+      const q = symbol.toLowerCase();
+      const maxD = Math.min(depth || 1, 5);
+      const nodes = loaded.analysis.graph.nodes;
+      const links = loaded.analysis.graph.links;
+      const targetIds = new Set<string>();
+      const targetNames = new Map<string, string>();
+
+      for (const node of nodes) {
+        if (node.label.toLowerCase().includes(q) && !node.id.startsWith("external:")) {
+          targetIds.add(node.id);
+          targetNames.set(node.id, node.label);
+        }
+      }
+      if (targetIds.size === 0) return { content: [{ type: "text" as const, text: JSON.stringify({ symbol, matchCount: 0, message: `No symbol '${symbol}' found.` }) }] };
+
+      const callers = new Map<string, { name: string; type: string; filePath: string | null; line: number | null; depth: number; via: string[] }>();
+      let frontier = new Set(targetIds);
+      const visited = new Set(targetIds);
+      const nodeMap = new Map(nodes.map((n) => [n.id, n]));
+
+      for (let d = 1; d <= maxD; d++) {
+        const next = new Set<string>();
+        for (const link of links) {
+          if ((link.type === "call" || link.type === "import") && frontier.has(link.target) && !visited.has(link.source)) {
+            visited.add(link.source);
+            next.add(link.source);
+            const srcNode = nodeMap.get(link.source);
+            const tgtName = targetNames.get(link.target) || nodeMap.get(link.target)?.label || link.target;
+            if (srcNode) {
+              if (!callers.has(link.source)) {
+                callers.set(link.source, { name: srcNode.label, type: srcNode.type, filePath: srcNode.filePath || null, line: srcNode.line || null, depth: d, via: [tgtName] });
+              } else {
+                callers.get(link.source)!.via.push(tgtName);
+              }
+            }
+          }
+        }
+        frontier = next;
+      }
+
+      const maxRes = maxResults || 30;
+      const targetDetails = Array.from(targetIds).map(id => { const n = nodeMap.get(id); return n ? { name: n.label, type: n.type, filePath: n.filePath || null, line: n.line || null } : { name: id, type: "unknown", filePath: null, line: null }; });
+
+      return { content: [{ type: "text" as const, text: JSON.stringify({ symbol, project: loaded.projectName, targets: targetDetails, totalCallers: callers.size, maxDepth: maxD, callers: Array.from(callers.values()).slice(0, maxRes) }, null, 2) }] };
+    }
+  );
+
+  // Tool 15: get_callees — Find all functions called by a symbol
+  server.tool(
+    "get_callees",
+    "Find everything a function, method, or class calls or depends on. The 'forward dependency' view — given a function name, trace what it imports and calls. Use to understand function dependencies before modifying.",
+    {
+      project: z.string().optional().describe("Project name or path"),
+      symbol: z.string().describe("Function or class name to find callees (case-insensitive, partial match)"),
+      maxResults: z.number().optional().describe("Maximum callees (default: 30)"),
+      depth: z.number().optional().describe("How many levels deep (default: 1, max: 5)"),
+    },
+    async ({ project, symbol, maxResults, depth }: { project?: string; symbol: string; maxResults?: number; depth?: number }) => {
+      const auth = await checkAuth();
+      await logActivity(auth, "get_callees", { project, symbol, maxResults, depth });
+      const loaded = await loadAnalysisAsync(project);
+      if (!loaded) return { content: [{ type: "text" as const, text: "No analysis found. Run 'analyze' first." }] };
+
+      const q = symbol.toLowerCase();
+      const maxD = Math.min(depth || 1, 5);
+      const nodes = loaded.analysis.graph.nodes;
+      const links = loaded.analysis.graph.links;
+      const sourceIds = new Set<string>();
+
+      for (const node of nodes) {
+        if (node.label.toLowerCase().includes(q) && !node.id.startsWith("external:")) sourceIds.add(node.id);
+      }
+      if (sourceIds.size === 0) return { content: [{ type: "text" as const, text: JSON.stringify({ symbol, matchCount: 0, message: `No symbol '${symbol}' found.` }) }] };
+
+      const callees = new Map<string, { name: string; type: string; filePath: string | null; line: number | null; depth: number }>();
+      let frontier = new Set(sourceIds);
+      const visited = new Set(sourceIds);
+      const nodeMap = new Map(nodes.map((n) => [n.id, n]));
+
+      for (let d = 1; d <= maxD; d++) {
+        const next = new Set<string>();
+        for (const link of links) {
+          if ((link.type === "call" || link.type === "import") && frontier.has(link.source) && !visited.has(link.target)) {
+            visited.add(link.target);
+            next.add(link.target);
+            const n = nodeMap.get(link.target);
+            if (n && !n.id.startsWith("external:")) callees.set(link.target, { name: n.label, type: n.type, filePath: n.filePath || null, line: n.line || null, depth: d });
+          }
+        }
+        frontier = next;
+      }
+
+      const maxRes = maxResults || 30;
+      const nodeMap2 = new Map(nodes.map((n) => [n.id, n]));
+      const sourceDetails = Array.from(sourceIds).map(id => { const n = nodeMap2.get(id); return n ? { name: n.label, type: n.type, filePath: n.filePath || null, line: n.line || null } : { name: id, type: "unknown", filePath: null, line: null }; });
+
+      return { content: [{ type: "text" as const, text: JSON.stringify({ symbol, project: loaded.projectName, sources: sourceDetails, totalCallees: callees.size, maxDepth: maxD, callees: Array.from(callees.values()).slice(0, maxRes) }, null, 2) }] };
+    }
+  );
+
+  // Tool 16: impact_analysis — Blast radius analysis
+  server.tool(
+    "impact_analysis",
+    "Full BLAST RADIUS analysis for changing a symbol. Traces BOTH callers (what depends on this) AND callees (what this depends on) in one view. Also finds related test files. Use BEFORE any significant code change.",
+    {
+      project: z.string().optional().describe("Project name or path"),
+      symbol: z.string().describe("Function, class, or module name (case-insensitive, partial match)"),
+      depth: z.number().optional().describe("How many levels deep (default: 2, max: 5)"),
+    },
+    async ({ project, symbol, depth }: { project?: string; symbol: string; depth?: number }) => {
+      const auth = await checkAuth();
+      await logActivity(auth, "impact_analysis", { project, symbol, depth });
+      const loaded = await loadAnalysisAsync(project);
+      if (!loaded) return { content: [{ type: "text" as const, text: "No analysis found. Run 'analyze' first." }] };
+
+      const q = symbol.toLowerCase();
+      const maxD = Math.min(depth || 2, 5);
+      const nodes = loaded.analysis.graph.nodes;
+      const links = loaded.analysis.graph.links;
+      const nodeMap = new Map(nodes.map((n) => [n.id, n]));
+      const symbolIds = new Set<string>();
+
+      for (const node of nodes) {
+        if (node.label.toLowerCase().includes(q) && !node.id.startsWith("external:")) symbolIds.add(node.id);
+      }
+      if (symbolIds.size === 0) return { content: [{ type: "text" as const, text: JSON.stringify({ symbol, matchCount: 0, message: `No symbol '${symbol}' found.` }) }] };
+
+      const callers = new Map<string, { name: string; type: string; filePath: string | null; depth: number }>();
+      const callees = new Map<string, { name: string; type: string; filePath: string | null; depth: number }>();
+
+      // Forward (callees)
+      let fF = new Set(symbolIds);
+      const fV = new Set(symbolIds);
+      for (let d = 1; d <= maxD; d++) {
+        const n = new Set<string>();
+        for (const l of links) if ((l.type === "call" || l.type === "import") && fF.has(l.source) && !fV.has(l.target)) { fV.add(l.target); n.add(l.target); const nd = nodeMap.get(l.target); if (nd && !nd.id.startsWith("external:")) callees.set(l.target, { name: nd.label, type: nd.type, filePath: nd.filePath || null, depth: d }); }
+        fF = n;
+      }
+
+      // Reverse (callers)
+      let rF = new Set(symbolIds);
+      const rV = new Set(symbolIds);
+      for (let d = 1; d <= maxD; d++) {
+        const n = new Set<string>();
+        for (const l of links) if ((l.type === "call" || l.type === "import") && rF.has(l.target) && !rV.has(l.source)) { rV.add(l.source); n.add(l.source); const nd = nodeMap.get(l.source); if (nd && !nd.id.startsWith("external:")) callers.set(l.source, { name: nd.label, type: nd.type, filePath: nd.filePath || null, depth: d }); }
+        rF = n;
+      }
+
+      // Find test files
+      const testFiles = new Set<string>();
+      for (const id of [...symbolIds]) {
+        const n = nodeMap.get(id);
+        if (n?.filePath) {
+          const absPath = path.isAbsolute(n.filePath) ? n.filePath : path.resolve(loaded.projectDir, n.filePath);
+          try {
+            const entries = fs.readdirSync(path.dirname(absPath));
+            const base = path.basename(absPath).replace(path.extname(absPath), "");
+            for (const e of entries) if ((e.includes(".test.") || e.includes(".spec.")) && e.toLowerCase().includes(base.toLowerCase())) testFiles.add(path.join(path.dirname(absPath), e));
+          } catch { /* skip */ }
+        }
+      }
+
+      const affectedFiles = new Set<string>();
+      for (const c of [...Array.from(callers.values()), ...Array.from(callees.values())]) if (c.filePath) affectedFiles.add(c.filePath);
+
+      return {
+        content: [{ type: "text" as const, text: JSON.stringify({
+          symbol, project: loaded.projectName,
+          impact: { incomingDependents: callers.size, outgoingDependencies: callees.size, totalAffectedFiles: affectedFiles.size, affectedFiles: Array.from(affectedFiles), testFiles: Array.from(testFiles) },
+          callers: Array.from(callers.values()).slice(0, 20),
+          callees: Array.from(callees.values()).slice(0, 20),
+          recommendation: callers.size > 10 ? "HIGH IMPACT" : callers.size > 0 ? "MEDIUM IMPACT" : "LOW IMPACT",
+        }, null, 2) }],
+      };
+    }
+  );
+
+  // Tool 17: project_context — One-shot comprehensive project overview
+  server.tool(
+    "project_context",
+    "Get a comprehensive overview of a project in ONE call: package.json (name, version, scripts, deps, devDeps), config files detected, README summary, test framework, git branch. Saves 5-10 individual read_file calls when starting work.",
+    {
+      project: z.string().optional().describe("Project name or path (auto-detects if omitted)"),
+    },
+    async ({ project }: { project?: string }) => {
+      const auth = await checkAuth();
+      await logActivity(auth, "project_context", { project });
+      const loaded = await loadAnalysisAsync(project);
+      if (!loaded) return { content: [{ type: "text" as const, text: "No analysis found. Run 'analyze' first." }] };
+
+      const projectDir = loaded.projectDir;
+      const ctx: any = { name: loaded.projectName, path: projectDir };
+
+      // package.json
+      const pkgPath = path.join(projectDir, "package.json");
+      if (fs.existsSync(pkgPath)) {
+        try {
+          const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf-8"));
+          ctx.version = pkg.version; ctx.description = pkg.description;
+          ctx.scripts = pkg.scripts || {}; ctx.scriptCount = Object.keys(ctx.scripts).length;
+          ctx.dependencies = pkg.dependencies ? Object.keys(pkg.dependencies) : [];
+          ctx.devDependencies = pkg.devDependencies ? Object.keys(pkg.devDependencies) : [];
+          ctx.main = pkg.main; ctx.bin = pkg.bin;
+        } catch { /* skip */ }
+      }
+
+      // Config files
+      ctx.configFiles = {};
+      for (const [key, f] of Object.entries({ tsconfig: "tsconfig.json", eslint: ".eslintrc.js", prettier: ".prettierrc", jest: "jest.config.js", vitest: "vitest.config.ts", playwright: "playwright.config.ts", docker: "Dockerfile" })) {
+        ctx.configFiles[key] = fs.existsSync(path.join(projectDir, f));
+      }
+
+      // README
+      for (const r of ["README.md", "README"]) {
+        const rp = path.join(projectDir, r);
+        if (fs.existsSync(rp)) { ctx.readme = { file: r, length: fs.statSync(rp).size }; break; }
+      }
+
+      // Git branch
+      const gh = path.join(projectDir, ".git", "HEAD");
+      if (fs.existsSync(gh)) {
+        try {
+          const h = fs.readFileSync(gh, "utf-8").trim();
+          const m = h.match(/^ref:\s*refs\/heads\/(.+)$/);
+          ctx.gitBranch = m ? m[1] : "(detached)";
+        } catch { /* skip */ }
+      }
+
+      // Stats
+      const st = getStats(loaded.analysis);
+      ctx.stats = { files: st.files, functions: st.functions, classes: st.classes, deps: st.dependencies, circularDeps: st.circularDeps, deadCode: st.deadCode };
+
+      // Top files
+      const fc = new Map<string, number>();
+      for (const n of loaded.analysis.graph.nodes) if (n.filePath && !n.id.startsWith("external:")) fc.set(n.filePath, (fc.get(n.filePath) || 0) + 1);
+      ctx.topFiles = Array.from(fc.entries()).sort((a, b) => b[1] - a[1]).slice(0, 10).map(([f, c]) => ({ file: f, entities: c }));
+
+      ctx.testFramework = ctx.configFiles.vitest ? "vitest" : ctx.configFiles.jest ? "jest" : ctx.configFiles.playwright ? "playwright" : "unknown";
+
+      return { content: [{ type: "text" as const, text: JSON.stringify(ctx, null, 2) }] };
+    }
+  );
+
+  // Tool 18: run_script — Run npm scripts
+  server.tool(
+    "run_script",
+    "Run an npm/pnpm/yarn script from package.json. Returns exit code, stdout/stderr, and duration. Handles cd to project dir automatically.",
+    {
+      project: z.string().optional().describe("Project name or path"),
+      script: z.string().describe("Script name from package.json (e.g. 'build', 'test', 'lint')"),
+      args: z.string().optional().describe("Optional args (e.g. '-- --watch')"),
+      timeout: z.number().optional().describe("Timeout in seconds (default: 60, max: 300)"),
+    },
+    async ({ project, script, args, timeout }: { project?: string; script: string; args?: string; timeout?: number }) => {
+      const auth = await checkAuth();
+      await logActivity(auth, "run_script", { project, script, args, timeout });
+      const loaded = await loadAnalysisAsync(project);
+      if (!loaded) return { content: [{ type: "text" as const, text: "No analysis found. Run 'analyze' first." }] };
+
+      const projectDir = loaded.projectDir;
+      const pkgPath = path.join(projectDir, "package.json");
+      if (fs.existsSync(pkgPath)) {
+        try {
+          const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf-8"));
+          if (!pkg.scripts?.[script]) return { content: [{ type: "text" as const, text: JSON.stringify({ error: `Script '${script}' not found`, available: pkg.scripts ? Object.keys(pkg.scripts) : [] }) }] };
+        } catch { /* skip */ }
+      }
+
+      const cmd = `cd ${JSON.stringify(projectDir)} && npm run ${script}${args ? " " + args : ""}`;
+      const maxTime = Math.min(timeout || 60, 300);
+      const startTime = Date.now();
+
+      try {
+        const cp = require("child_process");
+        const result = cp.execSync(cmd, { timeout: maxTime * 1000, shell: "/bin/bash", maxBuffer: 1024 * 1024, cwd: projectDir });
+        const dur = ((Date.now() - startTime) / 1000).toFixed(1);
+        return { content: [{ type: "text" as const, text: JSON.stringify({ script, project: loaded.projectName, exitCode: 0, duration: `${dur}s`, stdout: result.stdout.toString().substring(0, 10000), stderr: (result.stderr || "").toString().substring(0, 5000) }, null, 2) }] };
+      } catch (err: any) {
+        const dur = ((Date.now() - startTime) / 1000).toFixed(1);
+        return { content: [{ type: "text" as const, text: JSON.stringify({ script, project: loaded.projectName, exitCode: err.status || 1, duration: `${dur}s`, stdout: (err.stdout || "").toString().substring(0, 10000), stderr: (err.stderr || "").toString().substring(0, 5000), error: err.killed ? "TIMEOUT" : err.message?.substring(0, 300) }, null, 2) }] };
+      }
+    }
+  );
+
+  // Tool 19: git_changes — Recent git activity
+  server.tool(
+    "git_changes",
+    "Get recent git changes: last N commits (hash, author, date, message, files changed), uncommitted changes (modified/added/deleted), branch status (ahead/behind). Saves multiple git commands.",
+    {
+      project: z.string().optional().describe("Project name or path"),
+      commits: z.number().optional().describe("Number of recent commits (default: 5, max: 20)"),
+    },
+    async ({ project, commits }: { project?: string; commits?: number }) => {
+      const auth = await checkAuth();
+      await logActivity(auth, "git_changes", { project, commits });
+      const loaded = await loadAnalysisAsync(project);
+      if (!loaded) return { content: [{ type: "text" as const, text: "No analysis found. Run 'analyze' first." }] };
+
+      const projectDir = loaded.projectDir;
+      if (!fs.existsSync(path.join(projectDir, ".git"))) return { content: [{ type: "text" as const, text: JSON.stringify({ error: "Not a git repository" }) }] };
+
+      const maxC = Math.min(commits || 5, 20);
+      const result: any = { project: loaded.projectName };
+      const cp = require("child_process");
+
+      try {
+        result.branch = cp.execSync("git rev-parse --abbrev-ref HEAD", { cwd: projectDir, encoding: "utf-8" }).toString().trim();
+        const st = cp.execSync("git status --porcelain", { cwd: projectDir, encoding: "utf-8" }).toString();
+        const mod: string[] = [], add: string[] = [], del: string[] = [];
+        for (const line of st.split("\n").map((x: string) => x.trim()).filter(Boolean)) { const s = line.substring(0, 2), f = line.substring(3); if (s.includes("M")) mod.push(f); if (s.includes("A")) add.push(f); if (s.includes("D")) del.push(f); }
+        result.uncommitted = { modified: mod.slice(0, 20), added: add.slice(0, 10), deleted: del.slice(0, 10), hasChanges: st.trim().length > 0 };
+        try {
+          const [behind, ahead] = cp.execSync("git rev-list --left-right --count HEAD...@{upstream}", { cwd: projectDir, encoding: "utf-8" }).toString().trim().split("\t").map(Number);
+          result.ahead = ahead || 0; result.behind = behind || 0;
+        } catch { result.ahead = null; result.behind = null; }
+        const logRaw = cp.execSync(`git log -${maxC} --format="COMMIT%n%H%n%an%n%ai%n%s%nFILES:" --name-only`, { cwd: projectDir, encoding: "utf-8", maxBuffer: 1024 * 1024 }).toString();
+        result.recentCommits = [];
+        for (const block of logRaw.split("COMMIT\n").filter(Boolean)) {
+          const ls = block.trim().split("\n"); if (ls.length < 4) continue;
+          const ci: any = { hash: ls[0]?.substring(0, 12), author: ls[1], date: ls[2], message: ls[3] };
+          const fi = ls.findIndex((x: string) => x === "FILES:");
+          if (fi !== -1) ci.files = ls.slice(fi + 1).filter((x: string) => x.trim()).slice(0, 15);
+          result.recentCommits.push(ci);
+        }
+      } catch (err: any) { result.error = err.message?.substring(0, 300); }
+
+      return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
+    }
+  );
 }
 
 // Create the global MCP server instance

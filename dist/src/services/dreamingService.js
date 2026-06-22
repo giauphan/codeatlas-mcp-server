@@ -17,7 +17,7 @@ export async function saveDreamMemory(params) {
             const options = {
                 hostname: serverUrl.hostname,
                 port: serverUrl.port || (serverUrl.protocol === "https:" ? 443 : 80),
-                path: `/api/dreams/save?apiKey=${encodeURIComponent(apiKey)}`,
+                path: `/api/dreams/save`,
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
@@ -75,7 +75,6 @@ export async function queryDreamMemories(params) {
             const serverUrl = new URL(serverUrlStr);
             const queryParams = new URLSearchParams();
             queryParams.set("query", params.query);
-            queryParams.set("apiKey", apiKey);
             if (params.project)
                 queryParams.set("project", params.project);
             if (params.limit)
