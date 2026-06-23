@@ -287,38 +287,38 @@ export function getOpenIdeForDir(dir) {
         if (!fs.existsSync('/proc'))
             return null;
         const files = fs.readdirSync('/proc');
-        for (const file of files) {
-            if (/^\d+$/.test(file)) {
-                const pid = file;
-                const cmdlinePath = `/proc/${pid}/cmdline`;
-                try {
-                    if (fs.existsSync(cmdlinePath)) {
-                        const cmdline = fs.readFileSync(cmdlinePath, 'utf8');
-                        const args = cmdline.split('\0').filter(Boolean);
-                        if (args.length === 0)
-                            continue;
-                        const hasDirArg = args.some(arg => {
-                            try {
-                                return path.resolve(arg) === absPath;
-                            }
-                            catch {
-                                return false;
-                            }
-                        });
-                        if (hasDirArg) {
-                            const exePath = args[0].toLowerCase();
-                            const ideKeywords = ['code', 'vscode', 'cursor', 'windsurf', 'intellij', 'webstorm', 'phpstorm', 'idea', 'eclipse', 'sublime', 'gemini-cli'];
-                            for (const keyword of ideKeywords) {
-                                if (exePath.includes(keyword)) {
-                                    return path.basename(args[0]);
-                                }
+        // Safety: only scan up to 500 process entries to prevent abuse
+        const pidEntries = files.filter(f => /^\d+$/.test(f)).slice(0, 500);
+        for (const file of pidEntries) {
+            const pid = file;
+            const cmdlinePath = `/proc/${pid}/cmdline`;
+            try {
+                if (fs.existsSync(cmdlinePath)) {
+                    const cmdline = fs.readFileSync(cmdlinePath, 'utf8');
+                    const args = cmdline.split('\0').filter(Boolean);
+                    if (args.length === 0)
+                        continue;
+                    const hasDirArg = args.some(arg => {
+                        try {
+                            return path.resolve(arg) === absPath;
+                        }
+                        catch {
+                            return false;
+                        }
+                    });
+                    if (hasDirArg) {
+                        const exePath = args[0].toLowerCase();
+                        const ideKeywords = ['code', 'vscode', 'cursor', 'windsurf', 'intellij', 'webstorm', 'phpstorm', 'idea', 'eclipse', 'sublime', 'gemini-cli'];
+                        for (const keyword of ideKeywords) {
+                            if (exePath.includes(keyword)) {
+                                return path.basename(args[0]);
                             }
                         }
                     }
                 }
-                catch {
-                    // ignore
-                }
+            }
+            catch {
+                // ignore
             }
         }
     }
@@ -567,7 +567,7 @@ export function discoverProjects(tenantId) {
     if (process.env.CODEATLAS_MULTI_TENANT === "true") {
         const auth = authStorage.getStore();
         const isSystemAdmin = auth
-            ? (auth.uid === "admin" || auth.role === "admin" || auth.email === "admin@genrostore.com")
+            ? (auth.uid === "admin" || auth.role === "admin")
             : (tenantId === "admin");
         if (tenantId && !isSystemAdmin) {
             const tenantRoot = process.env.CODEATLAS_PROJECTS_ROOT || path.join(process.cwd(), "tenants");
@@ -724,7 +724,7 @@ export async function discoverProjectsAsync(tenantId) {
     if (process.env.CODEATLAS_MULTI_TENANT === "true") {
         const auth = authStorage.getStore();
         const isSystemAdmin = auth
-            ? (auth.uid === "admin" || auth.role === "admin" || auth.email === "admin@genrostore.com")
+            ? (auth.uid === "admin" || auth.role === "admin")
             : (tenantId === "admin");
         if (tenantId && !isSystemAdmin) {
             const tenantRoot = process.env.CODEATLAS_PROJECTS_ROOT || path.join(process.cwd(), "tenants");
