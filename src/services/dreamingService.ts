@@ -31,9 +31,6 @@ const CHROME_UA: string =
   "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36";
 
 function getDreamApiKey(): string | undefined {
-  const explicitKey: string | undefined = process.env.DREAM_REST_API_KEY;
-  if (explicitKey) return explicitKey;
-
   const envKey: string | undefined = process.env.CODEATLAS_API_KEY;
   if (envKey) return envKey;
 

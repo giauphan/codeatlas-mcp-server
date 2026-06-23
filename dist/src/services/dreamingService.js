@@ -3,9 +3,6 @@ import * as http from "http";
 import { getResolvedApiKey } from "./projectService.js";
 const CHROME_UA = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36";
 function getDreamApiKey() {
-    const explicitKey = process.env.DREAM_REST_API_KEY;
-    if (explicitKey)
-        return explicitKey;
     const envKey = process.env.CODEATLAS_API_KEY;
     if (envKey)
         return envKey;

@@ -44,13 +44,11 @@ describe("Dreaming Service - HTTPS Client", () => {
     beforeEach(() => {
         apiKeyMock = "test-mock-key";
         requestMock = null;
-        process.env.DREAM_REST_API_KEY = "test-mock-key";
         delete process.env.CODEATLAS_API_KEY;
     });
     afterEach(() => {
         apiKeyMock = undefined;
         requestMock = null;
-        delete process.env.DREAM_REST_API_KEY;
     });
     // ----- saveDreamMemory -----
     describe("saveDreamMemory()", () => {
@@ -82,7 +80,6 @@ describe("Dreaming Service - HTTPS Client", () => {
             await assert.rejects(() => dreamingService.saveDreamMemory({ memory_type: "MISTAKE", content: "test" }), { message: /Network Error: ECONNREFUSED/ });
         });
         it("throws when CODEATLAS_API_KEY is not set", async () => {
-            delete process.env.DREAM_REST_API_KEY;
             apiKeyMock = undefined;
             await assert.rejects(() => dreamingService.saveDreamMemory({ memory_type: "MISTAKE", content: "test" }), { message: /CODEATLAS_API_KEY is not set/ });
         });
@@ -98,7 +95,7 @@ describe("Dreaming Service - HTTPS Client", () => {
             assert.strictEqual(parsed.project, "p");
         });
         it("sends apiKey in query param and x-api-key header", async () => {
-            process.env.DREAM_REST_API_KEY = "key-sentinel";
+            process.env.CODEATLAS_API_KEY = "key-sentinel";
             const capture = {};
             requestMock = mockSuccessResponse(200, { id: "x" }, capture);
             await dreamingService.saveDreamMemory({ memory_type: "MISTAKE", content: "test" });
@@ -146,7 +143,6 @@ describe("Dreaming Service - HTTPS Client", () => {
             await assert.rejects(() => dreamingService.queryDreamMemories({ query: "x" }), { message: /Network Error: ETIMEDOUT/ });
         });
         it("throws when CODEATLAS_API_KEY is not set", async () => {
-            delete process.env.DREAM_REST_API_KEY;
             apiKeyMock = undefined;
             await assert.rejects(() => dreamingService.queryDreamMemories({ query: "x" }), { message: /CODEATLAS_API_KEY is not set/ });
         });
@@ -164,7 +160,7 @@ describe("Dreaming Service - HTTPS Client", () => {
             assert.ok(!String(capture.options.path).includes("limit="));
         });
         it("includes apiKey in query params and x-api-key header for GET", async () => {
-            process.env.DREAM_REST_API_KEY = "test-key-query";
+            process.env.CODEATLAS_API_KEY = "test-key-query";
             const capture = {};
             requestMock = mockSuccessResponse(200, { memories: [] }, capture);
             await dreamingService.queryDreamMemories({ query: "test" });
