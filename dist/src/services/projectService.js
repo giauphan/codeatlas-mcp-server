@@ -921,8 +921,8 @@ export async function loadAnalysisAsync(projectDir, force = false, changedFilePa
 }
 export function getResolvedApiKey() {
     let key = process.env.CODEATLAS_API_KEY;
-    if (key && (key.startsWith("ca_") || key.startsWith("test-"))) {
-        return key;
+    if (key && typeof key === 'string' && key.trim().length > 0) {
+        return key.trim();
     }
     const homeDir = os.homedir();
     const pathsToTry = [

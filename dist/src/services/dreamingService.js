@@ -1,11 +1,18 @@
 import * as https from "https";
+import * as http from "http";
 import { getResolvedApiKey } from "./projectService.js";
-/**
- * Save a dream memory to CodeAtlas Cloud via the Oracle CRUD API.
- * Used by the AI to persist insights (mistakes, preferences, knowledge, patterns).
- */
+const CHROME_UA = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36";
+function getDreamApiKey() {
+    const explicitKey = process.env.DREAM_REST_API_KEY;
+    if (explicitKey)
+        return explicitKey;
+    const envKey = process.env.CODEATLAS_API_KEY;
+    if (envKey)
+        return envKey;
+    return getResolvedApiKey();
+}
 export async function saveDreamMemory(params) {
-    const apiKey = getResolvedApiKey();
+    const apiKey = getDreamApiKey();
     if (!apiKey) {
         throw new Error("CODEATLAS_API_KEY is not set. Cannot save dream memory.");
     }
@@ -17,19 +24,19 @@ export async function saveDreamMemory(params) {
             const options = {
                 hostname: serverUrl.hostname,
                 port: serverUrl.port || (serverUrl.protocol === "https:" ? 443 : 80),
-                path: `/api/dreams/save`,
+                path: "/api/dreams/save?apiKey=" + encodeURIComponent(apiKey),
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
                     "x-api-key": apiKey,
+                    "User-Agent": CHROME_UA,
                     "Content-Length": Buffer.byteLength(payload),
                 },
             };
-            const req = https.request(options, (res) => {
+            const protocol = serverUrl.protocol === "https:" ? https : http;
+            const req = protocol.request(options, (res) => {
                 let data = "";
-                res.on("data", (chunk) => {
-                    data += chunk;
-                });
+                res.on("data", (chunk) => { data += chunk; });
                 res.on("end", () => {
                     if (res.statusCode && res.statusCode >= 200 && res.statusCode < 300) {
                         try {
@@ -37,35 +44,27 @@ export async function saveDreamMemory(params) {
                             resolve({ success: true, id: responseObj.id || responseObj.dreamId || "unknown" });
                         }
                         catch {
-                            // If response is not JSON but success, return generic success
                             resolve({ success: true, id: "unknown" });
                         }
                     }
                     else {
-                        const errMsg = `Failed to save dream memory: status ${res.statusCode}: ${data}`;
-                        reject(new Error(errMsg));
+                        reject(new Error("Failed to save dream memory: status " + res.statusCode + ": " + data));
                     }
                 });
             });
             req.on("error", (e) => {
-                const errMsg = `Dream Memory Save Network Error: ${e.message}`;
-                reject(new Error(errMsg));
+                reject(new Error("Dream Memory Save Network Error: " + e.message));
             });
             req.write(payload);
             req.end();
         }
         catch (err) {
-            const errMsg = `Dream Memory Save Initialization Error: ${err instanceof Error ? err.message : String(err)}`;
-            reject(new Error(errMsg));
+            reject(new Error("Dream Memory Save Init Error: " + (err instanceof Error ? err.message : String(err))));
         }
     });
 }
-/**
- * Query dream memories from CodeAtlas Cloud via the Oracle CRUD API.
- * Returns relevant memories with relevance scores.
- */
 export async function queryDreamMemories(params) {
-    const apiKey = getResolvedApiKey();
+    const apiKey = getDreamApiKey();
     if (!apiKey) {
         throw new Error("CODEATLAS_API_KEY is not set. Cannot query dream memories.");
     }
@@ -74,6 +73,7 @@ export async function queryDreamMemories(params) {
             const serverUrlStr = process.env.CODEATLAS_API_URL || "https://atlas.genrostore.com";
             const serverUrl = new URL(serverUrlStr);
             const queryParams = new URLSearchParams();
+            queryParams.set("apiKey", apiKey);
             queryParams.set("query", params.query);
             if (params.project)
                 queryParams.set("project", params.project);
@@ -82,17 +82,18 @@ export async function queryDreamMemories(params) {
             const options = {
                 hostname: serverUrl.hostname,
                 port: serverUrl.port || (serverUrl.protocol === "https:" ? 443 : 80),
-                path: `/api/dreams/query?${queryParams.toString()}`,
+                path: "/api/dreams/query?" + queryParams.toString(),
                 method: "GET",
                 headers: {
                     "x-api-key": apiKey,
+                    "User-Agent": CHROME_UA,
+                    "Accept": "application/json",
                 },
             };
-            const req = https.request(options, (res) => {
+            const protocol = serverUrl.protocol === "https:" ? https : http;
+            const req = protocol.request(options, (res) => {
                 let data = "";
-                res.on("data", (chunk) => {
-                    data += chunk;
-                });
+                res.on("data", (chunk) => { data += chunk; });
                 res.on("end", () => {
                     if (res.statusCode && res.statusCode >= 200 && res.statusCode < 300) {
                         try {
@@ -101,24 +102,21 @@ export async function queryDreamMemories(params) {
                             resolve(memories);
                         }
                         catch {
-                            reject(new Error(`Failed to parse dream memory query response: ${data}`));
+                            reject(new Error("Failed to parse dream memory query response: " + data));
                         }
                     }
                     else {
-                        const errMsg = `Failed to query dream memories: status ${res.statusCode}: ${data}`;
-                        reject(new Error(errMsg));
+                        reject(new Error("Failed to query dream memories: status " + res.statusCode + ": " + data));
                     }
                 });
             });
             req.on("error", (e) => {
-                const errMsg = `Dream Memory Query Network Error: ${e.message}`;
-                reject(new Error(errMsg));
+                reject(new Error("Dream Memory Query Network Error: " + e.message));
             });
             req.end();
         }
         catch (err) {
-            const errMsg = `Dream Memory Query Initialization Error: ${err instanceof Error ? err.message : String(err)}`;
-            reject(new Error(errMsg));
+            reject(new Error("Dream Memory Query Init Error: " + (err instanceof Error ? err.message : String(err))));
         }
     });
 }
