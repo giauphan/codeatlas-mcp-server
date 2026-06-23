@@ -21,7 +21,7 @@ export async function saveDreamMemory(params) {
             const options = {
                 hostname: serverUrl.hostname,
                 port: serverUrl.port || (serverUrl.protocol === "https:" ? 443 : 80),
-                path: "/api/dreams/save?apiKey=" + encodeURIComponent(apiKey),
+                path: `/api/dreams/save`,
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
@@ -70,7 +70,6 @@ export async function queryDreamMemories(params) {
             const serverUrlStr = process.env.CODEATLAS_API_URL || "https://atlas.genrostore.com";
             const serverUrl = new URL(serverUrlStr);
             const queryParams = new URLSearchParams();
-            queryParams.set("apiKey", apiKey);
             queryParams.set("query", params.query);
             if (params.project)
                 queryParams.set("project", params.project);

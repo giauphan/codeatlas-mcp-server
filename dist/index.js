@@ -44,12 +44,17 @@ if (!process.argv.includes('--help') && !process.argv.includes('-h')) {
             if (!isNaN(existingPid) && existingPid > 0) {
                 try {
                     process.kill(existingPid, 0); // Check if alive
-                    // For stdio MCP mode, multiple instances can coexist peacefully.
-                    // Just warn and continue, so Hermes sessions can each spawn their own.
-                    console.error(`[PID-Guard] ⚠️ Another instance running (PID: ${existingPid}). Overwriting PID file — stdio instances are independent.`);
+                    // Another instance is already running. Exit immediately to avoid duplicates.
+                    // DO NOT kill the old instance — that would break the active MCP connection
+                    // and cause Hermes to reconnect in an infinite kill-restart loop.
+                    console.error(`[PID-Guard] 🔒 Instance already running (PID: ${existingPid}). New instance exiting.`);
+                    process.exit(0);
                 }
                 catch (e) {
-                    if (e?.code !== 'ESRCH') {
+                    if (e?.code === 'ESRCH') {
+                        console.error(`[PID-Guard] 🗑️ Stale PID ${existingPid} — old instance is gone. Starting fresh.`);
+                    }
+                    else {
                         console.error(`[PID-Guard] ⚠️ Cannot verify PID ${existingPid}. Will overwrite.`);
                     }
                 }
