@@ -12,3 +12,5 @@ security_reports/
 *.ts
 *.tsbuildinfo
 CHANGELOG.md
+dist/src/**/*.test.js
+dist/src/**/*.test.js.map

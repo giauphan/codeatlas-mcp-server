@@ -1,7 +1,7 @@
 {
-  "name": "codeatlas-mcp-enterprise",
-  "version": "2.20.1",
-  "description": "Enterprise-grade local-first MCP server for CodeAtlas — AST analysis, codebase intelligence, and semantic memory powered by Oracle 26ai.",
+  "name": "codeatlas-mcp-server",
+  "version": "2.20.2",
+  "description": "Local-first MCP server for AI-powered codebase intelligence — AST analysis, dependency graphs, and semantic search. Your source code never leaves your machine.",
   "type": "module",
   "bin": {
     "codeatlas-enterprise": "dist/index.js",
@@ -34,7 +34,8 @@
     "ast",
     "ai",
     "codebase-intelligence",
-    "enterprise"
+    "local-first",
+    "developer-tools"
   ],
   "author": "giauphan",
   "license": "MIT",
