@@ -66,7 +66,7 @@ describe("Workspace Path Resolution & Discovery Tests", () => {
         readFileSync: (p: string, enc: any) => {
           if (p === "/proc/9999/status") return "PPid: 5000\n";
           if (p === "/proc/5000/status") return "PPid: 1\n";
-          if (p === "/proc/5000/cmdline") return "--workspace_id\0file_home_biibon_CodeAtlas\0";
+          if (p === "/proc/5000/cmdline") return "--workspace_id\0file_home_user_CodeAtlas\0";
           return "";
         }
       });
@@ -97,7 +97,7 @@ describe("Workspace Path Resolution & Discovery Tests", () => {
         readFileSync: (p: string, enc: any) => {
           if (p === "/proc/9999/status") return "PPid: 5000\n";
           if (p === "/proc/5000/status") return "PPid: 1\n";
-          if (p === "/proc/5000/cmdline") return "--workspace_id\0file_home_biibon_auto_edit_video_reup_tool\0";
+          if (p === "/proc/5000/cmdline") return "--workspace_id\0file_home_user_auto_edit_video_reup_tool\0";
           return "";
         }
       });
@@ -130,7 +130,7 @@ describe("Workspace Path Resolution & Discovery Tests", () => {
           if (p === "/proc/9999/status") return "PPid: 5000\n";
           if (p === "/proc/5000/status") return "PPid: 1\n";
           if (p === "/proc/5001/status") return "PPid: 5000\n"; // sibling!
-          if (p === "/proc/5001/cmdline") return "--workspace_id\0file_home_biibon_auto_edit_video_reup_tool\0";
+          if (p === "/proc/5001/cmdline") return "--workspace_id\0file_home_user_auto_edit_video_reup_tool\0";
           return "";
         }
       });
