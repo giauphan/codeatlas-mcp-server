@@ -54,13 +54,13 @@ describe("Workspace Path Resolution & Discovery Tests", () => {
         existsSync: (p: string) => {
           if (p === "/proc/9999/status" || p === "/proc/5000/status" || p === "/proc/5000/cmdline") return true;
           const norm = p.replace(/\\/g, "/");
-          return norm === "/" || norm === "/home" || norm === "/home/biibon" || norm === "/home/biibon/CodeAtlas";
+          return norm === "/" || norm === "/home" || norm === "/home/user" || norm === "/home/user/CodeAtlas";
         },
         readdirSync: (p: string) => {
           const norm = p.replace(/\\/g, "/");
           if (norm === "/") return ["home"];
           if (norm === "/home") return ["biibon"];
-          if (norm === "/home/biibon") return ["CodeAtlas", "codeatlas-mcp"];
+          if (norm === "/home/user") return ["CodeAtlas", "codeatlas-mcp"];
           return [];
         },
         readFileSync: (p: string, enc: any) => {
@@ -85,13 +85,13 @@ describe("Workspace Path Resolution & Discovery Tests", () => {
         existsSync: (p: string) => {
           if (p === "/proc/9999/status" || p === "/proc/5000/status" || p === "/proc/5000/cmdline") return true;
           const norm = p.replace(/\\/g, "/");
-          return norm === "/" || norm === "/home" || norm === "/home/biibon" || norm === "/home/biibon/auto-edit-video-reup-tool";
+          return norm === "/" || norm === "/home" || norm === "/home/user" || norm === "/home/user/auto-edit-video-reup-tool";
         },
         readdirSync: (p: string) => {
           const norm = p.replace(/\\/g, "/");
           if (norm === "/") return ["home"];
           if (norm === "/home") return ["biibon"];
-          if (norm === "/home/biibon") return ["auto-edit-video-reup-tool"];
+          if (norm === "/home/user") return ["auto-edit-video-reup-tool"];
           return [];
         },
         readFileSync: (p: string, enc: any) => {
@@ -116,14 +116,14 @@ describe("Workspace Path Resolution & Discovery Tests", () => {
         existsSync: (p: string) => {
           if (p === "/proc" || p === "/proc/9999/status" || p === "/proc/5000/status" || p === "/proc/5001/status" || p === "/proc/5001/cmdline") return true;
           const norm = p.replace(/\\/g, "/");
-          return norm === "/" || norm === "/home" || norm === "/home/biibon" || norm === "/home/biibon/auto-edit-video-reup-tool";
+          return norm === "/" || norm === "/home" || norm === "/home/user" || norm === "/home/user/auto-edit-video-reup-tool";
         },
         readdirSync: (p: string) => {
           const norm = p.replace(/\\/g, "/");
           if (norm === "/proc") return ["9999", "5000", "5001"];
           if (norm === "/") return ["home"];
           if (norm === "/home") return ["biibon"];
-          if (norm === "/home/biibon") return ["auto-edit-video-reup-tool"];
+          if (norm === "/home/user") return ["auto-edit-video-reup-tool"];
           return [];
         },
         readFileSync: (p: string, enc: any) => {
@@ -172,7 +172,7 @@ describe("Workspace Path Resolution & Discovery Tests", () => {
     it("should flag system IDE directories and subdirectories", () => {
       assert.strictEqual(isSystemIdeDirectory("/config/Downloads/Antigravity"), true);
       assert.strictEqual(isSystemIdeDirectory("/config/Downloads/Antigravity/resources/app"), true);
-      assert.strictEqual(isSystemIdeDirectory("/home/biibon/codeatlas-mcp-enterprise"), false);
+      assert.strictEqual(isSystemIdeDirectory("/home/user/codeatlas-mcp-enterprise"), false);
     });
 
     it("should detect IDE resources directory content structure", () => {

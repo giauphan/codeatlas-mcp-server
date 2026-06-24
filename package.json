@@ -1,7 +1,7 @@
 {
-  "name": "codeatlas-enterprise",
+  "name": "codeatlas-mcp-enterprise",
   "version": "2.20.1",
-  "description": "Enterprise-grade local-first MCP server and gateway for CodeAtlas",
+  "description": "Enterprise-grade local-first MCP server for CodeAtlas — AST analysis, codebase intelligence, and semantic memory powered by Oracle 26ai.",
   "type": "module",
   "bin": {
     "codeatlas-enterprise": "dist/index.js",
@@ -11,6 +11,14 @@
     "dist",
     "README.md"
   ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/giauphan/codeatlas-mcp-enterprise.git"
+  },
+  "homepage": "https://github.com/giauphan/codeatlas-mcp-enterprise#readme",
+  "bugs": {
+    "url": "https://github.com/giauphan/codeatlas-mcp-enterprise/issues"
+  },
   "scripts": {
     "build": "tsc",
     "start": "node dist/index.js",
@@ -22,6 +30,10 @@
     "mcp",
     "modelcontextprotocol",
     "codeatlas",
+    "code-analysis",
+    "ast",
+    "ai",
+    "codebase-intelligence",
     "enterprise"
   ],
   "author": "giauphan",

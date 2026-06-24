@@ -9,3 +9,5 @@ pnpm-debug.log*
 .env.*
 !.env.example
 .DS_Store
+# Build output
+dist/
