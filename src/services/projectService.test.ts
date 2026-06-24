@@ -154,7 +154,7 @@ describe("Workspace Path Resolution & Discovery Tests", () => {
         },
         readFileSync: (p: string, enc: any) => {
           if (p === "/proc/9999/status") return "PPid: 9999\n"; // PPid equals currentPid
-          if (p === "/proc/9999/cmdline") return "--workspace_id\0file_home_biibon_CodeAtlas\0";
+          if (p === "/proc/9999/cmdline") return "--workspace_id\0file_home_user_CodeAtlas\0";
           return "";
         }
       });

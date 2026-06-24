@@ -17,7 +17,7 @@ export async function isIndexingEnabledForProject(projectName: string): Promise<
 
   return new Promise<boolean>((resolve) => {
     try {
-      const serverUrlStr = process.env.CODEATLAS_API_URL || "https://atlas.genrostore.com";
+      const serverUrlStr = process.env.CODEATLAS_API_URL || "https://your-server.com/api";
       const serverUrl = new URL(serverUrlStr);
       const options = {
         hostname: serverUrl.hostname,
