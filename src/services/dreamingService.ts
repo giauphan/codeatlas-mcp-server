@@ -46,7 +46,7 @@ export async function saveDreamMemory(params: DreamMemoryInput): Promise<{ succe
   return new Promise<{ success: boolean; id: string }>((resolve, reject) => {
     try {
       const payload: string = JSON.stringify(params);
-      const serverUrlStr: string = process.env.CODEATLAS_API_URL || "https://atlas.genrostore.com";
+      const serverUrlStr: string = process.env.CODEATLAS_API_URL || "https://your-server.com/api";
       const serverUrl: URL = new URL(serverUrlStr);
 
       const options: https.RequestOptions = {
@@ -100,7 +100,7 @@ export async function queryDreamMemories(params: DreamMemoryQuery): Promise<Drea
 
   return new Promise<DreamMemoryResult[]>((resolve, reject) => {
     try {
-      const serverUrlStr: string = process.env.CODEATLAS_API_URL || "https://atlas.genrostore.com";
+      const serverUrlStr: string = process.env.CODEATLAS_API_URL || "https://your-server.com/api";
       const serverUrl: URL = new URL(serverUrlStr);
 
       const queryParams: URLSearchParams = new URLSearchParams();
