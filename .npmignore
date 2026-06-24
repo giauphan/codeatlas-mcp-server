@@ -1,0 +1,14 @@
+src/
+tests/
+test/
+node_modules/
+.git/
+.github/
+.codeatlas/
+security_reports/
+.gitignore
+.env
+.env.example
+*.ts
+*.tsbuildinfo
+CHANGELOG.md

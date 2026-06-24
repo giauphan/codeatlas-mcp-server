@@ -1,0 +1,60 @@
+{
+  "name": "codeatlas-mcp-enterprise",
+  "version": "2.20.1",
+  "description": "Enterprise-grade local-first MCP server for CodeAtlas — AST analysis, codebase intelligence, and semantic memory powered by Oracle 26ai.",
+  "type": "module",
+  "bin": {
+    "codeatlas-enterprise": "dist/index.js",
+    "codeatlas-mcp": "dist/index.js"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/giauphan/codeatlas-mcp-server.git"
+  },
+  "homepage": "https://github.com/giauphan/codeatlas-mcp-server#readme",
+  "bugs": {
+    "url": "https://github.com/giauphan/codeatlas-mcp-server/issues"
+  },
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "tsx index.ts",
+    "test": "npm run build && node --experimental-test-module-mocks --test \"dist/src/**/*.test.js\"",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "mcp",
+    "modelcontextprotocol",
+    "codeatlas",
+    "code-analysis",
+    "ast",
+    "ai",
+    "codebase-intelligence",
+    "enterprise"
+  ],
+  "author": "giauphan",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/node": "^20.0.0",
+    "tsx": "^4.22.1",
+    "typescript": "^5.4.0"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.1",
+    "@typescript-eslint/typescript-estree": "^8.0.0",
+    "chokidar": "^3.6.0",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "glob": "^10.3.10",
+    "hono": "^4.12.27",
+    "ignore": "^7.0.5",
+    "py-ast": "^1.9.0",
+    "supergateway": "^3.4.3",
+    "zod": "^3.22.4"
+  }
+}
