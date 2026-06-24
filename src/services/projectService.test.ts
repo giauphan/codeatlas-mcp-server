@@ -59,7 +59,7 @@ describe("Workspace Path Resolution & Discovery Tests", () => {
         readdirSync: (p: string) => {
           const norm = p.replace(/\\/g, "/");
           if (norm === "/") return ["home"];
-          if (norm === "/home") return ["biibon"];
+          if (norm === "/home") return ["user"];
           if (norm === "/home/user") return ["CodeAtlas", "codeatlas-mcp"];
           return [];
         },
@@ -90,7 +90,7 @@ describe("Workspace Path Resolution & Discovery Tests", () => {
         readdirSync: (p: string) => {
           const norm = p.replace(/\\/g, "/");
           if (norm === "/") return ["home"];
-          if (norm === "/home") return ["biibon"];
+          if (norm === "/home") return ["user"];
           if (norm === "/home/user") return ["auto-edit-video-reup-tool"];
           return [];
         },
@@ -122,7 +122,7 @@ describe("Workspace Path Resolution & Discovery Tests", () => {
           const norm = p.replace(/\\/g, "/");
           if (norm === "/proc") return ["9999", "5000", "5001"];
           if (norm === "/") return ["home"];
-          if (norm === "/home") return ["biibon"];
+          if (norm === "/home") return ["user"];
           if (norm === "/home/user") return ["auto-edit-video-reup-tool"];
           return [];
         },

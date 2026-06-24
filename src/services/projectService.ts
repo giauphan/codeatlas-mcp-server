@@ -1016,7 +1016,7 @@ export async function syncAnalysisToServer(projectName: string, analysis: any, b
   return new Promise((resolve, reject) => {
     try {
       const payload = JSON.stringify({ projectName, analysis, businessRule, changeDescription });
-      const serverUrlStr = process.env.CODEATLAS_API_URL || "https://atlas.genrostore.com";
+      const serverUrlStr = process.env.CODEATLAS_API_URL || "https://your-server.com/api";
       const serverUrl = new URL(serverUrlStr);
       
       const options = {
@@ -1071,7 +1071,7 @@ export async function getEpisodicMemoriesFromServer(projectName: string, eventTy
 
   return new Promise((resolve, reject) => {
     try {
-      const serverUrlStr = process.env.CODEATLAS_API_URL || "https://atlas.genrostore.com";
+      const serverUrlStr = process.env.CODEATLAS_API_URL || "https://your-server.com/api";
       const serverUrl = new URL(serverUrlStr);
       
       let pathStr = `/api/projects/memory?projectName=${encodeURIComponent(projectName)}`;
