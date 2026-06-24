@@ -7,4 +7,5 @@ pnpm-debug.log*
 # Environment secrets (if user creates it locally)
 .env
 .env.*
+!.env.example
 .DS_Store
