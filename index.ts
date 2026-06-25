@@ -8,6 +8,43 @@ import { RootsListChangedNotificationSchema } from "@modelcontextprotocol/sdk/ty
 import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
+import https from "https";
+
+// ── Version check (async, non-blocking) ────────────────────────────
+const PKG_NAME = "codeatlas-mcp-server";
+let cachedLatestVersion: string | null = null;
+
+async function checkForUpdate(): Promise<string | null> {
+  if (cachedLatestVersion) return cachedLatestVersion;
+  return new Promise((resolve) => {
+    const req = https.get(
+      `https://registry.npmjs.org/${PKG_NAME}/latest`,
+      (res) => {
+        let data = "";
+        res.on("data", (chunk: string) => { data += chunk; });
+        res.on("end", () => {
+          try {
+            const json = JSON.parse(data);
+            cachedLatestVersion = json.version || null;
+            resolve(cachedLatestVersion);
+          } catch { resolve(null); }
+        });
+      }
+    );
+    req.on("error", () => resolve(null));
+    req.setTimeout(3000, () => { req.destroy(); resolve(null); });
+  });
+}
+
+function getCurrentVersion(): string {
+  try {
+    for (const p of ['./package.json', '../package.json']) {
+      const pkg = JSON.parse(fs.readFileSync(new URL(p, import.meta.url), 'utf-8'));
+      if (pkg.version) return pkg.version;
+    }
+  } catch {}
+  return "0.0.0";
+}
 
 // Configure centralized log file in ~/.codeatlas/mcp.log
 const homeDir = os.homedir();
@@ -146,6 +183,15 @@ dotenv.config();
 
 // Start server
 async function main() {
+  // Check for newer version (non-blocking)
+  const currentVer = getCurrentVersion();
+  checkForUpdate().then((latest) => {
+    if (latest && latest !== currentVer) {
+      console.error(`\n📦 New version available: ${currentVer} → ${latest}`);
+      console.error(`   Run: npm install -g ${PKG_NAME}@latest\n`);
+    }
+  });
+
   // Auto-scan current working directory immediately on startup (standalone mode)
   const cwd = process.cwd();
   if (!isSystemIdeDirectory(cwd)) {
