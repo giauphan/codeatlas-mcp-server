@@ -146,6 +146,44 @@ dotenv.config();
 
 // Start server
 async function main() {
+  // Auto-scan current working directory immediately on startup (standalone mode)
+  const cwd = process.cwd();
+  if (!isSystemIdeDirectory(cwd)) {
+    console.error(`[Auto-Scan] 📂 Standalone mode — scanning CWD: ${cwd}`);
+    
+    // 1. Check if CWD itself is a project (has .git or .codeatlas)
+    const cwdHasGit = await fileExists(path.join(cwd, '.git'));
+    const cwdHasCodeatlas = await fileExists(path.join(cwd, '.codeatlas', 'analysis.json'));
+    if (cwdHasGit || cwdHasCodeatlas) {
+      console.error(`[Auto-Scan] 📦 Found project in CWD: ${cwd}`);
+      const cwdName = path.basename(cwd);
+      isIndexingEnabledForProject(cwdName).then((enabled) => {
+        if (!enabled) return;
+        loadAnalysisAsync(cwd, true).then((loaded) => {
+          if (loaded) console.error(`[Auto-Scan] ✅ Indexed: ${cwd}`);
+        }).catch(() => {});
+      }).catch(() => {});
+    }
+    
+    // 2. Scan subdirectories for .git projects regardless of IDE open status
+    discoverGitSubProjects(cwd, false).then((subProjects) => {
+      if (subProjects.length > 0) {
+        console.error(`[Auto-Scan] 📦 Found ${subProjects.length} project(s) in CWD`);
+        for (const subDir of subProjects) {
+          const subName = path.basename(subDir);
+          isIndexingEnabledForProject(subName).then((enabled) => {
+            if (!enabled) return;
+            loadAnalysisAsync(subDir, true).then((loaded) => {
+              if (loaded) console.error(`[Auto-Scan] ✅ Indexed: ${subDir}`);
+            }).catch(() => {});
+          }).catch(() => {});
+        }
+      } else {
+        console.error(`[Auto-Scan] ℹ️ No .git projects found in CWD: ${cwd}`);
+      }
+    }).catch(() => {});
+  }
+
   startWatcher();
 
   // Function to scan workspace roots from the client
