@@ -38,9 +38,19 @@ async function checkForUpdate(): Promise<string | null> {
 
 function getCurrentVersion(): string {
   try {
-    for (const p of ['./package.json', '../package.json']) {
-      const pkg = JSON.parse(fs.readFileSync(new URL(p, import.meta.url), 'utf-8'));
-      if (pkg.version) return pkg.version;
+    const dir = path.dirname(fileURLToPath(import.meta.url));
+    const candidates = [
+      path.join(dir, '..', 'package.json'),   // global: .../node_modules/codeatlas-mcp-server/package.json
+      path.join(dir, 'package.json'),          // local dev: dist/package.json
+      path.resolve('package.json'),            // CWD fallback
+    ];
+    for (const p of candidates) {
+      try {
+        if (fs.existsSync(p)) {
+          const pkg = JSON.parse(fs.readFileSync(p, 'utf-8'));
+          if (pkg.version) return pkg.version;
+        }
+      } catch { /* try next */ }
     }
   } catch {}
   return "0.0.0";
