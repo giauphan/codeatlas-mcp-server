@@ -1618,6 +1618,14 @@ export function registerTools(server: McpServer) {
       const loaded = await loadAnalysisAsync(project);
       if (!loaded) return { content: [{ type: "text" as const, text: "No analysis found. Run 'analyze' first." }] };
 
+      // 🛡️ Sentinel Security Validation
+      if (/[;&|$\n\r`()<>]/.test(script)) {
+        return { content: [{ type: "text" as const, text: JSON.stringify({ error: "Invalid characters in script parameter" }) }] };
+      }
+      if (args && /[;&|$\n\r`()<>]/.test(args)) {
+        return { content: [{ type: "text" as const, text: JSON.stringify({ error: "Invalid characters in args parameter" }) }] };
+      }
+
       const projectDir = loaded.projectDir;
       const pkgPath = path.join(projectDir, "package.json");
       if (fs.existsSync(pkgPath)) {
