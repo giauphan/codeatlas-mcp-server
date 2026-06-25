@@ -1619,13 +1619,7 @@ export function registerTools(server: McpServer) {
       if (!loaded) return { content: [{ type: "text" as const, text: "No analysis found. Run 'analyze' first." }] };
 
       // 🛡️ Sentinel Security Validation
-      if (/[;&|$\n\r`()<>]/.test(script)) {
-        return { content: [{ type: "text" as const, text: JSON.stringify({ error: "Invalid characters in script parameter" }) }] };
-      }
-      if (args && /[;&|$\n\r`()<>]/.test(args)) {
-        return { content: [{ type: "text" as const, text: JSON.stringify({ error: "Invalid characters in args parameter" }) }] };
-      }
-
+      // Use spawnSync without a shell to prevent command injection entirely
       const projectDir = loaded.projectDir;
       const pkgPath = path.join(projectDir, "package.json");
       if (fs.existsSync(pkgPath)) {
@@ -1635,15 +1629,33 @@ export function registerTools(server: McpServer) {
         } catch { /* skip */ }
       }
 
-      const cmd = `cd ${JSON.stringify(projectDir)} && npm run ${script}${args ? " " + args : ""}`;
       const maxTime = Math.min(timeout || 60, 300);
       const startTime = Date.now();
 
       try {
         const cp = require("child_process");
-        const result = cp.execSync(cmd, { timeout: maxTime * 1000, shell: "/bin/bash", maxBuffer: 1024 * 1024, cwd: projectDir });
+        const parsedArgs = args ? args.split(" ").filter(Boolean) : [];
+        const result = cp.spawnSync("npm", ["run", script, ...parsedArgs], {
+          timeout: maxTime * 1000,
+          shell: false, // Security: explicit shell false
+          maxBuffer: 1024 * 1024,
+          cwd: projectDir
+        });
+
         const dur = ((Date.now() - startTime) / 1000).toFixed(1);
-        return { content: [{ type: "text" as const, text: JSON.stringify({ script, project: loaded.projectName, exitCode: 0, duration: `${dur}s`, stdout: result.stdout.toString().substring(0, 10000), stderr: (result.stderr || "").toString().substring(0, 5000) }, null, 2) }] };
+
+        if (result.error) {
+          throw result.error;
+        }
+
+        const stdoutStr = result.stdout ? result.stdout.toString().substring(0, 10000) : "";
+        const stderrStr = result.stderr ? result.stderr.toString().substring(0, 5000) : "";
+
+        if (result.status !== 0) {
+          return { content: [{ type: "text" as const, text: JSON.stringify({ script, project: loaded.projectName, exitCode: result.status || 1, duration: `${dur}s`, stdout: stdoutStr, stderr: stderrStr, error: `Process exited with code ${result.status}` }, null, 2) }] };
+        }
+
+        return { content: [{ type: "text" as const, text: JSON.stringify({ script, project: loaded.projectName, exitCode: 0, duration: `${dur}s`, stdout: stdoutStr, stderr: stderrStr }, null, 2) }] };
       } catch (err: any) {
         const dur = ((Date.now() - startTime) / 1000).toFixed(1);
         return { content: [{ type: "text" as const, text: JSON.stringify({ script, project: loaded.projectName, exitCode: err.status || 1, duration: `${dur}s`, stdout: (err.stdout || "").toString().substring(0, 10000), stderr: (err.stderr || "").toString().substring(0, 5000), error: err.killed ? "TIMEOUT" : err.message?.substring(0, 300) }, null, 2) }] };
