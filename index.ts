@@ -201,7 +201,27 @@ async function main() {
     if (!succeeded) {
       const activeWorkspace = process.env.CODEATLAS_PROJECT_DIR || getWorkspaceFromAncestors() || process.env.GEMINI_CLI_IDE_WORKSPACE_PATH || process.cwd();
       if (isSystemIdeDirectory(activeWorkspace)) {
-        console.error(`[Auto-Scan] 🛡️ Ignored IDE system directory fallback: ${activeWorkspace}`);
+        console.error(`[Auto-Scan] 🛡️ Ignored IDE system directory fallback: ${activeWorkspace}. Falling back to CWD.`);
+        // Fall back to process.cwd() instead of returning — allows running from any directory
+        const cwdWorkspace = process.cwd();
+        if (isSystemIdeDirectory(cwdWorkspace)) {
+          console.error(`[Auto-Scan] 🛡️ CWD is also an IDE system directory. Skipping auto-scan.`);
+          return;
+        }
+        console.error(`[Auto-Scan] 📂 Using CWD as workspace: ${cwdWorkspace}`);
+        const subProjects = await discoverGitSubProjects(cwdWorkspace, true);
+        if (subProjects.length > 0) {
+          console.error(`[Auto-Scan] 📦 Fallback CWD: found ${subProjects.length} IDE-open .git project(s) in ${cwdWorkspace}`);
+          for (const subDir of subProjects) {
+            const subName = path.basename(subDir);
+            isIndexingEnabledForProject(subName).then((enabled) => {
+              if (!enabled) return;
+              loadAnalysisAsync(subDir, true).catch(() => {});
+            }).catch(() => {});
+          }
+        } else {
+          console.error(`[Auto-Scan] ℹ️ No .git projects found in CWD: ${cwdWorkspace}`);
+        }
         return;
       }
 
