@@ -1017,6 +1017,11 @@ export async function syncAnalysisToServer(projectName: string, analysis: any, b
     try {
       const payload = JSON.stringify({ projectName, analysis, businessRule, changeDescription });
       const serverUrlStr = process.env.CODEATLAS_API_URL || "https://your-server.com/api";
+      const serverApiKey = getResolvedApiKey();
+      if (!serverApiKey || serverUrlStr === "https://your-server.com/api") {
+        console.error(`[Auto-Scan] ⏭️ Cloud sync skipped — no CODEATLAS_API_URL configured.`);
+        return;
+      }
       const serverUrl = new URL(serverUrlStr);
       
       const options = {
@@ -1037,7 +1042,7 @@ export async function syncAnalysisToServer(projectName: string, analysis: any, b
         res.on("end", () => {
           if (res.statusCode && res.statusCode >= 200 && res.statusCode < 300) {
             console.error(`[Auto-Scan] ✅ Securely synced ${projectName} AST analysis to CodeAtlas Cloud!`);
-            resolve();
+            resolve(undefined);
           } else {
             const errMsg = `Secure Cloud Sync failed with status ${res.statusCode}: ${data}`;
             console.error(`[Auto-Scan] ❌ ${errMsg}`);
@@ -1072,6 +1077,12 @@ export async function getEpisodicMemoriesFromServer(projectName: string, eventTy
   return new Promise((resolve, reject) => {
     try {
       const serverUrlStr = process.env.CODEATLAS_API_URL || "https://your-server.com/api";
+      const serverApiKey = getResolvedApiKey();
+      if (!serverApiKey || serverUrlStr === "https://your-server.com/api") {
+        console.error(`[Auto-Scan] ⏭️ Cloud sync skipped — no CODEATLAS_API_URL configured.`);
+        resolve([]);
+        return;
+      }
       const serverUrl = new URL(serverUrlStr);
       
       let pathStr = `/api/projects/memory?projectName=${encodeURIComponent(projectName)}`;
