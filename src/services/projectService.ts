@@ -1016,9 +1016,9 @@ export async function syncAnalysisToServer(projectName: string, analysis: any, b
   return new Promise((resolve, reject) => {
     try {
       const payload = JSON.stringify({ projectName, analysis, businessRule, changeDescription });
-      const serverUrlStr = process.env.CODEATLAS_API_URL || "https://your-server.com/api";
+      const serverUrlStr = process.env.CODEATLAS_API_URL;
       const serverApiKey = getResolvedApiKey();
-      if (!serverApiKey || serverUrlStr === "https://your-server.com/api") {
+      if (!serverApiKey || !serverUrlStr) {
         console.error(`[Auto-Scan] ⏭️ Cloud sync skipped — no CODEATLAS_API_URL configured.`);
         return;
       }
@@ -1076,11 +1076,10 @@ export async function getEpisodicMemoriesFromServer(projectName: string, eventTy
 
   return new Promise((resolve, reject) => {
     try {
-      const serverUrlStr = process.env.CODEATLAS_API_URL || "https://your-server.com/api";
+      const serverUrlStr = process.env.CODEATLAS_API_URL;
       const serverApiKey = getResolvedApiKey();
-      if (!serverApiKey || serverUrlStr === "https://your-server.com/api") {
+      if (!serverApiKey || !serverUrlStr) {
         console.error(`[Auto-Scan] ⏭️ Cloud sync skipped — no CODEATLAS_API_URL configured.`);
-        resolve([]);
         return;
       }
       const serverUrl = new URL(serverUrlStr);

@@ -15,9 +15,11 @@ export async function isIndexingEnabledForProject(projectName: string): Promise<
   const apiKey = getResolvedApiKey();
   if (!apiKey) return true;
 
+  const serverUrlStr = process.env.CODEATLAS_API_URL;
+  if (!serverUrlStr) return true;
+
   return new Promise<boolean>((resolve) => {
     try {
-      const serverUrlStr = process.env.CODEATLAS_API_URL || "https://your-server.com/api";
       const serverUrl = new URL(serverUrlStr);
       const options = {
         hostname: serverUrl.hostname,

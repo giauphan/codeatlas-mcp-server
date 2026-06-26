@@ -43,10 +43,14 @@ export async function saveDreamMemory(params: DreamMemoryInput): Promise<{ succe
     throw new Error("CODEATLAS_API_KEY is not set. Cannot save dream memory.");
   }
 
+  const serverUrlStr = process.env.CODEATLAS_API_URL;
+  if (!serverUrlStr) {
+    throw new Error("CODEATLAS_API_URL is not set. Cannot save dream memory.");
+  }
+
   return new Promise<{ success: boolean; id: string }>((resolve, reject) => {
     try {
       const payload: string = JSON.stringify(params);
-      const serverUrlStr: string = process.env.CODEATLAS_API_URL || "https://your-server.com/api";
       const serverUrl: URL = new URL(serverUrlStr);
 
       const options: https.RequestOptions = {
@@ -98,9 +102,13 @@ export async function queryDreamMemories(params: DreamMemoryQuery): Promise<Drea
     throw new Error("CODEATLAS_API_KEY is not set. Cannot query dream memories.");
   }
 
+  const serverUrlStr = process.env.CODEATLAS_API_URL;
+  if (!serverUrlStr) {
+    throw new Error("CODEATLAS_API_URL is not set. Cannot query dream memories.");
+  }
+
   return new Promise<DreamMemoryResult[]>((resolve, reject) => {
     try {
-      const serverUrlStr: string = process.env.CODEATLAS_API_URL || "https://your-server.com/api";
       const serverUrl: URL = new URL(serverUrlStr);
 
       const queryParams: URLSearchParams = new URLSearchParams();

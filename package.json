@@ -1,6 +1,6 @@
 {
   "name": "codeatlas-mcp-server",
-  "version": "2.20.10",
+  "version": "2.20.11",
   "description": "Local-first MCP server for AI-powered codebase intelligence — AST analysis, dependency graphs, and semantic search. Your source code never leaves your machine.",
   "type": "module",
   "bin": {
