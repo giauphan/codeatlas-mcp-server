@@ -204,7 +204,45 @@ async function main() {
 
   // Auto-scan current working directory immediately on startup (standalone mode)
   const cwd = process.cwd();
-  if (!isSystemIdeDirectory(cwd)) {
+  
+  // Check for CODEATLAS_PROJECT_DIRS env var — multi-project support
+  const projectDirsEnv = process.env.CODEATLAS_PROJECT_DIRS;
+  if (projectDirsEnv) {
+    const dirs = projectDirsEnv.split(',').map(d => d.trim()).filter(d => d.length > 0);
+    console.error(`[Auto-Scan] 📂 Multi-project mode: ${dirs.length} dir(s) configured via CODEATLAS_PROJECT_DIRS`);
+    for (const dir of dirs) {
+      const resolved = path.resolve(dir);
+      if (!(await fileExists(resolved))) {
+        console.error(`[Auto-Scan] ⚠️ Path not found: ${resolved}`);
+        continue;
+      }
+      const hasGit = await fileExists(path.join(resolved, '.git'));
+      const hasCodeatlas = await fileExists(path.join(resolved, '.codeatlas', 'analysis.json'));
+      if (hasGit || hasCodeatlas) {
+        const name = path.basename(resolved);
+        console.error(`[Auto-Scan] 📦 Found project: ${name} (${resolved})`);
+        isIndexingEnabledForProject(name).then((enabled) => {
+          if (!enabled) return;
+          loadAnalysisAsync(resolved, true).then((loaded) => {
+            if (loaded) console.error(`[Auto-Scan] ✅ Indexed: ${resolved}`);
+          }).catch(() => {});
+        }).catch(() => {});
+      } else {
+        console.error(`[Auto-Scan] ℹ️ No .git project at ${resolved}, scanning subdirs...`);
+        discoverGitSubProjects(resolved, false).then((subs) => {
+          for (const sub of subs) {
+            const subName = path.basename(sub);
+            isIndexingEnabledForProject(subName).then((enabled) => {
+              if (!enabled) return;
+              loadAnalysisAsync(sub, true).then((loaded) => {
+                if (loaded) console.error(`[Auto-Scan] ✅ Indexed: ${sub}`);
+              }).catch(() => {});
+            }).catch(() => {});
+          }
+        });
+      }
+    }
+  } else if (!isSystemIdeDirectory(cwd)) {
     console.error(`[Auto-Scan] 📂 Standalone mode — scanning CWD: ${cwd}`);
     
     // 1. Check if CWD itself is a project (has .git or .codeatlas)
