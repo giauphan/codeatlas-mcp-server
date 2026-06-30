@@ -433,28 +433,32 @@ export class CodeAnalyzer {
       return fileList;
     }
     
-    let files: string[];
+    let entries: fs.Dirent[];
     try {
-      files = fs.readdirSync(dir);
+      // ⚡ Bolt Optimization: Use { withFileTypes: true } to get fs.Dirent objects.
+      // This avoids making a very expensive fs.statSync call for every single file.
+      entries = fs.readdirSync(dir, { withFileTypes: true });
     } catch {
       return fileList;
     }
     
-    for (const file of files) {
+    for (const entry of entries) {
       // Keep safety check for hidden files/folders (starting with .)
-      if (file.startsWith('.')) {
+      if (entry.name.startsWith('.')) {
         continue;
       }
       
-      const filePath = path.join(dir, file);
-      let stat: fs.Stats;
-      try {
-        stat = fs.statSync(filePath);
-      } catch {
-        continue;
-      }
+      const filePath = path.join(dir, entry.name);
       
-      const isDirectory = stat.isDirectory();
+      let isDirectory = entry.isDirectory();
+      if (entry.isSymbolicLink()) {
+        try {
+          // ⚡ Bolt Optimization fallback: Only run statSync for symlinks to follow them.
+          isDirectory = fs.statSync(filePath).isDirectory();
+        } catch {
+          continue;
+        }
+      }
       
       // Check if file/directory is ignored via .gitignore or default rules
       if (this.isIgnored(filePath, isDirectory)) {
@@ -463,7 +467,7 @@ export class CodeAnalyzer {
       
       if (isDirectory) {
         this.getFiles(filePath, fileList, depth + 1);
-      } else if (this.fileExtensions.some(ext => file.endsWith(ext))) {
+      } else if (this.fileExtensions.some(ext => entry.name.endsWith(ext))) {
         fileList.push(filePath);
       }
     }
