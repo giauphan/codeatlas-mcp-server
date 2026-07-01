@@ -1,3 +1,0 @@
-## 2025-02-06 - [Avoid synchronous fs.statSync in directory traversal]
-**Learning:** In Node.js, `fs.readdirSync(dir)` followed by `fs.statSync(file)` inside a loop to determine if a file is a directory is a major performance bottleneck for deep directory traversal. Calling `fs.statSync` incurs expensive synchronous system calls for every single entry.
-**Action:** Always prefer `fs.readdirSync(dir, { withFileTypes: true })` which yields `fs.Dirent` objects that have an extremely cheap `isDirectory()` method, drastically reducing the number of I/O operations required. Remember to handle symbolic links using `dirent.isSymbolicLink()` paired with `fs.statSync(file)` to correctly resolve their targets.

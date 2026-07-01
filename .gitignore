@@ -11,3 +11,6 @@ pnpm-debug.log*
 .DS_Store
 # Build output
 dist/
+
+# Jules AI learning notes
+.jules/
