@@ -433,28 +433,35 @@ export class CodeAnalyzer {
       return fileList;
     }
     
-    let files: string[];
+    let dirents: fs.Dirent[];
     try {
-      files = fs.readdirSync(dir);
+      // ⚡ Bolt Performance Optimization:
+      // Using withFileTypes: true to avoid calling fs.statSync for every file
+      dirents = fs.readdirSync(dir, { withFileTypes: true });
     } catch {
       return fileList;
     }
     
-    for (const file of files) {
+    for (const dirent of dirents) {
+      const file = dirent.name;
       // Keep safety check for hidden files/folders (starting with .)
       if (file.startsWith('.')) {
         continue;
       }
       
       const filePath = path.join(dir, file);
-      let stat: fs.Stats;
-      try {
-        stat = fs.statSync(filePath);
-      } catch {
-        continue;
-      }
       
-      const isDirectory = stat.isDirectory();
+      let isDirectory = dirent.isDirectory();
+
+      // If it's a symbolic link, we still need to stat it to find out if it points to a directory
+      if (dirent.isSymbolicLink()) {
+        try {
+          const stat = fs.statSync(filePath);
+          isDirectory = stat.isDirectory();
+        } catch {
+          continue;
+        }
+      }
       
       // Check if file/directory is ignored via .gitignore or default rules
       if (this.isIgnored(filePath, isDirectory)) {
