@@ -1627,6 +1627,14 @@ export function registerTools(server: McpServer) {
         } catch { /* skip */ }
       }
 
+      // Security validation to prevent command injection
+      if (/[&|;<>$`\n\r]/.test(script)) {
+        return { content: [{ type: "text" as const, text: JSON.stringify({ error: "Invalid script name: Contains forbidden shell characters" }) }] };
+      }
+      if (args && /[&|;<>$`\n\r]/.test(args)) {
+        return { content: [{ type: "text" as const, text: JSON.stringify({ error: "Invalid arguments: Contains forbidden shell characters" }) }] };
+      }
+
       const cmd = `cd ${JSON.stringify(projectDir)} && npm run ${script}${args ? " " + args : ""}`;
       const maxTime = Math.min(timeout || 60, 300);
       const startTime = Date.now();
