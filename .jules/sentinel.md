@@ -1,4 +1,0 @@
-## 2024-05-18 - Command Injection in run_script tool
-**Vulnerability:** The `run_script` tool in `src/presentation/mcpServer.ts` accepted unvalidated `script` and `args` parameters and concatenated them into a string passed to `child_process.execSync` using bash. This allowed an attacker to inject arbitrary shell commands by providing characters like `;`, `&`, or `|`.
-**Learning:** Even internal or local-first MCP server tools must treat all incoming parameters as untrusted input. Concatenating strings to form shell commands is highly prone to injection vulnerabilities.
-**Prevention:** Always validate and sanitize inputs that will be used in shell commands. Use a regex to block dangerous characters (e.g., `/[&|;<>$`\n\r]/`), or better yet, use execution methods that accept an array of arguments instead of a single string (like `child_process.spawn`) to completely bypass shell parsing.
