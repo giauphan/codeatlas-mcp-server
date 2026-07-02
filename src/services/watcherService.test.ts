@@ -21,6 +21,7 @@ describe("WatcherService tests", () => {
   it("should handle HTTPS request correctly and parse response", async () => {
     const originalKey = process.env.CODEATLAS_API_KEY;
     process.env.CODEATLAS_API_KEY = "test-api-key";
+    process.env.CODEATLAS_API_URL = "https://test.api/";
 
     const originalRequest = httpsWrapper.request;
     let requestOptions: any = null;
