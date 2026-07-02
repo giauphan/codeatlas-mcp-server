@@ -25,6 +25,8 @@ describe("Dreaming Service - HTTPS Client", () => {
   let dreamingService: typeof import("./dreamingService.js");
 
   before(async () => {
+    process.env.CODEATLAS_API_URL = "https://test.api/";
+
     mock.module("https", {
       namedExports: {
         request(options: any, callback: (res: any) => void) {
