@@ -1713,5 +1713,60 @@ export const server = new McpServer(
   }
 );
 
+
+  // Tool 17-19: Skill Store & Generation
+  const SKILLS_PATH = path.join(os.homedir(), '.codeatlas', 'skills.json');
+  function readSkills() {
+    try {
+      if (fs.existsSync(SKILLS_PATH)) {
+        return JSON.parse(fs.readFileSync(SKILLS_PATH, 'utf-8'));
+      }
+    } catch (e) {}
+    return {};
+  }
+  function writeSkills(skills) {
+    const dir = path.dirname(SKILLS_PATH);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(SKILLS_PATH, JSON.stringify(skills, null, 2));
+  }
+  server.tool('get_skill', 'Get an AI skill by name.', { name: z.string().describe('Skill name') }, async ({ name }) => {
+    try {
+      const skills = readSkills();
+      const skill = skills[name];
+      if (!skill) return { content: [{ type: 'text' as const, text: 'Skill not found: ' + name }], isError: true as const };
+      return { content: [{ type: 'text' as const, text: skill.prompt }] };
+    } catch (err) {
+      return { content: [{ type: 'text' as const, text: 'Error: ' + String(err) }], isError: true as const };
+    }
+  });
+  server.tool('search_skills', 'Search available skills.', { query: z.string().describe('Keyword'), category: z.string().optional().describe('Filter') }, async ({ query, category }) => {
+    try {
+      const skills = readSkills();
+      const lower = query.toLowerCase();
+      const filtered = Object.values(skills).filter(function(s) {
+        if (category && s.category !== category) return false;
+        return s.name.toLowerCase().includes(lower) || s.description.toLowerCase().includes(lower) || (s.tags || []).some(function(t) { return t.includes(lower); });
+      });
+      if (filtered.length === 0) return { content: [{ type: 'text' as const, text: 'No skills found' }] };
+      const list = filtered.map(function(s, i) { return (i+1) + '. ' + s.name + ' - ' + s.description; }).join('
+');
+      return { content: [{ type: 'text' as const, text: 'Found ' + filtered.length + ' skill(s):
+' + list }] };
+    } catch (err) {
+      return { content: [{ type: 'text' as const, text: 'Error: ' + String(err) }], isError: true as const };
+    }
+  });
+  server.tool('install_skill', 'Install a skill.', { name: z.string().min(1).max(200).describe('Name'), description: z.string().describe('Description'), category: z.enum(['pattern','workflow','architecture','testing','security','custom']).describe('Category'), prompt: z.string().describe('Prompt'), tags: z.string().optional().describe('Tags') }, async ({ name, description, category, prompt, tags }) => {
+    try {
+      const skills = readSkills();
+      const id = 'skill-' + name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+      skills[id] = { id: id, name: name, description: description, category: category, prompt: prompt, tags: tags ? tags.split(',').map(function(t) { return t.trim(); }) : [], version: (skills[id] ? skills[id].version + 1 : 1), installedAt: new Date().toISOString() };
+      writeSkills(skills);
+      return { content: [{ type: 'text' as const, text: 'Installed skill: ' + name + ' (v' + skills[id].version + ')' }] };
+    } catch (err) {
+      return { content: [{ type: 'text' as const, text: 'Error: ' + String(err) }], isError: true as const };
+    }
+  });
+
 registerTools(server);
 
