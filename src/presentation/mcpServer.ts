@@ -1635,15 +1635,33 @@ export function registerTools(server: McpServer) {
         return { content: [{ type: "text" as const, text: JSON.stringify({ error: "Invalid arguments: Contains forbidden shell characters" }) }] };
       }
 
-      const cmd = `cd ${JSON.stringify(projectDir)} && npm run ${script}${args ? " " + args : ""}`;
       const maxTime = Math.min(timeout || 60, 300);
       const startTime = Date.now();
 
       try {
         const cp = require("child_process");
-        const result = cp.execSync(cmd, { timeout: maxTime * 1000, shell: "/bin/bash", maxBuffer: 1024 * 1024, cwd: projectDir });
+        const spawnArgs = ["run", script];
+        if (args) {
+          // split arguments by space for spawn
+          spawnArgs.push(...args.match(/(?:[^\s"]+|"[^"]*")+/g)?.map((arg: string) => arg.replace(/^"|"$/g, '')) || []);
+        }
+
+        // Use spawnSync with shell: false to prevent command injection
+        const result = cp.spawnSync("npm", spawnArgs, {
+          timeout: maxTime * 1000,
+          shell: false,
+          maxBuffer: 1024 * 1024,
+          cwd: projectDir,
+          encoding: "utf-8"
+        });
+
         const dur = ((Date.now() - startTime) / 1000).toFixed(1);
-        return { content: [{ type: "text" as const, text: JSON.stringify({ script, project: loaded.projectName, exitCode: 0, duration: `${dur}s`, stdout: result.stdout.toString().substring(0, 10000), stderr: (result.stderr || "").toString().substring(0, 5000) }, null, 2) }] };
+
+        if (result.error) {
+          throw result.error;
+        }
+
+        return { content: [{ type: "text" as const, text: JSON.stringify({ script, project: loaded.projectName, exitCode: result.status, duration: `${dur}s`, stdout: (result.stdout || "").substring(0, 10000), stderr: (result.stderr || "").substring(0, 5000) }, null, 2) }] };
       } catch (err: any) {
         const dur = ((Date.now() - startTime) / 1000).toFixed(1);
         return { content: [{ type: "text" as const, text: JSON.stringify({ script, project: loaded.projectName, exitCode: err.status || 1, duration: `${dur}s`, stdout: (err.stdout || "").toString().substring(0, 10000), stderr: (err.stderr || "").toString().substring(0, 5000), error: err.killed ? "TIMEOUT" : err.message?.substring(0, 300) }, null, 2) }] };
@@ -1724,7 +1742,7 @@ export const server = new McpServer(
     } catch (e) {}
     return {};
   }
-  function writeSkills(skills) {
+  function writeSkills(skills: any) {
     const dir = path.dirname(SKILLS_PATH);
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
     fs.writeFileSync(SKILLS_PATH, JSON.stringify(skills, null, 2));
@@ -1743,15 +1761,13 @@ export const server = new McpServer(
     try {
       const skills = readSkills();
       const lower = query.toLowerCase();
-      const filtered = Object.values(skills).filter(function(s) {
+      const filtered = Object.values(skills).filter(function(s: any) {
         if (category && s.category !== category) return false;
-        return s.name.toLowerCase().includes(lower) || s.description.toLowerCase().includes(lower) || (s.tags || []).some(function(t) { return t.includes(lower); });
+        return s.name.toLowerCase().includes(lower) || s.description.toLowerCase().includes(lower) || (s.tags || []).some(function(t: any) { return t.includes(lower); });
       });
       if (filtered.length === 0) return { content: [{ type: 'text' as const, text: 'No skills found' }] };
-      const list = filtered.map(function(s, i) { return (i+1) + '. ' + s.name + ' - ' + s.description; }).join('
-');
-      return { content: [{ type: 'text' as const, text: 'Found ' + filtered.length + ' skill(s):
-' + list }] };
+      const list = filtered.map((s: any, i: number) => `${i+1}. ${s.name} - ${s.description}`).join('\n');
+      return { content: [{ type: 'text' as const, text: `Found ${filtered.length} skill(s):\n${list}` }] };
     } catch (err) {
       return { content: [{ type: 'text' as const, text: 'Error: ' + String(err) }], isError: true as const };
     }
@@ -1760,7 +1776,7 @@ export const server = new McpServer(
     try {
       const skills = readSkills();
       const id = 'skill-' + name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
-      skills[id] = { id: id, name: name, description: description, category: category, prompt: prompt, tags: tags ? tags.split(',').map(function(t) { return t.trim(); }) : [], version: (skills[id] ? skills[id].version + 1 : 1), installedAt: new Date().toISOString() };
+      skills[id] = { id: id, name: name, description: description, category: category, prompt: prompt, tags: tags ? tags.split(',').map(function(t: string) { return t.trim(); }) : [], version: (skills[id] ? skills[id].version + 1 : 1), installedAt: new Date().toISOString() };
       writeSkills(skills);
       return { content: [{ type: 'text' as const, text: 'Installed skill: ' + name + ' (v' + skills[id].version + ')' }] };
     } catch (err) {
