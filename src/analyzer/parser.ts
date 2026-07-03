@@ -153,9 +153,17 @@ export class CodeAnalyzer {
   }
 
   private buildAnalysisResult(): AnalysisResult {
+    // ⚡ Bolt Performance Optimization:
+    // Pre-calculate degrees to avoid O(N*L) lookup performance bottleneck
+    const nodeDegrees = new Map<string, number>();
+    for (const link of this.links) {
+      nodeDegrees.set(link.source, (nodeDegrees.get(link.source) || 0) + 1);
+      nodeDegrees.set(link.target, (nodeDegrees.get(link.target) || 0) + 1);
+    }
+
     // Add graph layout sizes based on relationships
     this.nodes.forEach(node => {
-      let degree = this.links.filter(l => l.source === node.id || l.target === node.id).length;
+      const degree = nodeDegrees.get(node.id) || 0;
       node.val = (node.type === 'module' ? 8 : (node.type === 'class' ? 6 : 4)) + Math.log1p(degree) * 2;
     });
 
@@ -172,12 +180,26 @@ export class CodeAnalyzer {
     const insights = this.generateAIInsights(graph);
     const circularDepsCount = this.detectCircularDeps();
 
+    // ⚡ Bolt Performance Optimization: Single pass for entity counts
+    let modules = 0, functions = 0, classes = 0, variables = 0;
+    for (const node of this.nodes.values()) {
+      if (node.type === 'module') modules++;
+      else if (node.type === 'function') functions++;
+      else if (node.type === 'class') classes++;
+      else if (node.type === 'variable') variables++;
+    }
+
+    let dependencies = 0;
+    for (const link of this.links) {
+      if (link.type === 'import') dependencies++;
+    }
+
     const counts = {
-      modules: Array.from(this.nodes.values()).filter(n => n.type === 'module').length,
-      functions: Array.from(this.nodes.values()).filter(n => n.type === 'function').length,
-      classes: Array.from(this.nodes.values()).filter(n => n.type === 'class').length,
-      variables: Array.from(this.nodes.values()).filter(n => n.type === 'variable').length,
-      dependencies: this.links.filter(l => l.type === 'import').length,
+      modules,
+      functions,
+      classes,
+      variables,
+      dependencies,
       circularDeps: circularDepsCount,
       deadCode: 0
     };
