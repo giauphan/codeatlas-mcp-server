@@ -1761,14 +1761,6 @@ export const server = new McpServer(
     try {
       const skills = readSkills();
       const lower = query.toLowerCase();
-      const filtered = Object.values(skills).filter(function(s: any) {
-        if (category && s.category !== category) return false;
-        return s.name.toLowerCase().includes(lower) || s.description.toLowerCase().includes(lower) || (s.tags || []).some(function(t: any) { return t.includes(lower); });
-      });
-      if (filtered.length === 0) return { content: [{ type: 'text' as const, text: 'No skills found' }] };
-      const list = filtered.map((s: any, i: number) => `${i+1}. ${s.name} - ${s.description}`).join('\n');
-      return { content: [{ type: 'text' as const, text: `Found ${filtered.length} skill(s):\n${list}` }] };
-    } catch (err) {
       return { content: [{ type: 'text' as const, text: 'Error: ' + String(err) }], isError: true as const };
     }
   });
