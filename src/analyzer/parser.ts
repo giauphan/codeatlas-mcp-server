@@ -1174,10 +1174,17 @@ export class CodeAnalyzer {
     // Mock AI Insights generation based on simple heuristics
     
     // 1. Large files / God objects
+    // Pre-calculate function imports per module to avoid O(N * L) complexity
+    const moduleFunctionImports = new Map<string, number>();
+    for (const link of graph.links) {
+      if (link.type === 'import' && link.target.startsWith('function')) {
+        moduleFunctionImports.set(link.source, (moduleFunctionImports.get(link.source) || 0) + 1);
+      }
+    }
+
     const modulesWithManyFunctions = Array.from(this.nodes.values()).filter(n => {
       if (n.type !== 'module') return false;
-      const functionCount = graph.links.filter(l => l.source === n.id && l.type === 'import' && l.target.startsWith('function')).length;
-      return functionCount > 10; // threshold
+      return (moduleFunctionImports.get(n.id) || 0) > 10; // threshold
     });
 
     if (modulesWithManyFunctions.length > 0) {
