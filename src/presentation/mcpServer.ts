@@ -1724,7 +1724,7 @@ export const server = new McpServer(
     } catch (e) {}
     return {};
   }
-  function writeSkills(skills) {
+  function writeSkills(skills: any) {
     const dir = path.dirname(SKILLS_PATH);
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
     fs.writeFileSync(SKILLS_PATH, JSON.stringify(skills, null, 2));
@@ -1743,15 +1743,13 @@ export const server = new McpServer(
     try {
       const skills = readSkills();
       const lower = query.toLowerCase();
-      const filtered = Object.values(skills).filter(function(s) {
+      const filtered = Object.values(skills).filter(function(s: any) {
         if (category && s.category !== category) return false;
-        return s.name.toLowerCase().includes(lower) || s.description.toLowerCase().includes(lower) || (s.tags || []).some(function(t) { return t.includes(lower); });
+        return s.name.toLowerCase().includes(lower) || s.description.toLowerCase().includes(lower) || (s.tags || []).some(function(t: string) { return t.includes(lower); });
       });
       if (filtered.length === 0) return { content: [{ type: 'text' as const, text: 'No skills found' }] };
-      const list = filtered.map(function(s, i) { return (i+1) + '. ' + s.name + ' - ' + s.description; }).join('
-');
-      return { content: [{ type: 'text' as const, text: 'Found ' + filtered.length + ' skill(s):
-' + list }] };
+      const list = filtered.map(function(s: any, i: number) { return (i+1) + ". " + s.name + " - " + s.description; }).join("\n");
+      return { content: [{ type: "text" as const, text: "Found " + filtered.length + " skill(s):\n" + list }] };
     } catch (err) {
       return { content: [{ type: 'text' as const, text: 'Error: ' + String(err) }], isError: true as const };
     }
@@ -1760,7 +1758,7 @@ export const server = new McpServer(
     try {
       const skills = readSkills();
       const id = 'skill-' + name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
-      skills[id] = { id: id, name: name, description: description, category: category, prompt: prompt, tags: tags ? tags.split(',').map(function(t) { return t.trim(); }) : [], version: (skills[id] ? skills[id].version + 1 : 1), installedAt: new Date().toISOString() };
+      skills[id] = { id: id, name: name, description: description, category: category, prompt: prompt, tags: tags ? tags.split(',').map(function(t: string) { return t.trim(); }) : [], version: (skills[id] ? skills[id].version + 1 : 1), installedAt: new Date().toISOString() };
       writeSkills(skills);
       return { content: [{ type: 'text' as const, text: 'Installed skill: ' + name + ' (v' + skills[id].version + ')' }] };
     } catch (err) {
