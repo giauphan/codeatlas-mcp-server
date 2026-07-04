@@ -153,46 +153,45 @@ export class CodeAnalyzer {
   }
 
   private buildAnalysisResult(): AnalysisResult {
-    // ⚡ Bolt Performance Optimization:
-    // Pre-calculate degrees to avoid O(N*L) lookup performance bottleneck
+    // ⚡ Bolt Performance Optimization: Consolidate passes over links and nodes
     const nodeDegrees = new Map<string, number>();
+    const validLinks: GraphLink[] = [];
+    let dependencies = 0;
+
+    // Single pass over links
     for (const link of this.links) {
-      nodeDegrees.set(link.source, (nodeDegrees.get(link.source) || 0) + 1);
-      nodeDegrees.set(link.target, (nodeDegrees.get(link.target) || 0) + 1);
+      if (this.nodes.has(link.source) && this.nodes.has(link.target)) {
+        validLinks.push(link);
+        nodeDegrees.set(link.source, (nodeDegrees.get(link.source) || 0) + 1);
+        nodeDegrees.set(link.target, (nodeDegrees.get(link.target) || 0) + 1);
+        if (link.type === 'import') {
+          dependencies++;
+        }
+      }
     }
 
-    // Add graph layout sizes based on relationships
-    this.nodes.forEach(node => {
+    let modules = 0, functions = 0, classes = 0, variables = 0;
+    const nodesArray: GraphNode[] = [];
+
+    // Single pass over nodes
+    for (const node of this.nodes.values()) {
+      nodesArray.push(node);
       const degree = nodeDegrees.get(node.id) || 0;
       node.val = (node.type === 'module' ? 8 : (node.type === 'class' ? 6 : 4)) + Math.log1p(degree) * 2;
-    });
 
-    // Only keep links where both source and target nodes exist
-    const validLinks = this.links.filter(
-      link => this.nodes.has(link.source) && this.nodes.has(link.target)
-    );
-
-    const graph: GraphData = {
-      nodes: Array.from(this.nodes.values()),
-      links: validLinks
-    };
-
-    const insights = this.generateAIInsights(graph);
-    const circularDepsCount = this.detectCircularDeps();
-
-    // ⚡ Bolt Performance Optimization: Single pass for entity counts
-    let modules = 0, functions = 0, classes = 0, variables = 0;
-    for (const node of this.nodes.values()) {
       if (node.type === 'module') modules++;
       else if (node.type === 'function') functions++;
       else if (node.type === 'class') classes++;
       else if (node.type === 'variable') variables++;
     }
 
-    let dependencies = 0;
-    for (const link of this.links) {
-      if (link.type === 'import') dependencies++;
-    }
+    const graph: GraphData = {
+      nodes: nodesArray,
+      links: validLinks
+    };
+
+    const insights = this.generateAIInsights(graph);
+    const circularDepsCount = this.detectCircularDeps();
 
     const counts = {
       modules,
