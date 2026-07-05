@@ -1554,16 +1554,14 @@ export function registerTools(server: McpServer) {
 
       // package.json
       const pkgPath = path.join(projectDir, "package.json");
-      if (fs.existsSync(pkgPath)) {
-        try {
-          const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf-8"));
-          ctx.version = pkg.version; ctx.description = pkg.description;
-          ctx.scripts = pkg.scripts || {}; ctx.scriptCount = Object.keys(ctx.scripts).length;
-          ctx.dependencies = pkg.dependencies ? Object.keys(pkg.dependencies) : [];
-          ctx.devDependencies = pkg.devDependencies ? Object.keys(pkg.devDependencies) : [];
-          ctx.main = pkg.main; ctx.bin = pkg.bin;
-        } catch { /* skip */ }
-      }
+      try {
+        const pkg = JSON.parse(await fs.promises.readFile(pkgPath, "utf-8"));
+        ctx.version = pkg.version; ctx.description = pkg.description;
+        ctx.scripts = pkg.scripts || {}; ctx.scriptCount = Object.keys(ctx.scripts).length;
+        ctx.dependencies = pkg.dependencies ? Object.keys(pkg.dependencies) : [];
+        ctx.devDependencies = pkg.devDependencies ? Object.keys(pkg.devDependencies) : [];
+        ctx.main = pkg.main; ctx.bin = pkg.bin;
+      } catch { /* skip */ }
 
       // Config files
       ctx.configFiles = {};
@@ -1579,13 +1577,11 @@ export function registerTools(server: McpServer) {
 
       // Git branch
       const gh = path.join(projectDir, ".git", "HEAD");
-      if (fs.existsSync(gh)) {
-        try {
-          const h = fs.readFileSync(gh, "utf-8").trim();
-          const m = h.match(/^ref:\s*refs\/heads\/(.+)$/);
-          ctx.gitBranch = m ? m[1] : "(detached)";
-        } catch { /* skip */ }
-      }
+      try {
+        const h = (await fs.promises.readFile(gh, "utf-8")).trim();
+        const m = h.match(/^ref:\s*refs\/heads\/(.+)$/);
+        ctx.gitBranch = m ? m[1] : "(detached)";
+      } catch { /* skip */ }
 
       // Stats
       const st = getStats(loaded.analysis);
