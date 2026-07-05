@@ -3,6 +3,10 @@ import { z } from "zod";
 import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
+import { exec } from "child_process";
+import { promisify } from "util";
+
+const execAsync = promisify(exec);
 import { checkAuth, logActivity } from "../services/authService.js";
 import {
   discoverProjectsAsync,
@@ -1688,19 +1692,39 @@ export function registerTools(server: McpServer) {
 
       const maxC = Math.min(commits || 5, 20);
       const result: any = { project: loaded.projectName };
-      const cp = require("child_process");
 
       try {
-        result.branch = cp.execSync("git rev-parse --abbrev-ref HEAD", { cwd: projectDir, encoding: "utf-8" }).toString().trim();
-        const st = cp.execSync("git status --porcelain", { cwd: projectDir, encoding: "utf-8" }).toString();
+        const [branchP, stP, revListP, logRawP] = await Promise.allSettled([
+          execAsync("git rev-parse --abbrev-ref HEAD", { cwd: projectDir, encoding: "utf-8" }),
+          execAsync("git status --porcelain", { cwd: projectDir, encoding: "utf-8" }),
+          execAsync("git rev-list --left-right --count HEAD...@{upstream}", { cwd: projectDir, encoding: "utf-8" }),
+          execAsync(`git log -${maxC} --format="COMMIT%n%H%n%an%n%ai%n%s%nFILES:" --name-only`, { cwd: projectDir, encoding: "utf-8", maxBuffer: 1024 * 1024 })
+        ]);
+
+        if (branchP.status === 'fulfilled') {
+          result.branch = branchP.value.stdout.toString().trim();
+        } else {
+          result.branch = "";
+        }
+
+        const st = stP.status === 'fulfilled' ? stP.value.stdout.toString() : "";
         const mod: string[] = [], add: string[] = [], del: string[] = [];
-        for (const line of st.split("\n").map((x: string) => x.trim()).filter(Boolean)) { const s = line.substring(0, 2), f = line.substring(3); if (s.includes("M")) mod.push(f); if (s.includes("A")) add.push(f); if (s.includes("D")) del.push(f); }
+        for (const line of st.split("\n").map((x: string) => x.trim()).filter(Boolean)) {
+          const s = line.substring(0, 2), f = line.substring(3);
+          if (s.includes("M")) mod.push(f);
+          if (s.includes("A")) add.push(f);
+          if (s.includes("D")) del.push(f);
+        }
         result.uncommitted = { modified: mod.slice(0, 20), added: add.slice(0, 10), deleted: del.slice(0, 10), hasChanges: st.trim().length > 0 };
-        try {
-          const [behind, ahead] = cp.execSync("git rev-list --left-right --count HEAD...@{upstream}", { cwd: projectDir, encoding: "utf-8" }).toString().trim().split("\t").map(Number);
+
+        if (revListP.status === 'fulfilled') {
+          const [behind, ahead] = revListP.value.stdout.toString().trim().split("\t").map(Number);
           result.ahead = ahead || 0; result.behind = behind || 0;
-        } catch { result.ahead = null; result.behind = null; }
-        const logRaw = cp.execSync(`git log -${maxC} --format="COMMIT%n%H%n%an%n%ai%n%s%nFILES:" --name-only`, { cwd: projectDir, encoding: "utf-8", maxBuffer: 1024 * 1024 }).toString();
+        } else {
+          result.ahead = null; result.behind = null;
+        }
+
+        const logRaw = logRawP.status === 'fulfilled' ? logRawP.value.stdout.toString() : "";
         result.recentCommits = [];
         for (const block of logRaw.split("COMMIT\n").filter(Boolean)) {
           const ls = block.trim().split("\n"); if (ls.length < 4) continue;
