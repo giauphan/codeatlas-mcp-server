@@ -1554,38 +1554,45 @@ export function registerTools(server: McpServer) {
 
       // package.json
       const pkgPath = path.join(projectDir, "package.json");
-      if (fs.existsSync(pkgPath)) {
-        try {
-          const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf-8"));
-          ctx.version = pkg.version; ctx.description = pkg.description;
-          ctx.scripts = pkg.scripts || {}; ctx.scriptCount = Object.keys(ctx.scripts).length;
-          ctx.dependencies = pkg.dependencies ? Object.keys(pkg.dependencies) : [];
-          ctx.devDependencies = pkg.devDependencies ? Object.keys(pkg.devDependencies) : [];
-          ctx.main = pkg.main; ctx.bin = pkg.bin;
-        } catch { /* skip */ }
-      }
+      try {
+        const pkgData = await fs.promises.readFile(pkgPath, "utf-8");
+        const pkg = JSON.parse(pkgData);
+        ctx.version = pkg.version; ctx.description = pkg.description;
+        ctx.scripts = pkg.scripts || {}; ctx.scriptCount = Object.keys(ctx.scripts).length;
+        ctx.dependencies = pkg.dependencies ? Object.keys(pkg.dependencies) : [];
+        ctx.devDependencies = pkg.devDependencies ? Object.keys(pkg.devDependencies) : [];
+        ctx.main = pkg.main; ctx.bin = pkg.bin;
+      } catch { /* skip */ }
 
       // Config files
       ctx.configFiles = {};
-      for (const [key, f] of Object.entries({ tsconfig: "tsconfig.json", eslint: ".eslintrc.js", prettier: ".prettierrc", jest: "jest.config.js", vitest: "vitest.config.ts", playwright: "playwright.config.ts", docker: "Dockerfile" })) {
-        ctx.configFiles[key] = fs.existsSync(path.join(projectDir, f));
-      }
+      const configEntries = Object.entries({ tsconfig: "tsconfig.json", eslint: ".eslintrc.js", prettier: ".prettierrc", jest: "jest.config.js", vitest: "vitest.config.ts", playwright: "playwright.config.ts", docker: "Dockerfile" });
+      await Promise.all(configEntries.map(async ([key, f]) => {
+        try {
+          await fs.promises.access(path.join(projectDir, f), fs.constants.F_OK);
+          ctx.configFiles[key] = true;
+        } catch {
+          ctx.configFiles[key] = false;
+        }
+      }));
 
       // README
       for (const r of ["README.md", "README"]) {
         const rp = path.join(projectDir, r);
-        if (fs.existsSync(rp)) { ctx.readme = { file: r, length: fs.statSync(rp).size }; break; }
+        try {
+          const stat = await fs.promises.stat(rp);
+          ctx.readme = { file: r, length: stat.size };
+          break;
+        } catch { /* skip */ }
       }
 
       // Git branch
       const gh = path.join(projectDir, ".git", "HEAD");
-      if (fs.existsSync(gh)) {
-        try {
-          const h = fs.readFileSync(gh, "utf-8").trim();
-          const m = h.match(/^ref:\s*refs\/heads\/(.+)$/);
-          ctx.gitBranch = m ? m[1] : "(detached)";
-        } catch { /* skip */ }
-      }
+      try {
+        const h = await fs.promises.readFile(gh, "utf-8");
+        const m = h.trim().match(/^ref:\s*refs\/heads\/(.+)$/);
+        ctx.gitBranch = m ? m[1] : "(detached)";
+      } catch { /* skip */ }
 
       // Stats
       const st = getStats(loaded.analysis);
@@ -1620,12 +1627,11 @@ export function registerTools(server: McpServer) {
 
       const projectDir = loaded.projectDir;
       const pkgPath = path.join(projectDir, "package.json");
-      if (fs.existsSync(pkgPath)) {
-        try {
-          const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf-8"));
-          if (!pkg.scripts?.[script]) return { content: [{ type: "text" as const, text: JSON.stringify({ error: `Script '${script}' not found`, available: pkg.scripts ? Object.keys(pkg.scripts) : [] }) }] };
-        } catch { /* skip */ }
-      }
+      try {
+        const pkgData = await fs.promises.readFile(pkgPath, "utf-8");
+        const pkg = JSON.parse(pkgData);
+        if (!pkg.scripts?.[script]) return { content: [{ type: "text" as const, text: JSON.stringify({ error: `Script '${script}' not found`, available: pkg.scripts ? Object.keys(pkg.scripts) : [] }) }] };
+      } catch { /* skip */ }
 
       // Security validation to prevent command injection
       if (/[&|;<>$`\n\r]/.test(script)) {
@@ -1684,7 +1690,11 @@ export function registerTools(server: McpServer) {
       if (!loaded) return { content: [{ type: "text" as const, text: "No analysis found. Run 'analyze' first." }] };
 
       const projectDir = loaded.projectDir;
-      if (!fs.existsSync(path.join(projectDir, ".git"))) return { content: [{ type: "text" as const, text: JSON.stringify({ error: "Not a git repository" }) }] };
+      try {
+        await fs.promises.access(path.join(projectDir, ".git"), fs.constants.F_OK);
+      } catch {
+        return { content: [{ type: "text" as const, text: JSON.stringify({ error: "Not a git repository" }) }] };
+      }
 
       const maxC = Math.min(commits || 5, 20);
       const result: any = { project: loaded.projectName };
@@ -1734,22 +1744,26 @@ export const server = new McpServer(
 
   // Tool 17-19: Skill Store & Generation
   const SKILLS_PATH = path.join(os.homedir(), '.codeatlas', 'skills.json');
-  function readSkills() {
+  async function readSkillsAsync() {
     try {
-      if (fs.existsSync(SKILLS_PATH)) {
-        return JSON.parse(fs.readFileSync(SKILLS_PATH, 'utf-8'));
-      }
-    } catch (e) {}
-    return {};
+      const data = await fs.promises.readFile(SKILLS_PATH, 'utf-8');
+      return JSON.parse(data);
+    } catch (e) {
+      return {};
+    }
   }
-  function writeSkills(skills: any) {
+  async function writeSkillsAsync(skills: any) {
     const dir = path.dirname(SKILLS_PATH);
-    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-    fs.writeFileSync(SKILLS_PATH, JSON.stringify(skills, null, 2));
+    try {
+      await fs.promises.access(dir);
+    } catch {
+      await fs.promises.mkdir(dir, { recursive: true });
+    }
+    await fs.promises.writeFile(SKILLS_PATH, JSON.stringify(skills, null, 2));
   }
   server.tool('get_skill', 'Get an AI skill by name.', { name: z.string().describe('Skill name') }, async ({ name }) => {
     try {
-      const skills = readSkills();
+      const skills = await readSkillsAsync();
       const skill = skills[name];
       if (!skill) return { content: [{ type: 'text' as const, text: 'Skill not found: ' + name }], isError: true as const };
       return { content: [{ type: 'text' as const, text: skill.prompt }] };
@@ -1759,7 +1773,7 @@ export const server = new McpServer(
   });
   server.tool('search_skills', 'Search available skills.', { query: z.string().describe('Keyword'), category: z.string().optional().describe('Filter') }, async ({ query, category }) => {
     try {
-      const skills = readSkills();
+      const skills = await readSkillsAsync();
       const lower = query.toLowerCase();
       const filtered = Object.values(skills).filter(function(s: any) {
         if (category && s.category !== category) return false;
@@ -1774,10 +1788,10 @@ export const server = new McpServer(
   });
   server.tool('install_skill', 'Install a skill.', { name: z.string().min(1).max(200).describe('Name'), description: z.string().describe('Description'), category: z.enum(['pattern','workflow','architecture','testing','security','custom']).describe('Category'), prompt: z.string().describe('Prompt'), tags: z.string().optional().describe('Tags') }, async ({ name, description, category, prompt, tags }) => {
     try {
-      const skills = readSkills();
+      const skills = await readSkillsAsync();
       const id = 'skill-' + name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
       skills[id] = { id: id, name: name, description: description, category: category, prompt: prompt, tags: tags ? tags.split(',').map(function(t: string) { return t.trim(); }) : [], version: (skills[id] ? skills[id].version + 1 : 1), installedAt: new Date().toISOString() };
-      writeSkills(skills);
+      await writeSkillsAsync(skills);
       return { content: [{ type: 'text' as const, text: 'Installed skill: ' + name + ' (v' + skills[id].version + ')' }] };
     } catch (err) {
       return { content: [{ type: 'text' as const, text: 'Error: ' + String(err) }], isError: true as const };
