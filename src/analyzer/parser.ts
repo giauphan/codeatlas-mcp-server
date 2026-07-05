@@ -136,7 +136,7 @@ export class CodeAnalyzer {
 
     // 3. Re-analyze only if file exists and is NOT ignored
     try {
-      if (fs.existsSync(absPath) && !this.isIgnored(absPath, false)) {
+      if ((await fs.promises.access(absPath).then(() => true).catch(() => false)) && !this.isIgnored(absPath, false)) {
         this.analyzeFile(absPath);
         if (!this.allFiles.includes(absPath)) {
           this.allFiles.push(absPath);
