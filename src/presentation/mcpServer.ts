@@ -1620,12 +1620,11 @@ export function registerTools(server: McpServer) {
 
       const projectDir = loaded.projectDir;
       const pkgPath = path.join(projectDir, "package.json");
-      if (fs.existsSync(pkgPath)) {
-        try {
-          const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf-8"));
-          if (!pkg.scripts?.[script]) return { content: [{ type: "text" as const, text: JSON.stringify({ error: `Script '${script}' not found`, available: pkg.scripts ? Object.keys(pkg.scripts) : [] }) }] };
-        } catch { /* skip */ }
-      }
+      try {
+        const pkgData = await fs.promises.readFile(pkgPath, "utf-8");
+        const pkg = JSON.parse(pkgData);
+        if (!pkg.scripts?.[script]) return { content: [{ type: "text" as const, text: JSON.stringify({ error: `Script '${script}' not found`, available: pkg.scripts ? Object.keys(pkg.scripts) : [] }) }] };
+      } catch { /* skip if file doesn't exist or is invalid JSON */ }
 
       // Security validation to prevent command injection
       if (/[&|;<>$`\n\r]/.test(script)) {
