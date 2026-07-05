@@ -1700,7 +1700,7 @@ export function registerTools(server: McpServer) {
           const [behind, ahead] = cp.execFileSync("git", ["rev-list", "--left-right", "--count", "HEAD...@{upstream}"], { cwd: projectDir, encoding: "utf-8" }).toString().trim().split("\t").map(Number);
           result.ahead = ahead || 0; result.behind = behind || 0;
         } catch { result.ahead = null; result.behind = null; }
-        const logRaw = cp.execFileSync("git", ["log", `-${maxC}`, "--format=COMMIT%n%H%n%an%n%ai%n%s%nFILES:", "--name-only"], { cwd: projectDir, encoding: "utf-8", maxBuffer: 1024 * 1024 }).toString();
+        const logRaw = cp.execFileSync("git", ["log", `-${maxC}`, '--format=COMMIT%n%H%n%an%n%ai%n%s%nFILES:', "--name-only"], { cwd: projectDir, encoding: "utf-8", maxBuffer: 1024 * 1024 }).toString();
         result.recentCommits = [];
         for (const block of logRaw.split("COMMIT\n").filter(Boolean)) {
           const ls = block.trim().split("\n"); if (ls.length < 4) continue;
