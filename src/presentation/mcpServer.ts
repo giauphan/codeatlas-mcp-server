@@ -1554,45 +1554,38 @@ export function registerTools(server: McpServer) {
 
       // package.json
       const pkgPath = path.join(projectDir, "package.json");
-      try {
-        const pkg = JSON.parse(await fs.promises.readFile(pkgPath, "utf-8"));
-        ctx.version = pkg.version; ctx.description = pkg.description;
-        ctx.scripts = pkg.scripts || {}; ctx.scriptCount = Object.keys(ctx.scripts).length;
-        ctx.dependencies = pkg.dependencies ? Object.keys(pkg.dependencies) : [];
-        ctx.devDependencies = pkg.devDependencies ? Object.keys(pkg.devDependencies) : [];
-        ctx.main = pkg.main; ctx.bin = pkg.bin;
-      } catch { /* skip */ }
+      if (fs.existsSync(pkgPath)) {
+        try {
+          const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf-8"));
+          ctx.version = pkg.version; ctx.description = pkg.description;
+          ctx.scripts = pkg.scripts || {}; ctx.scriptCount = Object.keys(ctx.scripts).length;
+          ctx.dependencies = pkg.dependencies ? Object.keys(pkg.dependencies) : [];
+          ctx.devDependencies = pkg.devDependencies ? Object.keys(pkg.devDependencies) : [];
+          ctx.main = pkg.main; ctx.bin = pkg.bin;
+        } catch { /* skip */ }
+      }
 
       // Config files
       ctx.configFiles = {};
-      const configChecks = await Promise.all(
-        Object.entries({ tsconfig: "tsconfig.json", eslint: ".eslintrc.js", prettier: ".prettierrc", jest: "jest.config.js", vitest: "vitest.config.ts", playwright: "playwright.config.ts", docker: "Dockerfile" })
-          .map(async ([key, f]) => {
-            try {
-              await fs.promises.access(path.join(projectDir, f));
-              return [key, true];
-            } catch {
-              return [key, false];
-            }
-          })
-      );
-      for (const [key, exists] of configChecks) {
-        ctx.configFiles[key as string] = exists;
+      for (const [key, f] of Object.entries({ tsconfig: "tsconfig.json", eslint: ".eslintrc.js", prettier: ".prettierrc", jest: "jest.config.js", vitest: "vitest.config.ts", playwright: "playwright.config.ts", docker: "Dockerfile" })) {
+        ctx.configFiles[key] = fs.existsSync(path.join(projectDir, f));
       }
 
       // README
       for (const r of ["README.md", "README"]) {
         const rp = path.join(projectDir, r);
-        try { ctx.readme = { file: r, length: (await fs.promises.stat(rp)).size }; break; } catch { /* skip */ }
+        if (fs.existsSync(rp)) { ctx.readme = { file: r, length: fs.statSync(rp).size }; break; }
       }
 
       // Git branch
       const gh = path.join(projectDir, ".git", "HEAD");
-      try {
-        const h = (await fs.promises.readFile(gh, "utf-8")).trim();
-        const m = h.match(/^ref:\s*refs\/heads\/(.+)$/);
-        ctx.gitBranch = m ? m[1] : "(detached)";
-      } catch { /* skip */ }
+      if (fs.existsSync(gh)) {
+        try {
+          const h = fs.readFileSync(gh, "utf-8").trim();
+          const m = h.match(/^ref:\s*refs\/heads\/(.+)$/);
+          ctx.gitBranch = m ? m[1] : "(detached)";
+        } catch { /* skip */ }
+      }
 
       // Stats
       const st = getStats(loaded.analysis);
@@ -1628,9 +1621,10 @@ export function registerTools(server: McpServer) {
       const projectDir = loaded.projectDir;
       const pkgPath = path.join(projectDir, "package.json");
       try {
-        const pkg = JSON.parse(await fs.promises.readFile(pkgPath, "utf-8"));
+        const pkgData = await fs.promises.readFile(pkgPath, "utf-8");
+        const pkg = JSON.parse(pkgData);
         if (!pkg.scripts?.[script]) return { content: [{ type: "text" as const, text: JSON.stringify({ error: `Script '${script}' not found`, available: pkg.scripts ? Object.keys(pkg.scripts) : [] }) }] };
-      } catch { /* skip */ }
+      } catch { /* skip if file doesn't exist or is invalid JSON */ }
 
       // Security validation to prevent command injection
       if (/[&|;<>$`\n\r]/.test(script)) {
@@ -1689,11 +1683,7 @@ export function registerTools(server: McpServer) {
       if (!loaded) return { content: [{ type: "text" as const, text: "No analysis found. Run 'analyze' first." }] };
 
       const projectDir = loaded.projectDir;
-      try {
-        await fs.promises.access(path.join(projectDir, ".git"));
-      } catch {
-        return { content: [{ type: "text" as const, text: JSON.stringify({ error: "Not a git repository" }) }] };
-      }
+      if (!fs.existsSync(path.join(projectDir, ".git"))) return { content: [{ type: "text" as const, text: JSON.stringify({ error: "Not a git repository" }) }] };
 
       const maxC = Math.min(commits || 5, 20);
       const result: any = { project: loaded.projectName };
