@@ -1555,7 +1555,6 @@ export function registerTools(server: McpServer) {
       // package.json
       const pkgPath = path.join(projectDir, "package.json");
       try {
-        await fs.promises.access(pkgPath, fs.constants.R_OK);
         const pkg = JSON.parse(await fs.promises.readFile(pkgPath, "utf-8"));
         ctx.version = pkg.version; ctx.description = pkg.description;
         ctx.scripts = pkg.scripts || {}; ctx.scriptCount = Object.keys(ctx.scripts).length;
@@ -1566,30 +1565,30 @@ export function registerTools(server: McpServer) {
 
       // Config files
       ctx.configFiles = {};
-      await Promise.all(Object.entries({ tsconfig: "tsconfig.json", eslint: ".eslintrc.js", prettier: ".prettierrc", jest: "jest.config.js", vitest: "vitest.config.ts", playwright: "playwright.config.ts", docker: "Dockerfile" }).map(async ([key, f]) => {
-        try {
-          await fs.promises.access(path.join(projectDir, f), fs.constants.F_OK);
-          ctx.configFiles[key] = true;
-        } catch {
-          ctx.configFiles[key] = false;
-        }
-      }));
+      const configChecks = await Promise.all(
+        Object.entries({ tsconfig: "tsconfig.json", eslint: ".eslintrc.js", prettier: ".prettierrc", jest: "jest.config.js", vitest: "vitest.config.ts", playwright: "playwright.config.ts", docker: "Dockerfile" })
+          .map(async ([key, f]) => {
+            try {
+              await fs.promises.access(path.join(projectDir, f));
+              return [key, true];
+            } catch {
+              return [key, false];
+            }
+          })
+      );
+      for (const [key, exists] of configChecks) {
+        ctx.configFiles[key as string] = exists;
+      }
 
       // README
       for (const r of ["README.md", "README"]) {
         const rp = path.join(projectDir, r);
-        try {
-          await fs.promises.access(rp, fs.constants.F_OK);
-          const stat = await fs.promises.stat(rp);
-          ctx.readme = { file: r, length: stat.size };
-          break;
-        } catch { /* skip */ }
+        try { ctx.readme = { file: r, length: (await fs.promises.stat(rp)).size }; break; } catch { /* skip */ }
       }
 
       // Git branch
       const gh = path.join(projectDir, ".git", "HEAD");
       try {
-        await fs.promises.access(gh, fs.constants.F_OK);
         const h = (await fs.promises.readFile(gh, "utf-8")).trim();
         const m = h.match(/^ref:\s*refs\/heads\/(.+)$/);
         ctx.gitBranch = m ? m[1] : "(detached)";
@@ -1629,7 +1628,6 @@ export function registerTools(server: McpServer) {
       const projectDir = loaded.projectDir;
       const pkgPath = path.join(projectDir, "package.json");
       try {
-        await fs.promises.access(pkgPath, fs.constants.R_OK);
         const pkg = JSON.parse(await fs.promises.readFile(pkgPath, "utf-8"));
         if (!pkg.scripts?.[script]) return { content: [{ type: "text" as const, text: JSON.stringify({ error: `Script '${script}' not found`, available: pkg.scripts ? Object.keys(pkg.scripts) : [] }) }] };
       } catch { /* skip */ }
@@ -1691,44 +1689,27 @@ export function registerTools(server: McpServer) {
       if (!loaded) return { content: [{ type: "text" as const, text: "No analysis found. Run 'analyze' first." }] };
 
       const projectDir = loaded.projectDir;
-      if (!fs.existsSync(path.join(projectDir, ".git"))) return { content: [{ type: "text" as const, text: JSON.stringify({ error: "Not a git repository" }) }] };
+      try {
+        await fs.promises.access(path.join(projectDir, ".git"));
+      } catch {
+        return { content: [{ type: "text" as const, text: JSON.stringify({ error: "Not a git repository" }) }] };
+      }
 
       const maxC = Math.min(commits || 5, 20);
       const result: any = { project: loaded.projectName };
       const cp = require("child_process");
-      const util = require("util");
-      const execAsync = util.promisify(cp.exec);
 
       try {
-        const [branchRes, stRes, revListRes, logRawRes] = await Promise.all([
-          execAsync("git rev-parse --abbrev-ref HEAD", { cwd: projectDir, encoding: "utf-8" }).catch(() => ({ stdout: "" })),
-          execAsync("git status --porcelain", { cwd: projectDir, encoding: "utf-8" }).catch(() => ({ stdout: "" })),
-          execAsync("git rev-list --left-right --count HEAD...@{upstream}", { cwd: projectDir, encoding: "utf-8" }).catch(() => ({ stdout: "" })),
-          execAsync(`git log -${maxC} --format="COMMIT%n%H%n%an%n%ai%n%s%nFILES:" --name-only`, { cwd: projectDir, encoding: "utf-8", maxBuffer: 1024 * 1024 }).catch(() => ({ stdout: "" }))
-        ]);
-
-        result.branch = branchRes.stdout.trim();
-        const st = stRes.stdout;
+        result.branch = cp.execSync("git rev-parse --abbrev-ref HEAD", { cwd: projectDir, encoding: "utf-8" }).toString().trim();
+        const st = cp.execSync("git status --porcelain", { cwd: projectDir, encoding: "utf-8" }).toString();
         const mod: string[] = [], add: string[] = [], del: string[] = [];
-        for (const line of st.split("\n").map((x: string) => x.trim()).filter(Boolean)) {
-          const s = line.substring(0, 2), f = line.substring(3);
-          if (s.includes("M")) mod.push(f);
-          if (s.includes("A")) add.push(f);
-          if (s.includes("D")) del.push(f);
-        }
+        for (const line of st.split("\n").map((x: string) => x.trim()).filter(Boolean)) { const s = line.substring(0, 2), f = line.substring(3); if (s.includes("M")) mod.push(f); if (s.includes("A")) add.push(f); if (s.includes("D")) del.push(f); }
         result.uncommitted = { modified: mod.slice(0, 20), added: add.slice(0, 10), deleted: del.slice(0, 10), hasChanges: st.trim().length > 0 };
-
         try {
-          const parts = revListRes.stdout.trim().split("\t");
-          if (parts.length === 2) {
-            const [behind, ahead] = parts.map(Number);
-            result.ahead = ahead || 0; result.behind = behind || 0;
-          } else {
-            result.ahead = null; result.behind = null;
-          }
+          const [behind, ahead] = cp.execSync("git rev-list --left-right --count HEAD...@{upstream}", { cwd: projectDir, encoding: "utf-8" }).toString().trim().split("\t").map(Number);
+          result.ahead = ahead || 0; result.behind = behind || 0;
         } catch { result.ahead = null; result.behind = null; }
-
-        const logRaw = logRawRes.stdout;
+        const logRaw = cp.execSync(`git log -${maxC} --format="COMMIT%n%H%n%an%n%ai%n%s%nFILES:" --name-only`, { cwd: projectDir, encoding: "utf-8", maxBuffer: 1024 * 1024 }).toString();
         result.recentCommits = [];
         for (const block of logRaw.split("COMMIT\n").filter(Boolean)) {
           const ls = block.trim().split("\n"); if (ls.length < 4) continue;
