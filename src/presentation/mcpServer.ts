@@ -1692,7 +1692,7 @@ export function registerTools(server: McpServer) {
       if (!loaded) return { content: [{ type: "text" as const, text: "No analysis found. Run 'analyze' first." }] };
 
       const projectDir = loaded.projectDir;
-      if (!fs.existsSync(path.join(projectDir, ".git"))) return { content: [{ type: "text" as const, text: JSON.stringify({ error: "Not a git repository" }) }] };
+      if (!(await fileExists(path.join(projectDir, ".git")))) return { content: [{ type: "text" as const, text: JSON.stringify({ error: "Not a git repository" }) }] };
 
       const maxC = Math.min(commits || 5, 20);
       const result: any = { project: loaded.projectName };
