@@ -1509,17 +1509,21 @@ export function registerTools(server: McpServer) {
 
       // Find test files
       const testFiles = new Set<string>();
-      for (const id of [...symbolIds]) {
+      await Promise.all([...symbolIds].map(async (id) => {
         const n = nodeMap.get(id);
         if (n?.filePath) {
           const absPath = path.isAbsolute(n.filePath) ? n.filePath : path.resolve(loaded.projectDir, n.filePath);
           try {
-            const entries = fs.readdirSync(path.dirname(absPath));
+            const entries = await fs.promises.readdir(path.dirname(absPath));
             const base = path.basename(absPath).replace(path.extname(absPath), "");
-            for (const e of entries) if ((e.includes(".test.") || e.includes(".spec.")) && e.toLowerCase().includes(base.toLowerCase())) testFiles.add(path.join(path.dirname(absPath), e));
+            for (const e of entries) {
+              if ((e.includes(".test.") || e.includes(".spec.")) && e.toLowerCase().includes(base.toLowerCase())) {
+                testFiles.add(path.join(path.dirname(absPath), e));
+              }
+            }
           } catch { /* skip */ }
         }
-      }
+      }));
 
       const affectedFiles = new Set<string>();
       for (const c of [...Array.from(callers.values()), ...Array.from(callees.values())]) if (c.filePath) affectedFiles.add(c.filePath);
