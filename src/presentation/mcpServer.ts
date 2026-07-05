@@ -1552,39 +1552,67 @@ export function registerTools(server: McpServer) {
       const projectDir = loaded.projectDir;
       const ctx: any = { name: loaded.projectName, path: projectDir };
 
-      // package.json
-      const pkgPath = path.join(projectDir, "package.json");
-      if (fs.existsSync(pkgPath)) {
-        try {
-          const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf-8"));
-          ctx.version = pkg.version; ctx.description = pkg.description;
-          ctx.scripts = pkg.scripts || {}; ctx.scriptCount = Object.keys(ctx.scripts).length;
-          ctx.dependencies = pkg.dependencies ? Object.keys(pkg.dependencies) : [];
-          ctx.devDependencies = pkg.devDependencies ? Object.keys(pkg.devDependencies) : [];
-          ctx.main = pkg.main; ctx.bin = pkg.bin;
-        } catch { /* skip */ }
-      }
+      const [pkgResult, configResult, readmeResult, gitResult] = await Promise.all([
+        // package.json
+        (async () => {
+          const pkgPath = path.join(projectDir, "package.json");
+          try {
+            const data = await fs.promises.readFile(pkgPath, "utf-8");
+            const pkg = JSON.parse(data);
+            return {
+              version: pkg.version,
+              description: pkg.description,
+              scripts: pkg.scripts || {},
+              scriptCount: Object.keys(pkg.scripts || {}).length,
+              dependencies: pkg.dependencies ? Object.keys(pkg.dependencies) : [],
+              devDependencies: pkg.devDependencies ? Object.keys(pkg.devDependencies) : [],
+              main: pkg.main,
+              bin: pkg.bin
+            };
+          } catch { return null; }
+        })(),
 
-      // Config files
-      ctx.configFiles = {};
-      for (const [key, f] of Object.entries({ tsconfig: "tsconfig.json", eslint: ".eslintrc.js", prettier: ".prettierrc", jest: "jest.config.js", vitest: "vitest.config.ts", playwright: "playwright.config.ts", docker: "Dockerfile" })) {
-        ctx.configFiles[key] = fs.existsSync(path.join(projectDir, f));
-      }
+        // Config files
+        (async () => {
+          const conf: Record<string, boolean> = {};
+          await Promise.all(Object.entries({ tsconfig: "tsconfig.json", eslint: ".eslintrc.js", prettier: ".prettierrc", jest: "jest.config.js", vitest: "vitest.config.ts", playwright: "playwright.config.ts", docker: "Dockerfile" }).map(async ([key, f]) => {
+            conf[key] = await fileExists(path.join(projectDir, f));
+          }));
+          return conf;
+        })(),
 
-      // README
-      for (const r of ["README.md", "README"]) {
-        const rp = path.join(projectDir, r);
-        if (fs.existsSync(rp)) { ctx.readme = { file: r, length: fs.statSync(rp).size }; break; }
-      }
+        // README
+        (async () => {
+          for (const r of ["README.md", "README"]) {
+            try {
+              const rp = path.join(projectDir, r);
+              const stat = await fs.promises.stat(rp);
+              return { file: r, length: stat.size };
+            } catch { }
+          }
+          return null;
+        })(),
 
-      // Git branch
-      const gh = path.join(projectDir, ".git", "HEAD");
-      if (fs.existsSync(gh)) {
-        try {
-          const h = fs.readFileSync(gh, "utf-8").trim();
-          const m = h.match(/^ref:\s*refs\/heads\/(.+)$/);
-          ctx.gitBranch = m ? m[1] : "(detached)";
-        } catch { /* skip */ }
+        // Git branch
+        (async () => {
+          try {
+            const gh = path.join(projectDir, ".git", "HEAD");
+            const h = await fs.promises.readFile(gh, "utf-8");
+            const m = h.trim().match(/^ref:\s*refs\/heads\/(.+)$/);
+            return m ? m[1] : "(detached)";
+          } catch { return null; }
+        })()
+      ]);
+
+      if (pkgResult) {
+        Object.assign(ctx, pkgResult);
+      }
+      ctx.configFiles = configResult;
+      if (readmeResult) {
+        ctx.readme = readmeResult;
+      }
+      if (gitResult) {
+        ctx.gitBranch = gitResult;
       }
 
       // Stats
@@ -1620,9 +1648,10 @@ export function registerTools(server: McpServer) {
 
       const projectDir = loaded.projectDir;
       const pkgPath = path.join(projectDir, "package.json");
-      if (fs.existsSync(pkgPath)) {
+      if (await fileExists(pkgPath)) {
         try {
-          const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf-8"));
+          const pkgData = await fs.promises.readFile(pkgPath, "utf-8");
+          const pkg = JSON.parse(pkgData);
           if (!pkg.scripts?.[script]) return { content: [{ type: "text" as const, text: JSON.stringify({ error: `Script '${script}' not found`, available: pkg.scripts ? Object.keys(pkg.scripts) : [] }) }] };
         } catch { /* skip */ }
       }
@@ -1684,7 +1713,7 @@ export function registerTools(server: McpServer) {
       if (!loaded) return { content: [{ type: "text" as const, text: "No analysis found. Run 'analyze' first." }] };
 
       const projectDir = loaded.projectDir;
-      if (!fs.existsSync(path.join(projectDir, ".git"))) return { content: [{ type: "text" as const, text: JSON.stringify({ error: "Not a git repository" }) }] };
+      if (!(await fileExists(path.join(projectDir, ".git")))) return { content: [{ type: "text" as const, text: JSON.stringify({ error: "Not a git repository" }) }] };
 
       const maxC = Math.min(commits || 5, 20);
       const result: any = { project: loaded.projectName };
@@ -1734,22 +1763,25 @@ export const server = new McpServer(
 
   // Tool 17-19: Skill Store & Generation
   const SKILLS_PATH = path.join(os.homedir(), '.codeatlas', 'skills.json');
-  function readSkills() {
+  async function readSkills() {
     try {
-      if (fs.existsSync(SKILLS_PATH)) {
-        return JSON.parse(fs.readFileSync(SKILLS_PATH, 'utf-8'));
+      if (await fileExists(SKILLS_PATH)) {
+        const data = await fs.promises.readFile(SKILLS_PATH, 'utf-8');
+        return JSON.parse(data);
       }
     } catch (e) {}
     return {};
   }
-  function writeSkills(skills: any) {
+  async function writeSkills(skills: any) {
     const dir = path.dirname(SKILLS_PATH);
-    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-    fs.writeFileSync(SKILLS_PATH, JSON.stringify(skills, null, 2));
+    if (!(await fileExists(dir))) {
+      await fs.promises.mkdir(dir, { recursive: true });
+    }
+    await fs.promises.writeFile(SKILLS_PATH, JSON.stringify(skills, null, 2));
   }
   server.tool('get_skill', 'Get an AI skill by name.', { name: z.string().describe('Skill name') }, async ({ name }) => {
     try {
-      const skills = readSkills();
+      const skills = await readSkills();
       const skill = skills[name];
       if (!skill) return { content: [{ type: 'text' as const, text: 'Skill not found: ' + name }], isError: true as const };
       return { content: [{ type: 'text' as const, text: skill.prompt }] };
@@ -1759,7 +1791,7 @@ export const server = new McpServer(
   });
   server.tool('search_skills', 'Search available skills.', { query: z.string().describe('Keyword'), category: z.string().optional().describe('Filter') }, async ({ query, category }) => {
     try {
-      const skills = readSkills();
+      const skills = await readSkills();
       const lower = query.toLowerCase();
       const filtered = Object.values(skills).filter(function(s: any) {
         if (category && s.category !== category) return false;
@@ -1774,10 +1806,10 @@ export const server = new McpServer(
   });
   server.tool('install_skill', 'Install a skill.', { name: z.string().min(1).max(200).describe('Name'), description: z.string().describe('Description'), category: z.enum(['pattern','workflow','architecture','testing','security','custom']).describe('Category'), prompt: z.string().describe('Prompt'), tags: z.string().optional().describe('Tags') }, async ({ name, description, category, prompt, tags }) => {
     try {
-      const skills = readSkills();
+      const skills = await readSkills();
       const id = 'skill-' + name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
       skills[id] = { id: id, name: name, description: description, category: category, prompt: prompt, tags: tags ? tags.split(',').map(function(t: string) { return t.trim(); }) : [], version: (skills[id] ? skills[id].version + 1 : 1), installedAt: new Date().toISOString() };
-      writeSkills(skills);
+      await writeSkills(skills);
       return { content: [{ type: 'text' as const, text: 'Installed skill: ' + name + ' (v' + skills[id].version + ')' }] };
     } catch (err) {
       return { content: [{ type: 'text' as const, text: 'Error: ' + String(err) }], isError: true as const };
