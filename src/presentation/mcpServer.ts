@@ -3,10 +3,6 @@ import { z } from "zod";
 import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
-import { exec } from "child_process";
-import { promisify } from "util";
-
-const execAsync = promisify(exec);
 import { checkAuth, logActivity } from "../services/authService.js";
 import {
   discoverProjectsAsync,
@@ -1302,53 +1298,43 @@ export function registerTools(server: McpServer) {
       const extSet = new Set([".ts", ".tsx", ".js", ".jsx", ".py", ".php", ".json", ".yaml", ".yml", ".md", ".css", ".scss", ".html"]);
 
       try {
-        const walkDir = async (dir: string, depth: number) => {
+        const walkDir = (dir: string, depth: number) => {
           if (depth > 8) return;
           try {
-            const entries = await fs.promises.readdir(dir, { withFileTypes: true });
-            const dirPromises = [];
+            const entries = fs.readdirSync(dir, { withFileTypes: true });
             for (const entry of entries) {
               if (entry.name.startsWith(".") || entry.name === "node_modules" || entry.name === "dist" || entry.name === "build" || entry.name === "venv" || entry.name === ".venv") continue;
               const fullPath = path.join(dir, entry.name);
-              if (entry.isDirectory()) dirPromises.push(walkDir(fullPath, depth + 1));
+              if (entry.isDirectory()) walkDir(fullPath, depth + 1);
               else if (entry.isFile()) {
                 const ext = path.extname(entry.name).toLowerCase();
                 if (extSet.has(ext)) allFiles.push(fullPath);
               }
             }
-            await Promise.all(dirPromises);
           } catch { /* skip */ }
         };
-        await walkDir(loaded.projectDir, 0);
+        walkDir(loaded.projectDir, 0);
       } catch { /* fallback */ }
 
       const results: Array<{ file: string; line: number; content: string; contextBefore: string[]; contextAfter: string[] }> = [];
-      const chunkSize = 50;
-      for (let j = 0; j < allFiles.length; j += chunkSize) {
+      for (const filePath of allFiles) {
         if (results.length >= maxRes) break;
-        const chunk = allFiles.slice(j, j + chunkSize);
-        const fileContents = await Promise.allSettled(chunk.map(f => fs.promises.readFile(f, "utf-8")));
-
-        for (let k = 0; k < chunk.length; k++) {
-          if (results.length >= maxRes) break;
-          const res = fileContents[k];
-          if (res.status === "fulfilled") {
-            const content = res.value;
-            const lines = content.split("\n");
-            for (let i = 0; i < lines.length; i++) {
-              if (results.length >= maxRes) break;
-              if (lines[i].toLowerCase().includes(q)) {
-                results.push({
-                  file: path.relative(loaded.projectDir, chunk[k]),
-                  line: i + 1,
-                  content: lines[i].trim(),
-                  contextBefore: lines.slice(Math.max(0, i - ctx), i).map(l => l.trim()).filter(Boolean),
-                  contextAfter: lines.slice(i + 1, i + 1 + ctx).map(l => l.trim()).filter(Boolean),
-                });
-              }
+        try {
+          const content = fs.readFileSync(filePath, "utf-8");
+          const lines = content.split("\n");
+          for (let i = 0; i < lines.length; i++) {
+            if (results.length >= maxRes) break;
+            if (lines[i].toLowerCase().includes(q)) {
+              results.push({
+                file: path.relative(loaded.projectDir, filePath),
+                line: i + 1,
+                content: lines[i].trim(),
+                contextBefore: lines.slice(Math.max(0, i - ctx), i).map(l => l.trim()).filter(Boolean),
+                contextAfter: lines.slice(i + 1, i + 1 + ctx).map(l => l.trim()).filter(Boolean),
+              });
             }
           }
-        }
+        } catch { /* skip */ }
       }
 
       return {
@@ -1523,21 +1509,17 @@ export function registerTools(server: McpServer) {
 
       // Find test files
       const testFiles = new Set<string>();
-      await Promise.all([...symbolIds].map(async (id) => {
+      for (const id of [...symbolIds]) {
         const n = nodeMap.get(id);
         if (n?.filePath) {
           const absPath = path.isAbsolute(n.filePath) ? n.filePath : path.resolve(loaded.projectDir, n.filePath);
           try {
-            const entries = await fs.promises.readdir(path.dirname(absPath));
+            const entries = fs.readdirSync(path.dirname(absPath));
             const base = path.basename(absPath).replace(path.extname(absPath), "");
-            for (const e of entries) {
-              if ((e.includes(".test.") || e.includes(".spec.")) && e.toLowerCase().includes(base.toLowerCase())) {
-                testFiles.add(path.join(path.dirname(absPath), e));
-              }
-            }
+            for (const e of entries) if ((e.includes(".test.") || e.includes(".spec.")) && e.toLowerCase().includes(base.toLowerCase())) testFiles.add(path.join(path.dirname(absPath), e));
           } catch { /* skip */ }
         }
-      }));
+      }
 
       const affectedFiles = new Set<string>();
       for (const c of [...Array.from(callers.values()), ...Array.from(callees.values())]) if (c.filePath) affectedFiles.add(c.filePath);
@@ -1638,11 +1620,12 @@ export function registerTools(server: McpServer) {
 
       const projectDir = loaded.projectDir;
       const pkgPath = path.join(projectDir, "package.json");
-      try {
-        const pkgData = await fs.promises.readFile(pkgPath, "utf-8");
-        const pkg = JSON.parse(pkgData);
-        if (!pkg.scripts?.[script]) return { content: [{ type: "text" as const, text: JSON.stringify({ error: `Script '${script}' not found`, available: pkg.scripts ? Object.keys(pkg.scripts) : [] }) }] };
-      } catch { /* skip if file doesn't exist or is invalid JSON */ }
+      if (fs.existsSync(pkgPath)) {
+        try {
+          const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf-8"));
+          if (!pkg.scripts?.[script]) return { content: [{ type: "text" as const, text: JSON.stringify({ error: `Script '${script}' not found`, available: pkg.scripts ? Object.keys(pkg.scripts) : [] }) }] };
+        } catch { /* skip */ }
+      }
 
       // Security validation to prevent command injection
       if (/[&|;<>$`\n\r]/.test(script)) {
@@ -1705,39 +1688,19 @@ export function registerTools(server: McpServer) {
 
       const maxC = Math.min(commits || 5, 20);
       const result: any = { project: loaded.projectName };
+      const cp = require("child_process");
 
       try {
-        const [branchP, stP, revListP, logRawP] = await Promise.allSettled([
-          execAsync("git rev-parse --abbrev-ref HEAD", { cwd: projectDir, encoding: "utf-8" }),
-          execAsync("git status --porcelain", { cwd: projectDir, encoding: "utf-8" }),
-          execAsync("git rev-list --left-right --count HEAD...@{upstream}", { cwd: projectDir, encoding: "utf-8" }),
-          execAsync(`git log -${maxC} --format="COMMIT%n%H%n%an%n%ai%n%s%nFILES:" --name-only`, { cwd: projectDir, encoding: "utf-8", maxBuffer: 1024 * 1024 })
-        ]);
-
-        if (branchP.status === 'fulfilled') {
-          result.branch = branchP.value.stdout.toString().trim();
-        } else {
-          result.branch = "";
-        }
-
-        const st = stP.status === 'fulfilled' ? stP.value.stdout.toString() : "";
+        result.branch = cp.execFileSync("git", ["rev-parse", "--abbrev-ref", "HEAD"], { cwd: projectDir, encoding: "utf-8" }).toString().trim();
+        const st = cp.execFileSync("git", ["status", "--porcelain"], { cwd: projectDir, encoding: "utf-8" }).toString();
         const mod: string[] = [], add: string[] = [], del: string[] = [];
-        for (const line of st.split("\n").map((x: string) => x.trim()).filter(Boolean)) {
-          const s = line.substring(0, 2), f = line.substring(3);
-          if (s.includes("M")) mod.push(f);
-          if (s.includes("A")) add.push(f);
-          if (s.includes("D")) del.push(f);
-        }
+        for (const line of st.split("\n").map((x: string) => x.trim()).filter(Boolean)) { const s = line.substring(0, 2), f = line.substring(3); if (s.includes("M")) mod.push(f); if (s.includes("A")) add.push(f); if (s.includes("D")) del.push(f); }
         result.uncommitted = { modified: mod.slice(0, 20), added: add.slice(0, 10), deleted: del.slice(0, 10), hasChanges: st.trim().length > 0 };
-
-        if (revListP.status === 'fulfilled') {
-          const [behind, ahead] = revListP.value.stdout.toString().trim().split("\t").map(Number);
+        try {
+          const [behind, ahead] = cp.execFileSync("git", ["rev-list", "--left-right", "--count", "HEAD...@{upstream}"], { cwd: projectDir, encoding: "utf-8" }).toString().trim().split("\t").map(Number);
           result.ahead = ahead || 0; result.behind = behind || 0;
-        } else {
-          result.ahead = null; result.behind = null;
-        }
-
-        const logRaw = logRawP.status === 'fulfilled' ? logRawP.value.stdout.toString() : "";
+        } catch { result.ahead = null; result.behind = null; }
+        const logRaw = cp.execFileSync("git", ["log", `-${maxC}`, "--format=COMMIT%n%H%n%an%n%ai%n%s%nFILES:", "--name-only"], { cwd: projectDir, encoding: "utf-8", maxBuffer: 1024 * 1024 }).toString();
         result.recentCommits = [];
         for (const block of logRaw.split("COMMIT\n").filter(Boolean)) {
           const ls = block.trim().split("\n"); if (ls.length < 4) continue;
