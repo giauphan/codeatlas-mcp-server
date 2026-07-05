@@ -1646,13 +1646,22 @@ export function registerTools(server: McpServer) {
           spawnArgs.push(...args.match(/(?:[^\s"]+|"[^"]*")+/g)?.map((arg: string) => arg.replace(/^"|"$/g, '')) || []);
         }
 
-        // Use spawnSync with shell: false to prevent command injection
-        const result = cp.spawnSync("npm", spawnArgs, {
+        const util = require('util');
+        const spawnAsync = util.promisify(require('child_process').execFile);
+
+        // Use child_process.execFile to prevent command injection while being non-blocking
+        const result = await spawnAsync("npm", spawnArgs, {
           timeout: maxTime * 1000,
           shell: false,
           maxBuffer: 1024 * 1024,
           cwd: projectDir,
           encoding: "utf-8"
+        }).then((res: any) => {
+          res.status = 0;
+          return res;
+        }).catch((err: any) => {
+          err.status = err.code || 1;
+          return { error: err, status: err.code || 1, stdout: err.stdout, stderr: err.stderr };
         });
 
         const dur = ((Date.now() - startTime) / 1000).toFixed(1);
@@ -1688,19 +1697,21 @@ export function registerTools(server: McpServer) {
 
       const maxC = Math.min(commits || 5, 20);
       const result: any = { project: loaded.projectName };
-      const cp = require("child_process");
+      const util = require("util");
+      const execAsync = util.promisify(require("child_process").exec);
 
       try {
-        result.branch = cp.execSync("git rev-parse --abbrev-ref HEAD", { cwd: projectDir, encoding: "utf-8" }).toString().trim();
-        const st = cp.execSync("git status --porcelain", { cwd: projectDir, encoding: "utf-8" }).toString();
+        result.branch = (await execAsync("git rev-parse --abbrev-ref HEAD", { cwd: projectDir, encoding: "utf-8" })).stdout.toString().trim();
+        const st = (await execAsync("git status --porcelain", { cwd: projectDir, encoding: "utf-8" })).stdout.toString();
         const mod: string[] = [], add: string[] = [], del: string[] = [];
         for (const line of st.split("\n").map((x: string) => x.trim()).filter(Boolean)) { const s = line.substring(0, 2), f = line.substring(3); if (s.includes("M")) mod.push(f); if (s.includes("A")) add.push(f); if (s.includes("D")) del.push(f); }
         result.uncommitted = { modified: mod.slice(0, 20), added: add.slice(0, 10), deleted: del.slice(0, 10), hasChanges: st.trim().length > 0 };
         try {
-          const [behind, ahead] = cp.execSync("git rev-list --left-right --count HEAD...@{upstream}", { cwd: projectDir, encoding: "utf-8" }).toString().trim().split("\t").map(Number);
+          const revListRaw = (await execAsync("git rev-list --left-right --count HEAD...@{upstream}", { cwd: projectDir, encoding: "utf-8" })).stdout.toString().trim();
+          const [behind, ahead] = revListRaw.split("\t").map(Number);
           result.ahead = ahead || 0; result.behind = behind || 0;
         } catch { result.ahead = null; result.behind = null; }
-        const logRaw = cp.execSync(`git log -${maxC} --format="COMMIT%n%H%n%an%n%ai%n%s%nFILES:" --name-only`, { cwd: projectDir, encoding: "utf-8", maxBuffer: 1024 * 1024 }).toString();
+        const logRaw = (await execAsync(`git log -${maxC} --format="COMMIT%n%H%n%an%n%ai%n%s%nFILES:" --name-only`, { cwd: projectDir, encoding: "utf-8", maxBuffer: 1024 * 1024 })).stdout.toString();
         result.recentCommits = [];
         for (const block of logRaw.split("COMMIT\n").filter(Boolean)) {
           const ls = block.trim().split("\n"); if (ls.length < 4) continue;
