@@ -1298,22 +1298,24 @@ export function registerTools(server: McpServer) {
       const extSet = new Set([".ts", ".tsx", ".js", ".jsx", ".py", ".php", ".json", ".yaml", ".yml", ".md", ".css", ".scss", ".html"]);
 
       try {
-        const walkDir = (dir: string, depth: number) => {
+        const walkDir = async (dir: string, depth: number) => {
           if (depth > 8) return;
           try {
-            const entries = fs.readdirSync(dir, { withFileTypes: true });
+            const entries = await fs.promises.readdir(dir, { withFileTypes: true });
+            const dirPromises = [];
             for (const entry of entries) {
               if (entry.name.startsWith(".") || entry.name === "node_modules" || entry.name === "dist" || entry.name === "build" || entry.name === "venv" || entry.name === ".venv") continue;
               const fullPath = path.join(dir, entry.name);
-              if (entry.isDirectory()) walkDir(fullPath, depth + 1);
+              if (entry.isDirectory()) dirPromises.push(walkDir(fullPath, depth + 1));
               else if (entry.isFile()) {
                 const ext = path.extname(entry.name).toLowerCase();
                 if (extSet.has(ext)) allFiles.push(fullPath);
               }
             }
+            await Promise.all(dirPromises);
           } catch { /* skip */ }
         };
-        walkDir(loaded.projectDir, 0);
+        await walkDir(loaded.projectDir, 0);
       } catch { /* fallback */ }
 
       const results: Array<{ file: string; line: number; content: string; contextBefore: string[]; contextAfter: string[] }> = [];
