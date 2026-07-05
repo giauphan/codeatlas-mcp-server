@@ -594,6 +594,9 @@ export function discoverProjects(tenantId?: string): { name: string; dir: string
       : (tenantId === "admin");
 
     if (tenantId && !isSystemAdmin) {
+      if (tenantId.includes('..') || tenantId.includes('/') || tenantId.includes('\\')) {
+        return [];
+      }
       const tenantRoot = process.env.CODEATLAS_PROJECTS_ROOT || path.join(process.cwd(), "tenants");
       const userDir = path.join(tenantRoot, tenantId);
       if (fs.existsSync(userDir)) {
@@ -753,6 +756,9 @@ export async function discoverProjectsAsync(tenantId?: string): Promise<{ name: 
       : (tenantId === "admin");
 
     if (tenantId && !isSystemAdmin) {
+      if (tenantId.includes('..') || tenantId.includes('/') || tenantId.includes('\\')) {
+        return [];
+      }
       const tenantRoot = process.env.CODEATLAS_PROJECTS_ROOT || path.join(process.cwd(), "tenants");
       const userDir = path.join(tenantRoot, tenantId);
       if (await fileExists(userDir)) {
