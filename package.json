@@ -5,7 +5,8 @@
   "type": "module",
   "bin": {
     "codeatlas-enterprise": "dist/index.js",
-    "codeatlas-mcp": "dist/index.js"
+    "codeatlas-mcp": "dist/index.js",
+    "codeatlas": "dist/index.js"
   },
   "files": [
     "dist",

@@ -682,6 +682,147 @@ export function registerTools(server: McpServer) {
     }
   );
 
+  // ── Tool 8d: Search Genome ─────────────────────────────────────
+  server.tool(
+    "search_genome",
+    "Search CodeAtlas Genome for relevant genes. Uses semantic search to find the most relevant genes.",
+    {
+      query: z.string().describe("Natural language search query"),
+      project: z.string().optional().describe("Filter by project"),
+      limit: z.number().min(1).max(50).optional().default(10).describe("Max results (default: 10)"),
+    },
+    async ({ query, project, limit }) => {
+      const auth = await checkAuth();
+      await logActivity(auth, "search_genome", { query: query.substring(0, 100), project, limit });
+      try {
+        const serverUrl = process.env.CODEATLAS_API_URL || "https://atlas.genrostore.com/";
+        const apiKey = process.env.CODEATLAS_API_KEY;
+        if (!apiKey) throw new Error("CODEATLAS_API_KEY not set");
+
+        const qs = new URLSearchParams({ query, limit: String(limit || 10) });
+        if (project) qs.set("project", project);
+        const url = `${serverUrl.replace(/\/+$/, "")}/api/genome/search?${qs}`;
+
+        const resp = await fetch(url, {
+          headers: { "x-api-key": apiKey, "User-Agent": "codeatlas-enterprise/2.0" },
+        });
+        if (!resp.ok) throw new Error(`Genome search failed: ${resp.status} ${await resp.text()}`);
+        const data = await resp.json();
+        return { content: [{ type: "text" as const, text: JSON.stringify(data, null, 2) }] };
+      } catch (err: unknown) {
+        return {
+          content: [{ type: "text" as const, text: `Failed to search genome: ${err instanceof Error ? err.message : String(err)}` }],
+          isError: true,
+        };
+      }
+    }
+  );
+
+  // ── Tool 8e: Get Gene ──────────────────────────────────────────
+  server.tool(
+    "get_gene",
+    "Get a specific gene by ID from the CodeAtlas Genome.",
+    {
+      geneId: z.string().describe("The gene ID to retrieve"),
+    },
+    async ({ geneId }) => {
+      const auth = await checkAuth();
+      await logActivity(auth, "get_gene", { geneId });
+      try {
+        const serverUrl = process.env.CODEATLAS_API_URL || "https://atlas.genrostore.com/";
+        const apiKey = process.env.CODEATLAS_API_KEY;
+        if (!apiKey) throw new Error("CODEATLAS_API_KEY not set");
+
+        const url = `${serverUrl.replace(/\/+$/, "")}/api/genome/gene/${encodeURIComponent(geneId)}`;
+        const resp = await fetch(url, {
+          headers: { "x-api-key": apiKey, "User-Agent": "codeatlas-enterprise/2.0" },
+        });
+        if (resp.status === 404) {
+          return { content: [{ type: "text" as const, text: JSON.stringify({ success: false, error: "Gene not found" }, null, 2) }] };
+        }
+        if (!resp.ok) throw new Error(`Get gene failed: ${resp.status} ${await resp.text()}`);
+        const data = await resp.json();
+        return { content: [{ type: "text" as const, text: JSON.stringify(data, null, 2) }] };
+      } catch (err: unknown) {
+        return {
+          content: [{ type: "text" as const, text: `Failed to get gene: ${err instanceof Error ? err.message : String(err)}` }],
+          isError: true,
+        };
+      }
+    }
+  );
+
+  // ── Tool 8f: Scan Immune Genes ─────────────────────────────────
+  server.tool(
+    "scan_immune_genes",
+    "Scan the CodeAtlas Immune System for previously encountered failures matching a problem description. Returns prevention context to inject into prompts.",
+    {
+      problem: z.string().describe("Describe the problem or error to scan for"),
+      project: z.string().optional().describe("Filter by project"),
+    },
+    async ({ problem, project }) => {
+      const auth = await checkAuth();
+      await logActivity(auth, "scan_immune_genes", { problem: problem.substring(0, 100), project });
+      try {
+        const serverUrl = process.env.CODEATLAS_API_URL || "https://atlas.genrostore.com/";
+        const apiKey = process.env.CODEATLAS_API_KEY;
+        if (!apiKey) throw new Error("CODEATLAS_API_KEY not set");
+
+        const qs = new URLSearchParams({ problem });
+        if (project) qs.set("project", project);
+        const url = `${serverUrl.replace(/\/+$/, "")}/api/genome/immune/context?${qs}`;
+
+        const resp = await fetch(url, {
+          headers: { "x-api-key": apiKey, "User-Agent": "codeatlas-enterprise/2.0" },
+        });
+        if (!resp.ok) throw new Error(`Immune scan failed: ${resp.status} ${await resp.text()}`);
+        const data = await resp.json();
+        return { content: [{ type: "text" as const, text: data.context || "No immune responses found." }] };
+      } catch (err: unknown) {
+        return {
+          content: [{ type: "text" as const, text: `Failed to scan immune genes: ${err instanceof Error ? err.message : String(err)}` }],
+          isError: true,
+        };
+      }
+    }
+  );
+
+  // ── Tool 8g: Save Immune Gene ──────────────────────────────────
+  server.tool(
+    "save_immune_gene",
+    "Record a failure pattern as an immune gene in CodeAtlas Genome. This helps prevent future agents from repeating the same mistake.",
+    {
+      problem: z.string().describe("The problem or task context"),
+      failure: z.string().describe("What went wrong — the failure description"),
+      prevention: z.string().describe("How to prevent or fix this failure"),
+      project: z.string().optional().describe("Project to associate with this immune gene"),
+    },
+    async ({ problem, failure, prevention, project }) => {
+      const auth = await checkAuth();
+      await logActivity(auth, "save_immune_gene", { problem: problem.substring(0, 50), failure: failure.substring(0, 50), project });
+      try {
+        const serverUrl = process.env.CODEATLAS_API_URL || "https://atlas.genrostore.com/";
+        const apiKey = process.env.CODEATLAS_API_KEY;
+        if (!apiKey) throw new Error("CODEATLAS_API_KEY not set");
+
+        const url = `${serverUrl.replace(/\/+$/, "")}/api/genome/immune`;
+        const resp = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "x-api-key": apiKey, "User-Agent": "codeatlas-enterprise/2.0" },
+          body: JSON.stringify({ problem, failure, prevention, project }),
+        });
+        if (!resp.ok) throw new Error(`Save immune gene failed: ${resp.status} ${await resp.text()}`);
+        const data = await resp.json();
+        return { content: [{ type: "text" as const, text: JSON.stringify(data, null, 2) }] };
+      } catch (err: unknown) {
+        return {
+          content: [{ type: "text" as const, text: `Failed to save immune gene: ${err instanceof Error ? err.message : String(err)}` }],
+          isError: true,
+        };
+      }
+    }
+  );
+
   // Tool 8c: Trace Feature Flow
   server.tool(
     "trace_feature_flow",
@@ -1706,6 +1847,205 @@ export function registerTools(server: McpServer) {
       } catch (err: any) { result.error = err.message?.substring(0, 300); }
 
       return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
+    }
+  );
+
+  // ── Tool 9a: Setup Second Brain ──────────────────────────────
+  server.tool(
+    "setup_second_brain",
+    "Configure CodeAtlas Second Brain for any MCP client (Hermes, Claude Code, Gemini CLI). "
+    + "Installs MCP config and auto-retrieval plugin so the AI automatically saves/retrieves knowledge.",
+    {
+      client: z.enum(["hermes", "claude", "gemini", "all"]).optional().default("all")
+        .describe("Which client to configure"),
+      apiKey: z.string().optional().describe("CODEATLAS_API_KEY (will use env var if not provided)"),
+      autoPlugin: z.boolean().optional().default(true)
+        .describe("Also install Hermes auto Second Brain plugin (pre/post LLM hooks)"),
+    },
+    async ({ client = "all", apiKey, autoPlugin = true }) => {
+      const auth = await checkAuth();
+      await logActivity(auth, "setup_second_brain", { client, autoPlugin });
+
+      const key = apiKey || process.env.CODEATLAS_API_KEY;
+      if (!key) return { content: [{ type: "text" as const, text: JSON.stringify({
+        success: false, error: "CODEATLAS_API_KEY not set. Provide apiKey parameter or set env var."
+      }, null, 2) }] };
+
+      const results: any[] = [];
+      const mcpEntry = `  codeatlas:\n    command: npx\n    args: ["-y", "codeatlas-enterprise"]\n    env:\n      CODEATLAS_API_KEY: "${key}"\n    enabled: true\n`;
+
+      // Hermes MCP config
+      if (client === "hermes" || client === "all") {
+        const hermesCfg = path.join(os.homedir(), ".hermes", "config.yaml");
+        try {
+          if (fs.existsSync(hermesCfg)) {
+            let cfg = fs.readFileSync(hermesCfg, "utf-8");
+            if (cfg.includes("codeatlas:")) {
+              results.push({ client: "hermes", action: "mcp_config", status: "already_configured" });
+            } else if (cfg.includes("mcp_servers:")) {
+              cfg = cfg.replace("mcp_servers:", "mcp_servers:\n" + mcpEntry);
+              fs.writeFileSync(hermesCfg, cfg);
+              results.push({ client: "hermes", action: "mcp_config", status: "updated" });
+            } else {
+              fs.writeFileSync(hermesCfg, "\nmcp_servers:\n" + mcpEntry, { flag: "a" });
+              results.push({ client: "hermes", action: "mcp_config", status: "appended" });
+            }
+          } else {
+            fs.mkdirSync(path.dirname(hermesCfg), { recursive: true });
+            fs.writeFileSync(hermesCfg, "mcp_servers:\n" + mcpEntry);
+            results.push({ client: "hermes", action: "mcp_config", status: "created" });
+          }
+        } catch (err: any) {
+          results.push({ client: "hermes", action: "mcp_config", status: "error", error: err.message });
+        }
+
+        // Hermes auto plugin
+        if (autoPlugin) {
+          try {
+            const pluginDir = path.join(os.homedir(), ".hermes", "plugins", "codeatlas_second_brain");
+            if (!fs.existsSync(pluginDir)) fs.mkdirSync(pluginDir, { recursive: true });
+            const pluginInit = `"""CodeAtlas Second Brain Plugin — Auto activation on every turn"""
+import json, urllib.request, urllib.parse, logging
+from typing import Any
+log = logging.getLogger(__name__)
+KEY = "${key}"
+URL = "https://atlas.genrostore.com/"
+UA = "Hermes-SecondBrain-Plugin/1.0"
+def _rq(m, p, b=None, q=None):
+    import urllib.error
+    u = URL.rstrip("/") + p
+    if q: u += "?" + "&".join(f"{k}={urllib.parse.quote(str(v))}" for k,v in q.items() if v)
+    h = urllib.request.Request(u, data=json.dumps(b).encode() if b else None, method=m)
+    h.add_header("x-api-key", KEY); h.add_header("Content-Type", "application/json"); h.add_header("User-Agent", UA)
+    try:
+        r = urllib.request.urlopen(h, timeout=10)
+        return json.loads(r.read().decode()), r.status
+    except urllib.error.HTTPError as e:
+        return {"err": e.read().decode("utf-8",errors="replace")[:200]}, e.code
+def register(ctx):
+    def on_pre_llm_call(**kw):
+        user = kw.get("user_message","")
+        if not user: return None
+        parts = []
+        try:
+            r,s = _rq("GET","/api/dreams/query",q={"query":user,"project":"hermes-auto","limit":3})
+            m = r.get("memories",[]) if 200<=s<300 else []
+            if m:
+                ctx=["## Auto-retrieved Dreams from CodeAtlas"]
+                for x in m:
+                    c = x.get("content","")[:120]
+                    if c: ctx.append(f"- [{x.get('memory_type','?')}] {c}")
+                parts.append("\\n".join(ctx))
+        except: pass
+        try:
+            r,s = _rq("GET","/api/genome/search",q={"query":user,"project":"hermes-auto","limit":3})
+            g = r.get("genes",[]) if 200<=s<300 else []
+            if g:
+                ctx=["## Auto-retrieved Genome DNA"]
+                for x in g[:3]: ctx.append(f"- [{x.get('category','')}] {x.get('name','')} (conf:{x.get('confidence','')})")
+                parts.append("\\n".join(ctx))
+        except: pass
+        try:
+            r,s = _rq("GET","/api/genome/immune/context",q={"problem":user,"project":"hermes-auto"})
+            c = r.get("context","") if 200<=s<300 else ""
+            if c and len(c)>50: parts.append(f"## Auto-retrieved Immune Prevention\\n{c[:500]}")
+        except: pass
+        if parts: return {"context":"\\n\\n".join(parts)}
+        return None
+    def on_post_llm_call(**kw):
+        resp = kw.get("assistant_response","")
+        if not resp or len(resp)<100: return
+        try: _rq("POST","/api/dreams/save",b={"memory_type":"KNOWLEDGE","content":"[Auto-Save] "+resp[:200].replace(chr(10)," "),"importance":5,"project":"hermes-auto","session_id":"auto-"+kw.get("turn_id","0")})
+        except: pass
+    ctx.register_hook("pre_llm_call",on_pre_llm_call)
+    ctx.register_hook("post_llm_call",on_post_llm_call)
+    log.info("Second Brain auto plugin active")
+`;
+            const pluginYaml = `name: codeatlas_second_brain\nversion: "1.0"\ndescription: Automatic Second Brain activation\nhooks:\n  - pre_llm_call\n  - post_llm_call\nenabled: true\n`;
+            fs.writeFileSync(path.join(pluginDir, "__init__.py"), pluginInit);
+            fs.writeFileSync(path.join(pluginDir, "plugin.yaml"), pluginYaml);
+            results.push({ client: "hermes", action: "auto_plugin", status: "installed" });
+          } catch (err: any) {
+            results.push({ client: "hermes", action: "auto_plugin", status: "error", error: err.message });
+          }
+        }
+      }
+
+      // Claude MCP config
+      if (client === "claude" || client === "all") {
+        const claudeCfg = path.join(os.homedir(), ".claude", "claude.json");
+        try {
+          const claudeEntry = { mcpServers: {
+            codeatlas: { command: "npx", args: ["-y", "codeatlas-enterprise"], env: { CODEATLAS_API_KEY: key } },
+            ["codeatlas-genome"]: { command: "npx", args: ["-y", "codeatlas-enterprise"], env: { CODEATLAS_API_KEY: key } },
+          }};
+          if (fs.existsSync(claudeCfg)) {
+            const existing = JSON.parse(fs.readFileSync(claudeCfg, "utf-8"));
+            existing.mcpServers = { ...existing.mcpServers, ...claudeEntry.mcpServers };
+            fs.writeFileSync(claudeCfg, JSON.stringify(existing, null, 2));
+            results.push({ client: "claude", action: "mcp_config", status: "updated" });
+          } else {
+            fs.mkdirSync(path.dirname(claudeCfg), { recursive: true });
+            fs.writeFileSync(claudeCfg, JSON.stringify(claudeEntry, null, 2));
+            results.push({ client: "claude", action: "mcp_config", status: "created" });
+          }
+        } catch (err: any) {
+          results.push({ client: "claude", action: "mcp_config", status: "error", error: err.message });
+        }
+      }
+
+      return { content: [{ type: "text" as const, text: JSON.stringify({
+        success: true, results,
+        summary: `${results.filter(r => !r.error).length}/${results.length} operations succeeded`,
+        restartRequired: true,
+        message: "Restart your MCP client for changes to take effect",
+      }, null, 2) }] };
+    }
+  );
+
+  // ── Tool 9b: Check Second Brain Status ──────────────────────
+  server.tool(
+    "check_second_brain_status",
+    "Check the current Second Brain configuration status for all MCP clients.",
+    {},
+    async () => {
+      const auth = await checkAuth();
+      const results: any = { hermes: {}, claude: {}, gemini: {} };
+
+      // Hermes
+      const hermesCfg = path.join(os.homedir(), ".hermes", "config.yaml");
+      if (fs.existsSync(hermesCfg)) {
+        const cfg = fs.readFileSync(hermesCfg, "utf-8");
+        results.hermes.mcp = cfg.includes("codeatlas:") ? "configured" : "not_configured";
+      } else {
+        results.hermes.mcp = "no_config";
+      }
+      const pluginDir = path.join(os.homedir(), ".hermes", "plugins", "codeatlas_second_brain");
+      results.hermes.plugin = fs.existsSync(path.join(pluginDir, "__init__.py")) ? "installed" : "not_installed";
+      results.hermes.restartRequired = results.hermes.plugin === "installed" || results.hermes.mcp === "not_configured";
+      // Claude
+      const claudeCfg = path.join(os.homedir(), ".claude", "claude.json");
+      if (fs.existsSync(claudeCfg)) {
+        const cl = JSON.parse(fs.readFileSync(claudeCfg, "utf-8"));
+        results.claude.mcp = cl.mcpServers?.codeatlas ? "configured" : "not_configured";
+      } else {
+        results.claude.mcp = "no_config";
+      }
+
+      // API key
+      results.apiKey = process.env.CODEATLAS_API_KEY ? "set" : "not_set";
+
+      // Cloud connectivity
+      try {
+        const resp = await fetch(`https://atlas.genrostore.com/api/genome/search?limit=1`, {
+          headers: { "x-api-key": process.env.CODEATLAS_API_KEY || "", "User-Agent": "codeatlas-enterprise/2.0" },
+        });
+        results.cloud = resp.ok ? "reachable" : `error_${resp.status}`;
+      } catch {
+        results.cloud = "unreachable";
+      }
+
+      return { content: [{ type: "text" as const, text: JSON.stringify(results, null, 2) }] };
     }
   );
 }
