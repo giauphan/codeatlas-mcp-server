@@ -96,7 +96,7 @@ export async function saveDreamMemory(params: DreamMemoryInput): Promise<{ succe
 // ── One-shot sync: check cloud dream status ──
 export async function syncDreams(): Promise<{ success: boolean; count: number; message: string }> {
   try {
-    const memories = await queryDreamMemories({ query: "", limit: 1 });
+    const memories = await queryDreamMemories({ query: "", limit: 100 });
     const count = memories?.length ?? 0;
     return {
       success: true,
