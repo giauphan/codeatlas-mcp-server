@@ -14,6 +14,7 @@ export interface DreamMemoryQuery {
   query: string;
   project?: string;
   limit?: number;
+  offset?: number;
 }
 
 export interface DreamMemoryResult {
@@ -107,6 +108,7 @@ export async function queryDreamMemories(params: DreamMemoryQuery): Promise<Drea
       queryParams.set("query", params.query);
       if (params.project) queryParams.set("project", params.project);
       if (params.limit) queryParams.set("limit", String(params.limit));
+      if (params.offset) queryParams.set("offset", String(params.offset));
 
       const options: https.RequestOptions = {
         hostname: serverUrl.hostname,

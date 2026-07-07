@@ -14,7 +14,7 @@ import {
   inMemoryAnalysisCache,
   AnalysisResultLocal
 } from "../services/projectService.js";
-import { saveDreamMemory, queryDreamMemories } from "../services/dreamingService.js";
+import { saveDreamMemory, queryDreamMemories, DreamMemoryResult } from "../services/dreamingService.js";
 import { CodeAnalyzer } from "../analyzer/parser.js";
 import { SecurityScanner } from "../securityScanner.js";
 
@@ -677,6 +677,97 @@ export function registerTools(server: McpServer) {
             text: `Failed to query dream memories: ${err instanceof Error ? err.message : String(err)}`,
           }],
           isError: true,
+        };
+      }
+    }
+  );
+
+  // ── Tool 8c: Sync Dreams (scan + report status) ──────────────────
+  // AI IDE can call this to check dream sync health, or trigger batch
+  server.tool(
+    "sync_dreams",
+    "Check dream memory sync status. Returns count of stored dreams grouped by type and project. Use this to verify dreams are syncing to the cloud correctly. Can be called from any AI IDE, CLI, or Hermes cron.",
+    {
+      type: z.enum(["MISTAKE", "PREFERENCE", "KNOWLEDGE", "PATTERN"]).optional().describe("Filter by memory type"),
+      project: z.string().optional().describe("Filter by project name"),
+    },
+    async ({ type, project }: { type?: "MISTAKE" | "PREFERENCE" | "KNOWLEDGE" | "PATTERN"; project?: string }) => {
+      const auth = await checkAuth();
+      await logActivity(auth, "sync_dreams", { type, project });
+
+      try {
+        // Fetch up to 500 dreams for status reporting
+        let allDreams: DreamMemoryResult[] = [];
+        const PAGE_SIZE = 100;
+        let offset = 0;
+
+        while (true) {
+          const dreams = await queryDreamMemories({
+            query: "",
+            project,
+            limit: PAGE_SIZE,
+            offset,
+          });
+          if (!dreams || dreams.length === 0) break;
+          allDreams = allDreams.concat(dreams);
+          if (dreams.length < PAGE_SIZE) break;
+          offset += PAGE_SIZE;
+        }
+
+        // Group by type and project
+        const byType: Record<string, number> = {};
+        const byProject: Record<string, number> = {};
+        for (const d of allDreams) {
+          const typed = d as any;
+          const t = typed.memory_type || "UNKNOWN";
+          const p = typed.project || "unknown";
+          byType[t] = (byType[t] || 0) + 1;
+          byProject[p] = (byProject[p] || 0) + 1;
+        }
+
+        // Filter by type if requested
+        if (type) {
+          allDreams = allDreams.filter((d: any) =>
+            d.memory_type === type
+          );
+        }
+
+        const lines: string[] = [];
+        lines.push(`Dream Memory Sync Status`);
+        lines.push(`═══════════════════════`);
+        lines.push(`Total dreams: ${allDreams.length}`);
+        lines.push(``);
+        lines.push(`By Type:`);
+        for (const [t, c] of Object.entries(byType)) {
+          lines.push(`  ${t}: ${c}`);
+        }
+        lines.push(``);
+        lines.push(`By Project:`);
+        for (const [p, c] of Object.entries(byProject)) {
+          lines.push(`  ${p}: ${c}`);
+        }
+        if (allDreams.length > 0) {
+          lines.push(``);
+          lines.push(`Most recent:`);
+          const sorted = [...allDreams].sort((a: any, b: any) =>
+            new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()
+          );
+          for (const d of sorted.slice(0, 5)) {
+            const r = d as any;
+            lines.push(`  [${r.memory_type}] ${(r.content as string || '').substring(0, 60)} (${r.project})`);
+          }
+        }
+        lines.push(``);
+        lines.push(`✅ Sync OK — ${allDreams.length} dreams stored in CodeAtlas Cloud`);
+
+        return {
+          content: [{ type: "text" as const, text: lines.join("\n") }],
+        };
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        return {
+          content: [{ type: "text" as const, text: `Error: ${msg}` }],
+          isError: true as const,
         };
       }
     }
