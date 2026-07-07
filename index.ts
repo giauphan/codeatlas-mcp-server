@@ -53,10 +53,8 @@ if (process.argv.includes('--version') || process.argv.includes('-v')) {
   process.exit(0);
 }
 
-// ── One-shot dream sync ──
-// Called via CLI: node index.ts --sync-dreams
-// Syncs dreams from mcp-server Oracle DB to cloud and exits.
-// Useful for Hermes/Claude pre-init hooks, cron, or manual sync.
+// One-shot dream sync: node index.ts --sync-dreams
+// Reads dream count from cloud API and exits. Designed for cron or AI IDE pre-init hooks.
 if (process.argv.includes('--sync-dreams')) {
   const { syncDreams } = await import("./src/services/dreamingService.js");
   const result = await syncDreams();
