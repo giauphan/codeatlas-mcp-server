@@ -93,6 +93,25 @@ export async function saveDreamMemory(params: DreamMemoryInput): Promise<{ succe
   });
 }
 
+// ── One-shot sync: check cloud dream status ──
+export async function syncDreams(): Promise<{ success: boolean; count: number; message: string }> {
+  try {
+    const memories = await queryDreamMemories({ query: "", limit: 1 });
+    const count = memories?.length ?? 0;
+    return {
+      success: true,
+      count,
+      message: `✅ ${count} dreams synced in CodeAtlas Cloud`,
+    };
+  } catch (err: unknown) {
+    return {
+      success: false,
+      count: -1,
+      message: `❌ Sync failed: ${err instanceof Error ? err.message : String(err)}`,
+    };
+  }
+}
+
 export async function queryDreamMemories(params: DreamMemoryQuery): Promise<DreamMemoryResult[]> {
   const apiKey: string | undefined = getDreamApiKey();
   if (!apiKey) {

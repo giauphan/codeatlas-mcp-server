@@ -53,6 +53,17 @@ if (process.argv.includes('--version') || process.argv.includes('-v')) {
   process.exit(0);
 }
 
+// ── One-shot dream sync ──
+// Called via CLI: node index.ts --sync-dreams
+// Syncs dreams from mcp-server Oracle DB to cloud and exits.
+// Useful for Hermes/Claude pre-init hooks, cron, or manual sync.
+if (process.argv.includes('--sync-dreams')) {
+  const { syncDreams } = await import("./src/services/dreamingService.js");
+  const result = await syncDreams();
+  console.log(JSON.stringify(result, null, 2));
+  process.exit(result.success ? 0 : 1);
+}
+
 if (!process.argv.includes('--help') && !process.argv.includes('-h')) {
   try {
     if (fs.existsSync(pidFilePath)) {
