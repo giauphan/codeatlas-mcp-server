@@ -1551,6 +1551,7 @@ export function registerTools(server: McpServer) {
       const results: Array<{ file: string; line: number; content: string; contextBefore: string[]; contextAfter: string[] }> = [];
       const concurrency = 20;
       let currentIndex = 0;
+      const projectDir = loaded.projectDir;
 
       async function worker() {
         while (currentIndex < allFiles.length && results.length < maxRes) {
@@ -1563,7 +1564,7 @@ export function registerTools(server: McpServer) {
               if (results.length >= maxRes) break;
               if (lines[i].toLowerCase().includes(q)) {
                 results.push({
-                  file: path.relative(loaded!.projectDir, filePath),
+                  file: path.relative(projectDir, filePath),
                   line: i + 1,
                   content: lines[i].trim(),
                   contextBefore: lines.slice(Math.max(0, i - ctx), i).map(l => l.trim()).filter(Boolean),
