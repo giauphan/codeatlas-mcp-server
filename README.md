@@ -264,30 +264,31 @@ BEGIN ADMIN.codeatlas_ctx_pkg.set_tenant(:tenantId); END;
 ## 🏗 Architecture
 
 ```
-┌──────────────────────────────────────────────────┐
-│                 AI IDE / CLI                      │
-│  (Claude Code, Hermes, Cursor, VS Code, Gemini)  │
-└──────────────┬─────────────────────────┬──────────┘
-               │ MCP stdio/SSE             │
-               ▼                           ▼
-┌──────────────────────────┐   ┌──────────────────────┐
-│   CodeAtlas MCP Server    │   │  Hermes Cron Job     │
-│                           │   │  (sync-dreams-cron)  │
-│   ┌─────────────────┐    │   └──────────┬───────────┘
-│   │ 30 MCP Tools     │    │              │
-│   │ - Code Analysis  │    │              │ API
-│   │ - Dream Memory   │    │              ▼
-│   │ - Genome Immune  │    │   ┌──────────────────────┐
-│   │ - Search/Flow    │    │   │  CodeAtlas Cloud      │
-│   │ - Git/DevOps     │    │   │  (atlas.genrostore.com)│
-│   └─────────────────┘    │   │                        │
-│                          │   │  ┌──────────────────┐  │
-│   ┌─────────────────┐    │   │  │ Oracle 26ai DB    │  │
-│   │ Local AST Analyzer│  │   │  │ - Dream Memory    │  │
-│   │ + Security Scanner│  │   │  │ - Genome          │  │
-│   └─────────────────┘    │   │  │ - System Memory   │  │
-└──────────────────────────┘   │  └──────────────────┘  │
-                               └────────────────────────┘
+                          ┌──────────────────────────────┐
+                          │         AI IDE / CLI          │
+                          │ (Claude, Hermes, Cursor, VS…) │
+                          └──────────┬───────────────────┘
+                                     │ MCP stdio/SSE
+                                     ▼
+┌──────────────────────────────┐   ┌──────────────────────────────┐
+│     CodeAtlas MCP Server      │   │      Hermes Cron Job         │
+│                                │   │   (sync-dreams-cron.sh)    │
+│  ┌────────────────────────┐   │   └─────────────┬────────────────┘
+│  │    30 MCP Tools        │   │                 │
+│  │  Code Analysis         │   │                 │ HTTP API
+│  │  Dream Memory          │   │                 ▼
+│  │  Genome Immune         │   │   ┌──────────────────────────────┐
+│  │  Code Search & Flow    │   │   │      CodeAtlas Cloud         │
+│  │  Git & DevOps          │   │   │   (atlas.genrostore.com)    │
+│  │  Second Brain          │   │   │                              │
+│  │  Enterprise Security   │   │   │  ┌────────────────────────┐ │
+│  └────────────────────────┘   │   │  │     Oracle 26ai DB      │ │
+│                                │   │  │  - Dream Memory       │ │
+│  ┌────────────────────────┐   │   │  │  - Genome Immune      │ │
+│  │  Local AST Analyzer    │   │   │  │  - System Memory      │ │
+│  │  + Security Scanner    │   │   │  └────────────────────────┘ │
+│  └────────────────────────┘   │   └──────────────────────────────┘
+└──────────────────────────────┘
 ```
 
 ---
