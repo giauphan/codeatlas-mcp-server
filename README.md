@@ -180,7 +180,7 @@ mcp_servers:
 | Variable | Required | Default | Description |
 |---|---|---|---|
 | `CODEATLAS_API_KEY` | ✅ Yes | — | API key for CodeAtlas Cloud. Generate from Dashboard → Control Center. |
-| `CODEATLAS_API_URL` | ❌ No | `https://atlas.genrostore.com` | Live server URL for dream/genome sync. |
+| `CODEATLAS_API_URL` | ❌ No | `https://atlas.genrostore.com` | Live server URL. All cloud features (dreams, genome, system memory) route through this. MCP server has NO direct Oracle connection — it uses this REST API. |
 | `NVIDIA_API_KEY` | ❌ No | — | NVIDIA NIM API key for embedding generation (nv-embed-v1). Needed for vector search in dreams. |
 | `ORACLE_USER` | ✅ Yes | `ADMIN` | Oracle 26ai database user. |
 | `ORACLE_PASSWORD` | ✅ Yes | — | Oracle 26ai password. |
@@ -264,31 +264,53 @@ BEGIN ADMIN.codeatlas_ctx_pkg.set_tenant(:tenantId); END;
 ## 🏗 Architecture
 
 ```
-                          ┌──────────────────────────────┐
-                          │         AI IDE / CLI          │
-                          │ (Claude, Hermes, Cursor, VS…) │
-                          └──────────┬───────────────────┘
-                                     │ MCP stdio/SSE
-                                     ▼
-┌──────────────────────────────┐   ┌──────────────────────────────┐
-│     CodeAtlas MCP Server      │   │      Hermes Cron Job         │
-│                                │   │   (sync-dreams-cron.sh)    │
-│  ┌────────────────────────┐   │   └─────────────┬────────────────┘
-│  │    30 MCP Tools        │   │                 │
-│  │  Code Analysis         │   │                 │ HTTP API
-│  │  Dream Memory          │   │                 ▼
-│  │  Genome Immune         │   │   ┌──────────────────────────────┐
-│  │  Code Search & Flow    │   │   │      CodeAtlas Cloud         │
-│  │  Git & DevOps          │   │   │   (atlas.genrostore.com)    │
-│  │  Second Brain          │   │   │                              │
-│  │  Enterprise Security   │   │   │  ┌────────────────────────┐ │
-│  └────────────────────────┘   │   │  │     Oracle 26ai DB      │ │
-│                                │   │  │  - Dream Memory       │ │
-│  ┌────────────────────────┐   │   │  │  - Genome Immune      │ │
-│  │  Local AST Analyzer    │   │   │  │  - System Memory      │ │
-│  │  + Security Scanner    │   │   │  └────────────────────────┘ │
-│  └────────────────────────┘   │   └──────────────────────────────┘
-└──────────────────────────────┘
+                    ┌──────────────────────────────┐
+                    │         AI IDE / CLI          │
+                    │ (Claude, Hermes, Cursor, VS…) │
+                    └──────────────┬───────────────┘
+                                  │ MCP stdio/SSE
+                                  ▼
+             ┌────────────────────────────────────┐
+             │      CodeAtlas MCP Server           │
+             │                                    │
+             │  ┌──────────────────────────────┐  │
+             │  │       30 MCP Tools           │  │
+             │  │  ┌─────────────────────────┐ │  │
+             │  │  │  Cloud Features          │ │  │
+             │  │  │  • Dream Memory          │ │  │
+             │  │  │  • Genome Immune         │ │  │
+             │  │  │  • System Memory         │ │  │
+             │  │  │  • Second Brain          │ │  │
+             │  │  │  • Enterprise Security   │ │  │
+             │  │  └──────────┬──────────────┘ │  │
+             │  │  ┌──────────┴──────────────┐ │  │
+             │  │  │  Local Features          │ │  │
+             │  │  │  • Code Analysis (AST)   │ │  │
+             │  │  │  • Code Search           │ │  │
+             │  │  │  • Callers/Callees       │ │  │
+             │  │  │  • Git/DevOps            │ │  │
+             │  │  └─────────────────────────┘ │  │
+             │  └──────────────────────────────┘  │
+             └──────────────┬─────────────────────┘
+                            │ HTTPS API (REST)
+                            ▼
+             ┌────────────────────────────────────┐
+             │      CodeAtlas Cloud                │
+             │   (atlas.genrostore.com)           │
+             │                                    │
+             │  ┌──────────────────────────────┐  │
+             │  │        Oracle 26ai DB         │  │
+             │  │  • Dream Memory              │  │
+             │  │  • Genome Immune             │  │
+             │  │  • System Memory             │  │
+             │  │  • Project Metadata          │  │
+             │  └──────────────────────────────┘  │
+             └────────────────────────────────────┘
+
+       CLI: npx codeatlas-mcp-enterprise --sync-dreams  (one-shot health check)
+
+       Cron: 0 */4 * * * npx codeatlas-mcp-enterprise --sync-dreams
+             (periodic sync verification via Hermes/systemd)
 ```
 
 ---
