@@ -1549,25 +1549,44 @@ export function registerTools(server: McpServer) {
       } catch { /* fallback */ }
 
       const results: Array<{ file: string; line: number; content: string; contextBefore: string[]; contextAfter: string[] }> = [];
-      for (const filePath of allFiles) {
-        if (results.length >= maxRes) break;
-        try {
-          const content = fs.readFileSync(filePath, "utf-8");
-          const lines = content.split("\n");
-          for (let i = 0; i < lines.length; i++) {
-            if (results.length >= maxRes) break;
-            if (lines[i].toLowerCase().includes(q)) {
-              results.push({
-                file: path.relative(loaded.projectDir, filePath),
-                line: i + 1,
-                content: lines[i].trim(),
-                contextBefore: lines.slice(Math.max(0, i - ctx), i).map(l => l.trim()).filter(Boolean),
-                contextAfter: lines.slice(i + 1, i + 1 + ctx).map(l => l.trim()).filter(Boolean),
-              });
+      const concurrency = 20;
+      let currentIndex = 0;
+      const projectDir = loaded.projectDir;
+
+      async function worker() {
+        while (currentIndex < allFiles.length && results.length < maxRes) {
+          const filePath = allFiles[currentIndex++];
+          try {
+            const content = await fs.promises.readFile(filePath, "utf-8");
+            if (results.length >= maxRes) return;
+            const lines = content.split("\n");
+            for (let i = 0; i < lines.length; i++) {
+              if (results.length >= maxRes) break;
+              if (lines[i].toLowerCase().includes(q)) {
+                results.push({
+                  file: path.relative(projectDir, filePath),
+                  line: i + 1,
+                  content: lines[i].trim(),
+                  contextBefore: lines.slice(Math.max(0, i - ctx), i).map(l => l.trim()).filter(Boolean),
+                  contextAfter: lines.slice(i + 1, i + 1 + ctx).map(l => l.trim()).filter(Boolean),
+                });
+              }
             }
-          }
-        } catch { /* skip */ }
+          } catch { /* skip */ }
+        }
       }
+
+      const workers = [];
+      for (let i = 0; i < concurrency; i++) {
+        workers.push(worker());
+      }
+      await Promise.all(workers);
+
+      // Sort results to ensure deterministic output despite concurrent reads
+      results.sort((a, b) => {
+        if (a.file !== b.file) return a.file.localeCompare(b.file);
+        return a.line - b.line;
+      });
 
       return {
         content: [{ type: "text" as const, text: JSON.stringify({ query, project: loaded.projectName, matchCount: results.length, truncated: results.length >= maxRes, files: [...new Set(results.map(r => r.file))], results: results.slice(0, maxRes) }, null, 2) }],
