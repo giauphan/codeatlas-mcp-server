@@ -1976,11 +1976,10 @@ export function registerTools(server: McpServer) {
       const auth = await checkAuth();
       await logActivity(auth, "setup_second_brain", { client, autoPlugin });
 
-      let key = apiKey || process.env.CODEATLAS_API_KEY;
+      const key = (apiKey || process.env.CODEATLAS_API_KEY)?.trim();
       if (!key) return { content: [{ type: "text" as const, text: JSON.stringify({
         success: false, error: "CODEATLAS_API_KEY not set. Provide apiKey parameter or set env var."
       }, null, 2) }] };
-      key = key.trim();
 
       // 🛡️ Sentinel Security Validation
       // Prevent command/code injection via malicious API key in generated Python script and YAML config
