@@ -1526,6 +1526,9 @@ export function registerTools(server: McpServer) {
       const maxRes = Math.min(maxResults || 30, 100);
       const ctx = contextLines || 2;
       const q = query.toLowerCase();
+      if (!q) {
+        return { content: [{ type: "text" as const, text: JSON.stringify({ query, project: loaded.projectName, matchCount: 0, truncated: false, files: [], results: [] }, null, 2) }] };
+      }
       const allFiles: string[] = [];
       const extSet = new Set([".ts", ".tsx", ".js", ".jsx", ".py", ".php", ".json", ".yaml", ".yml", ".md", ".css", ".scss", ".html"]);
 
