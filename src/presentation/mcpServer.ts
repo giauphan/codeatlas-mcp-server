@@ -1552,6 +1552,7 @@ export function registerTools(server: McpServer) {
       const concurrency = 20;
       let currentIndex = 0;
       const projectDir = loaded.projectDir;
+      const regex = new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
 
       async function worker() {
         while (currentIndex < allFiles.length && results.length < maxRes) {
@@ -1559,6 +1560,10 @@ export function registerTools(server: McpServer) {
           try {
             const content = await fs.promises.readFile(filePath, "utf-8");
             if (results.length >= maxRes) return;
+
+            // Fast reject: skip expensive split if query is not in file
+            if (!regex.test(content)) continue;
+
             const lines = content.split("\n");
             for (let i = 0; i < lines.length; i++) {
               if (results.length >= maxRes) break;
