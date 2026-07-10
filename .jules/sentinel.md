@@ -13,4 +13,4 @@
 ## 2026-07-10 - [Denial of Service via Regex Injection]
 **Vulnerability:** A poorly escaped regular expression character class in the `code_search` tool `/[.*+?^${}()|[]\]/g` allowed regular expression metacharacters (e.g., `+`) to slip through unescaped when replacing characters to form a new Regular Expression object, leading to a `SyntaxError: Invalid regular expression` and subsequently a server crash.
 **Learning:** The regular expression used for escaping `q.replace(/[.*+?^${}()|[]\]/g, "\\$&")` was missing a `\` for the literal `[` inside the character class (`\[`), and `\\` for `\`, which meant it was evaluating `[]\]` as matching the `]` literal.
-**Prevention:** Use the MDN recommended standard `/[-[\]{}()*+?.,\\^$|#\s]/g` or `/[.*+?^${}()|[\]\\]/g` for escaping regular expression strings in javascript.
+**Prevention:** Use the MDN recommended standard `/[-[\]{}()*+?.,\\\\^$|#\\s]/g` or `/[.*+?^${}()|[\\]\\\\]/g` for escaping regular expression strings in javascript.
