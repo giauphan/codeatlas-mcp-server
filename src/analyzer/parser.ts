@@ -179,12 +179,29 @@ export class CodeAnalyzer {
     const insights = this.generateAIInsights(graph);
     const circularDepsCount = this.detectCircularDeps();
 
+    let modules = 0;
+    let functions = 0;
+    let classes = 0;
+    let variables = 0;
+
+    for (const node of this.nodes.values()) {
+      if (node.type === 'module') modules++;
+      else if (node.type === 'function') functions++;
+      else if (node.type === 'class') classes++;
+      else if (node.type === 'variable') variables++;
+    }
+
+    let dependencies = 0;
+    for (const link of this.links) {
+      if (link.type === 'import') dependencies++;
+    }
+
     const counts = {
-      modules: Array.from(this.nodes.values()).filter(n => n.type === 'module').length,
-      functions: Array.from(this.nodes.values()).filter(n => n.type === 'function').length,
-      classes: Array.from(this.nodes.values()).filter(n => n.type === 'class').length,
-      variables: Array.from(this.nodes.values()).filter(n => n.type === 'variable').length,
-      dependencies: this.links.filter(l => l.type === 'import').length,
+      modules,
+      functions,
+      classes,
+      variables,
+      dependencies,
       circularDeps: circularDepsCount,
       deadCode: 0
     };
@@ -1153,11 +1170,23 @@ export class CodeAnalyzer {
     // Mock AI Insights generation based on simple heuristics
     
     // 1. Large files / God objects
-    const modulesWithManyFunctions = Array.from(this.nodes.values()).filter(n => {
-      if (n.type !== 'module') return false;
-      const functionCount = graph.links.filter(l => l.source === n.id && l.type === 'import' && l.target.startsWith('function')).length;
-      return functionCount > 10; // threshold
-    });
+    // Pre-calculate function import counts per module to avoid O(N*L) complexity
+    const moduleFunctionCounts = new Map<string, number>();
+    for (const link of graph.links) {
+      if (link.type === 'import' && link.target.startsWith('function')) {
+        moduleFunctionCounts.set(link.source, (moduleFunctionCounts.get(link.source) || 0) + 1);
+      }
+    }
+
+    const modulesWithManyFunctions: string[] = [];
+    for (const node of this.nodes.values()) {
+      if (node.type === 'module') {
+        const functionCount = moduleFunctionCounts.get(node.id) || 0;
+        if (functionCount > 10) { // threshold
+          modulesWithManyFunctions.push(node.id);
+        }
+      }
+    }
 
     if (modulesWithManyFunctions.length > 0) {
       insights.push({
@@ -1166,7 +1195,7 @@ export class CodeAnalyzer {
         title: 'God Object Detected',
         description: `Found ${modulesWithManyFunctions.length} modules containing a large number of functions. Consider splitting them.`,
         severity: 'high',
-        affectedNodes: modulesWithManyFunctions.map(n => n.id)
+        affectedNodes: modulesWithManyFunctions
       });
     }
 
