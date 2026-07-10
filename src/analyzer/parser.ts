@@ -153,9 +153,16 @@ export class CodeAnalyzer {
   }
 
   private buildAnalysisResult(): AnalysisResult {
+    // Calculate node degrees efficiently in O(L) time instead of O(N*L)
+    const nodeDegrees = new Map<string, number>();
+    for (const link of this.links) {
+      nodeDegrees.set(link.source, (nodeDegrees.get(link.source) || 0) + 1);
+      nodeDegrees.set(link.target, (nodeDegrees.get(link.target) || 0) + 1);
+    }
+
     // Add graph layout sizes based on relationships
     this.nodes.forEach(node => {
-      let degree = this.links.filter(l => l.source === node.id || l.target === node.id).length;
+      const degree = nodeDegrees.get(node.id) || 0;
       node.val = (node.type === 'module' ? 8 : (node.type === 'class' ? 6 : 4)) + Math.log1p(degree) * 2;
     });
 
