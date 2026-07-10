@@ -1976,10 +1976,18 @@ export function registerTools(server: McpServer) {
       const auth = await checkAuth();
       await logActivity(auth, "setup_second_brain", { client, autoPlugin });
 
-      const key = apiKey || process.env.CODEATLAS_API_KEY;
+      const key = (apiKey || process.env.CODEATLAS_API_KEY)?.trim();
       if (!key) return { content: [{ type: "text" as const, text: JSON.stringify({
         success: false, error: "CODEATLAS_API_KEY not set. Provide apiKey parameter or set env var."
       }, null, 2) }] };
+
+      // 🛡️ Sentinel Security Validation
+      // Prevent command/code injection via malicious API key in generated Python script and YAML config
+      if (!/^[a-zA-Z0-9_\-.]+$/.test(key)) {
+        return { content: [{ type: "text" as const, text: JSON.stringify({
+          success: false, error: "Invalid API key format. Expected alphanumeric characters, dashes, dots, or underscores."
+        }, null, 2) }] };
+      }
 
       const results: any[] = [];
       const mcpEntry = `  codeatlas:\n    command: npx\n    args: ["-y", "codeatlas-enterprise"]\n    env:\n      CODEATLAS_API_KEY: "${key}"\n    enabled: true\n`;
