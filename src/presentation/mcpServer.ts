@@ -1526,6 +1526,9 @@ export function registerTools(server: McpServer) {
       const maxRes = Math.min(maxResults || 30, 100);
       const ctx = contextLines || 2;
       const q = query.toLowerCase();
+      if (!q) {
+        return { content: [{ type: "text" as const, text: JSON.stringify({ query, project: loaded.projectName, matchCount: 0, truncated: false, files: [], results: [] }, null, 2) }] };
+      }
       const allFiles: string[] = [];
       const extSet = new Set([".ts", ".tsx", ".js", ".jsx", ".py", ".php", ".json", ".yaml", ".yml", ".md", ".css", ".scss", ".html"]);
 
@@ -1552,6 +1555,7 @@ export function registerTools(server: McpServer) {
       const concurrency = 20;
       let currentIndex = 0;
       const projectDir = loaded.projectDir;
+      const searchPattern = new RegExp(q.replace(/[.*+?^${}()|[]\]/g, "\\$&"), "i");
 
       async function worker() {
         while (currentIndex < allFiles.length && results.length < maxRes) {
@@ -1559,6 +1563,9 @@ export function registerTools(server: McpServer) {
           try {
             const content = await fs.promises.readFile(filePath, "utf-8");
             if (results.length >= maxRes) return;
+            // Fast reject: skip expensive split if query is not in file
+            if (!searchPattern.test(content)) continue;
+
             const lines = content.split("\n");
             for (let i = 0; i < lines.length; i++) {
               if (results.length >= maxRes) break;
