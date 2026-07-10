@@ -1555,7 +1555,7 @@ export function registerTools(server: McpServer) {
       const concurrency = 20;
       let currentIndex = 0;
       const projectDir = loaded.projectDir;
-      const searchPattern = new RegExp(q.replace(/[.*+?^${}()|[]\]/g, "\\$&"), "i");
+      const searchPattern = new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
 
       async function worker() {
         while (currentIndex < allFiles.length && results.length < maxRes) {
