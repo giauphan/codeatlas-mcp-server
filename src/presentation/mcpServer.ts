@@ -786,7 +786,7 @@ export function registerTools(server: McpServer) {
       const auth = await checkAuth();
       await logActivity(auth, "search_genome", { query: query.substring(0, 100), project, limit });
       try {
-        const serverUrl = process.env.CODEATLAS_API_URL || "https://atlas.genrostore.com/";
+        const serverUrl = process.env.CODEATLAS_API_URL || "https://your-server.com";
         const apiKey = process.env.CODEATLAS_API_KEY;
         if (!apiKey) throw new Error("CODEATLAS_API_KEY not set");
 
@@ -820,7 +820,7 @@ export function registerTools(server: McpServer) {
       const auth = await checkAuth();
       await logActivity(auth, "get_gene", { geneId });
       try {
-        const serverUrl = process.env.CODEATLAS_API_URL || "https://atlas.genrostore.com/";
+        const serverUrl = process.env.CODEATLAS_API_URL || "https://your-server.com";
         const apiKey = process.env.CODEATLAS_API_KEY;
         if (!apiKey) throw new Error("CODEATLAS_API_KEY not set");
 
@@ -855,7 +855,7 @@ export function registerTools(server: McpServer) {
       const auth = await checkAuth();
       await logActivity(auth, "scan_immune_genes", { problem: problem.substring(0, 100), project });
       try {
-        const serverUrl = process.env.CODEATLAS_API_URL || "https://atlas.genrostore.com/";
+        const serverUrl = process.env.CODEATLAS_API_URL || "https://your-server.com";
         const apiKey = process.env.CODEATLAS_API_KEY;
         if (!apiKey) throw new Error("CODEATLAS_API_KEY not set");
 
@@ -892,7 +892,7 @@ export function registerTools(server: McpServer) {
       const auth = await checkAuth();
       await logActivity(auth, "save_immune_gene", { problem: problem.substring(0, 50), failure: failure.substring(0, 50), project });
       try {
-        const serverUrl = process.env.CODEATLAS_API_URL || "https://atlas.genrostore.com/";
+        const serverUrl = process.env.CODEATLAS_API_URL || "https://your-server.com";
         const apiKey = process.env.CODEATLAS_API_KEY;
         if (!apiKey) throw new Error("CODEATLAS_API_KEY not set");
 
@@ -2000,7 +2000,7 @@ import json, urllib.request, urllib.parse, logging
 from typing import Any
 log = logging.getLogger(__name__)
 KEY = "${key}"
-URL = "https://atlas.genrostore.com/"
+URL = process.env.CODEATLAS_API_URL || "https://your-server.com/"
 UA = "Hermes-SecondBrain-Plugin/1.0"
 def _rq(m, p, b=None, q=None):
     import urllib.error
@@ -2128,7 +2128,7 @@ def register(ctx):
 
       // Cloud connectivity
       try {
-        const resp = await fetch(`https://atlas.genrostore.com/api/genome/search?limit=1`, {
+        const resp = await fetch(`${process.env.CODEATLAS_API_URL || "https://your-server.com"}/api/genome/search?limit=1`, {
           headers: { "x-api-key": process.env.CODEATLAS_API_KEY || "", "User-Agent": "codeatlas-enterprise/2.0" },
         });
         results.cloud = resp.ok ? "reachable" : `error_${resp.status}`;

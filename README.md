@@ -180,7 +180,7 @@ mcp_servers:
 | Variable | Required | Default | Description |
 |---|---|---|---|
 | `CODEATLAS_API_KEY` | ✅ Yes | — | API key for CodeAtlas Cloud. Generate from Dashboard → Control Center. |
-| `CODEATLAS_API_URL` | ❌ No | `https://atlas.genrostore.com` | Live server URL. All cloud features (dreams, genome, system memory) route through this. MCP server has NO direct Oracle connection — it uses this REST API. |
+| `CODEATLAS_API_URL` | ❌ No | `https://your-server.com` | Live server URL. All cloud features (dreams, genome, system memory) route through this. MCP server has NO direct Oracle connection — it uses this REST API. |
 | `NVIDIA_API_KEY` | ❌ No | — | NVIDIA NIM API key for embedding generation (nv-embed-v1). Needed for vector search in dreams. |
 | `ORACLE_USER` | ✅ Yes | `ADMIN` | Oracle 26ai database user. |
 | `ORACLE_PASSWORD` | ✅ Yes | — | Oracle 26ai password. |
