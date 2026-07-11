@@ -11,6 +11,9 @@ export class CodeAnalyzer {
   private nodes: Map<string, GraphNode> = new Map();
   private links: GraphLink[] = [];
   private readonly maxFiles: number;
+
+  // Performance cache
+  private functionNodesByNameCache: Map<string, string[]> | null = null;
   private readonly excludedDirectories: string[];
   private readonly excludedFiles: string[];
   private readonly fileExtensions: string[];
@@ -760,21 +763,7 @@ export class CodeAnalyzer {
     }
 
     // Method calls — only link to functions already discovered in the graph
-    const functionNodesByName = new Map<string, string[]>();
-    for (const key of this.nodes.keys()) {
-      if (key.startsWith('function:')) {
-        const lastColonIdx = key.lastIndexOf(':');
-        if (lastColonIdx !== -1) {
-          const funcName = key.substring(lastColonIdx + 1);
-          let arr = functionNodesByName.get(funcName);
-          if (!arr) {
-            arr = [];
-            functionNodesByName.set(funcName, arr);
-          }
-          arr.push(key);
-        }
-      }
-    }
+    const functionNodesByName = this.getFunctionNodesByName();
 
     for (const call of result.calls) {
       // Search all known function nodes to find a match
@@ -1126,7 +1115,34 @@ export class CodeAnalyzer {
     }
     if (!this.nodes.has(node.id)) {
       this.nodes.set(node.id, node);
+      if (node.type === 'function' || node.id.startsWith('function:')) {
+        this.functionNodesByNameCache = null; // Invalidate cache
+      }
     }
+  }
+
+  private getFunctionNodesByName(): Map<string, string[]> {
+    if (this.functionNodesByNameCache) {
+      return this.functionNodesByNameCache;
+    }
+    const map = new Map<string, string[]>();
+    for (const key of this.nodes.keys()) {
+      if (key.startsWith('function:')) {
+        const lastColonIdx = key.lastIndexOf(':');
+        if (lastColonIdx !== -1) {
+          const funcName = key.substring(lastColonIdx + 1);
+          let arr = map.get(funcName);
+          if (!arr) {
+            arr = [key];
+            map.set(funcName, arr);
+          } else {
+            arr.push(key);
+          }
+        }
+      }
+    }
+    this.functionNodesByNameCache = map;
+    return map;
   }
 
   private addLink(link: GraphLink) {
