@@ -235,7 +235,7 @@ export class CodeAnalyzer {
       folderNodeMap.get(folder)!.push(node);
     }
 
-    // Build chunks and separate cross-chunk links
+    // Split large graphs into chunks for the force layout to converge faster.
     const chunks = new Map<string, ChunkData>();
     const nodeToFolder = new Map<string, string>();
     const crossLinks: GraphLink[] = [];
@@ -247,7 +247,7 @@ export class CodeAnalyzer {
       }
     }
 
-    // Create chunks with internal links
+    // Within-chunk links keep the layout cohesive; cross-chunk edges become thin connectors.
     for (const [folder, nodes] of folderNodeMap) {
       const nodeIds = new Set(nodes.map(n => n.id));
       const internalLinks = result.graph.links.filter(
@@ -269,7 +269,7 @@ export class CodeAnalyzer {
       }
     }
 
-    // Build folder info for manifest
+    // Manifest aggregates file-count stats per directory for the project tree.
     const folders: FolderInfo[] = [];
     for (const [folder, chunk] of chunks) {
       const types: Record<string, number> = {};
@@ -379,7 +379,7 @@ export class CodeAnalyzer {
   private detectCircularDeps(): number {
     const adjList = new Map<string, string[]>();
     
-    // Build adjacency list for module-to-module imports
+    // Adjacency list drives cycle detection and impact analysis.
     for (const link of this.links) {
       if (link.type === 'import' && link.source.startsWith('module:') && link.target.startsWith('module:')) {
         if (!adjList.has(link.source)) {
@@ -575,7 +575,8 @@ export class CodeAnalyzer {
 
       let linkSourceId = moduleId;
       if (func.indent && func.indent > 0) {
-        // Find the most recent class defined before this function
+        // Functions without an explicit parent class are assigned to the closest
+  // preceding class by line number. This handles PHP/Python file-scoped functions.
         const parentClass = reversedClasses
           .find(cls => cls.line < func.line);
         if (parentClass) {
@@ -632,7 +633,7 @@ export class CodeAnalyzer {
       }
     }
 
-    // Build a simple scope tracker from functions list
+    // Scope tracker maps line ranges to class boundaries for AST pruning.
     const sortedFunctions = [...result.functions].sort((a, b) => a.line - b.line);
     for (const call of result.calls) {
       // Find which function this call is inside using binary search

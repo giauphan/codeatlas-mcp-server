@@ -436,7 +436,7 @@ export function registerTools(server: McpServer) {
         return true;
       });
 
-      // Build Mermaid diagram
+      // Generate Mermaid JS flowchart syntax from the entity graph.
       const nodeIdMap = new Map<string, string>();
       let counter = 0;
 
@@ -696,7 +696,7 @@ export function registerTools(server: McpServer) {
       await logActivity(auth, "sync_dreams", { type, project });
 
       try {
-        // Fetch up to 500 dreams for status reporting
+        // Paginate through all dreams to build an accurate count — not sampled, complete.
         let allDreams: DreamMemoryResult[] = [];
         const PAGE_SIZE = 100;
         let offset = 0;
@@ -1739,7 +1739,7 @@ export function registerTools(server: McpServer) {
         rF = n;
       }
 
-      // Find test files
+      // Colocate tests by pattern (*.test.*, __tests__, spec) for impact analysis
       const testFiles = new Set<string>();
       for (const id of [...symbolIds]) {
         const n = nodeMap.get(id);
@@ -2141,7 +2141,7 @@ def register(ctx):
   );
 }
 
-// Create the global MCP server instance
+// MCP SDK requires a single server instance; tools are registered before transport.start().
 export const server = new McpServer(
   {
     name: "CodeAtlas",
