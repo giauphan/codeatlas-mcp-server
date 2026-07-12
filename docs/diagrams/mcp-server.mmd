@@ -1,0 +1,35 @@
+flowchart TB
+    subgraph Input["Input"]
+        IDE["AI IDE (Claude/Cursor)"]
+        CLI["CLI (codeatlas-mcp)"]
+    end
+
+    subgraph MCP["MCP Server"]
+        Entry["index.ts"]
+        MCPTools["30 MCP Tools"]
+        Analyzer["Code Analyzer"]
+    end
+
+    subgraph AnalyzerModules["Analyzer Modules"]
+        AST["AST Parser<br/>(TS/JS/Python/PHP)"]
+        DepGraph["Dependency Graph"]
+        CodeSearch["Semantic Code Search"]
+        FuncCache["functionNodesByName<br/>Cache (70% speedup)"]
+    end
+
+    subgraph Cloud["Cloud API"]
+        Platform["codeatlas-platform<br/>(HTTP)"]
+        Dreams["Dream Memories"]
+        Genome["Genome DNA"]
+    end
+
+    IDE <-->|"MCP stdio"| MCP
+    CLI --> MCP
+    MCP --> Analyzer
+    Analyzer --> AST
+    Analyzer --> DepGraph
+    Analyzer --> CodeSearch
+    Analyzer --> FuncCache
+    MCP -.->|"CONNECT v2.1"| Platform
+    Platform --> Dreams
+    Platform --> Genome
