@@ -433,28 +433,30 @@ export class CodeAnalyzer {
       return fileList;
     }
     
-    let files: string[];
+    let files: fs.Dirent[];
     try {
-      files = fs.readdirSync(dir);
+      // ⚡ Bolt: Use withFileTypes to avoid costly fs.statSync calls on every file
+      files = fs.readdirSync(dir, { withFileTypes: true });
     } catch {
       return fileList;
     }
     
     for (const file of files) {
       // Keep safety check for hidden files/folders (starting with .)
-      if (file.startsWith('.')) {
+      if (file.name.startsWith('.')) {
         continue;
       }
       
-      const filePath = path.join(dir, file);
-      let stat: fs.Stats;
-      try {
-        stat = fs.statSync(filePath);
-      } catch {
-        continue;
-      }
+      const filePath = path.join(dir, file.name);
       
-      const isDirectory = stat.isDirectory();
+      let isDirectory = file.isDirectory();
+      if (file.isSymbolicLink()) {
+        try {
+          isDirectory = fs.statSync(filePath).isDirectory();
+        } catch {
+          continue;
+        }
+      }
       
       // Check if file/directory is ignored via .gitignore or default rules
       if (this.isIgnored(filePath, isDirectory)) {
@@ -463,7 +465,7 @@ export class CodeAnalyzer {
       
       if (isDirectory) {
         this.getFiles(filePath, fileList, depth + 1);
-      } else if (this.fileExtensions.some(ext => file.endsWith(ext))) {
+      } else if (this.fileExtensions.some(ext => file.name.endsWith(ext))) {
         fileList.push(filePath);
       }
     }
