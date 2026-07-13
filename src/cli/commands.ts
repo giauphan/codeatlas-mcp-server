@@ -12,7 +12,7 @@ import * as path from "path";
 import * as os from "os";
 import * as readline from "readline";
 
-const API_URL = process.env.CODEATLAS_API_URL || "https://atlas.genrostore.com/";
+const API_URL = process.env.CODEATLAS_API_URL || "https://your-server.com";
 
 /* ── Helpers ───────────────────────────────────────────────────── */
 
