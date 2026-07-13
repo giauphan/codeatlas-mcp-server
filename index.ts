@@ -47,7 +47,7 @@ if (process.argv.includes('--version') || process.argv.includes('-v')) {
   // Try both relative locations (source: index.ts, dist: dist/index.js)
   let pkg: any;
   for (const p of ['./package.json', '../package.json']) {
-    try { pkg = JSON.parse(fs.readFileSync(new URL(p, import.meta.url), 'utf-8')); break; } catch {}
+    try { pkg = JSON.parse(fs.readFileSync(new URL(p, import.meta.url), 'utf-8')); break; } catch { }
   }
   if (pkg) console.log(pkg.version);
   process.exit(0);
@@ -141,7 +141,7 @@ console.error = (...args: any[]) => {
       logQueue.shift();
     }
     logQueue.push(`[${timestamp}] ${message}\n`);
-    flushLogQueue().catch(() => {});
+    flushLogQueue().catch(() => { });
   } catch (err) {
     // Ignore queue errors
   }
@@ -152,12 +152,12 @@ import { server } from "./src/presentation/mcpServer.js";
 
 // Import Domain / Application Services
 import { checkAuth } from "./src/services/authService.js";
-import { 
-  getStats, 
-  discoverProjects, 
-  loadAnalysis, 
-  discoverProjectsAsync, 
-  loadAnalysisAsync, 
+import {
+  getStats,
+  discoverProjects,
+  loadAnalysis,
+  discoverProjectsAsync,
+  loadAnalysisAsync,
   fileExists,
   getWorkspaceFromAncestors,
   isSystemIdeDirectory,
@@ -206,7 +206,7 @@ async function main() {
                   }).catch((err) => {
                     console.error(`[Auto-Scan] ❌ Failed: ${subDir}: ${err}`);
                   });
-                }).catch(() => {});
+                }).catch(() => { });
               }
             } else {
               console.error(`[Auto-Scan] ℹ️ No .git projects found under container root: ${workspacePath}`);
@@ -236,8 +236,8 @@ async function main() {
           const subName = path.basename(subDir);
           isIndexingEnabledForProject(subName).then((enabled) => {
             if (!enabled) return;
-            loadAnalysisAsync(subDir, true).catch(() => {});
-          }).catch(() => {});
+            loadAnalysisAsync(subDir, true).catch(() => { });
+          }).catch(() => { });
         }
       } else {
         console.error(`[Auto-Scan] ℹ️ No .git projects found in workspace fallback: ${activeWorkspace}`);
