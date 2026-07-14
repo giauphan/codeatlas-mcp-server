@@ -72,7 +72,6 @@ export function stopWatcher() {
     watcher = null;
   }
   activeWatchedPaths.clear();
-  console.error("[Watcher] 🛑 File watcher stopped.");
 }
 
 export function startWatcher() {
