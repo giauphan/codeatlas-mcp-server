@@ -10,6 +10,7 @@
 import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
+import { getHermesConfigPath, getHermesPluginDir } from "../utils/pathUtils.js";
 import * as readline from "readline";
 
 const API_URL = process.env.CODEATLAS_API_URL || "https://your-server.com";
@@ -242,14 +243,14 @@ export async function cmdDoctor(): Promise<void> {
       return { status: "fail", detail: `HTTP ${r.status}` };
     }],
     ["MCP config (Hermes)", async () => {
-      const cfg = path.join(os.homedir(), ".hermes", "config.yaml");
+      const cfg = getHermesConfigPath();
       if (!fs.existsSync(cfg)) return { status: "warn", detail: "not found" };
       const c = fs.readFileSync(cfg, "utf-8");
       if (c.includes("codeatlas:")) return { status: "ok" };
       return { status: "warn", detail: "codeatlas not configured" };
     }],
     ["Auto plugin (Hermes)", async () => {
-      const p = path.join(os.homedir(), ".hermes", "plugins", "codeatlas_second_brain", "__init__.py");
+      const p = path.join(getHermesPluginDir(), "__init__.py");
       return fs.existsSync(p) ? { status: "ok" } : { status: "warn", detail: "not installed" };
     }],
     ["Dream persistence", async () => {

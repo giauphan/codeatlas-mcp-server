@@ -3,6 +3,7 @@ import { z } from "zod";
 import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
+import { getHomePath, getHermesConfigPath, getHermesPluginDir, getClaudeConfigPath } from "../utils/pathUtils.js";
 import { checkAuth, logActivity } from "../services/authService.js";
 import {
   discoverProjectsAsync,
@@ -37,7 +38,7 @@ export function registerTools(server: McpServer) {
 
       // Safety: reject paths that are the user's home directory or system roots
       const resolvedPath = path.resolve(projectPath);
-      const homeDir = os.homedir();
+      const homeDir = getHomePath();
       if (resolvedPath === homeDir || resolvedPath === "/" || resolvedPath === "/home") {
         return { content: [{ type: "text" as const, text: `Error: Refusing to analyze '${resolvedPath}' — path is too broad. Please specify a project subdirectory.` }] };
       }
@@ -1971,7 +1972,7 @@ export function registerTools(server: McpServer) {
 
       // Hermes MCP config
       if (client === "hermes" || client === "all") {
-        const hermesCfg = path.join(os.homedir(), ".hermes", "config.yaml");
+        const hermesCfg = getHermesConfigPath();
         try {
           if (fs.existsSync(hermesCfg)) {
             let cfg = fs.readFileSync(hermesCfg, "utf-8");
@@ -1997,7 +1998,7 @@ export function registerTools(server: McpServer) {
         // Hermes auto plugin
         if (autoPlugin) {
           try {
-            const pluginDir = path.join(os.homedir(), ".hermes", "plugins", "codeatlas_second_brain");
+            const pluginDir = getHermesPluginDir();
             if (!fs.existsSync(pluginDir)) fs.mkdirSync(pluginDir, { recursive: true });
             const pluginInit = `"""CodeAtlas Second Brain Plugin — Auto activation on every turn"""
 import json, urllib.request, urllib.parse, logging
@@ -2068,7 +2069,7 @@ def register(ctx):
 
       // Claude MCP config
       if (client === "claude" || client === "all") {
-        const claudeCfg = path.join(os.homedir(), ".claude", "claude.json");
+        const claudeCfg = getClaudeConfigPath();
         try {
           const claudeEntry = { mcpServers: {
             codeatlas: { command: "npx", args: ["-y", "codeatlas-enterprise"], env: { CODEATLAS_API_KEY: key } },
@@ -2108,18 +2109,18 @@ def register(ctx):
       const results: any = { hermes: {}, claude: {}, gemini: {} };
 
       // Hermes
-      const hermesCfg = path.join(os.homedir(), ".hermes", "config.yaml");
+      const hermesCfg = getHermesConfigPath();
       if (fs.existsSync(hermesCfg)) {
         const cfg = fs.readFileSync(hermesCfg, "utf-8");
         results.hermes.mcp = cfg.includes("codeatlas:") ? "configured" : "not_configured";
       } else {
         results.hermes.mcp = "no_config";
       }
-      const pluginDir = path.join(os.homedir(), ".hermes", "plugins", "codeatlas_second_brain");
+      const pluginDir = getHermesPluginDir();
       results.hermes.plugin = fs.existsSync(path.join(pluginDir, "__init__.py")) ? "installed" : "not_installed";
       results.hermes.restartRequired = results.hermes.plugin === "installed" || results.hermes.mcp === "not_configured";
       // Claude
-      const claudeCfg = path.join(os.homedir(), ".claude", "claude.json");
+      const claudeCfg = getClaudeConfigPath();
       if (fs.existsSync(claudeCfg)) {
         const cl = JSON.parse(fs.readFileSync(claudeCfg, "utf-8"));
         results.claude.mcp = cl.mcpServers?.codeatlas ? "configured" : "not_configured";
