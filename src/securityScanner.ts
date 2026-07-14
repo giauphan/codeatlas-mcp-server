@@ -101,7 +101,6 @@ export class SecurityScanner {
     const aiModel = process.env.CODEATLAS_SCAN_AI_MODEL || "deepseek-v4-pro";
 
     if (!aiUrl || !aiKey) {
-      console.log("[SecurityScanner] AI scan not configured — skipping LLM deep analysis");
       return findings;
     }
 
@@ -139,7 +138,6 @@ export class SecurityScanner {
         ? JSON.parse(data.choices[0].message.content.replace(/```json|```/g, "").trim())
         : [];
 
-      console.log("[SecurityScanner] AI scan found", aiFindings.length, "additional issues");
       return [...findings, ...aiFindings];
     } catch (err) {
       console.warn("[SecurityScanner] AI scan failed:", err instanceof Error ? err.message : String(err));
