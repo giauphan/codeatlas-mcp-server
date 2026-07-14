@@ -3,3 +3,7 @@
 **Learning:** Input args to script was directly appended to command executed by shell via `execSync`
 **Prevention:** Sanitise input or do not run in shell.
 ## 2026-07-13 - Command Injection Risk in execSync\n**Vulnerability:** Use of `child_process.execSync` for git commands allowed potential command injection via the `commits` parameter.\n**Learning:** Even if a parameter seems safe (like a number), using shell execution (`exec`, `execSync`) is inherently risky and can interpret shell metacharacters.\n**Prevention:** Always use `child_process.execFileSync` or `child_process.spawnSync` (with `shell: false`) for executing external binaries. Pass arguments as an array instead of a single string.
+## 2024-07-14 - Sensitive Data Exposure in URL Parameters
+**Vulnerability:** The API key `CODEATLAS_API_KEY` was being sent as a query parameter in URLs within `src/services/dreamingService.ts` when making requests to CodeAtlas Cloud.
+**Learning:** Passing sensitive data like API keys in URL query parameters exposes them to server logs, browser history, and proxy servers (CWE-598).
+**Prevention:** Always transmit API keys and other sensitive credentials securely via HTTP headers (e.g., `x-api-key`, `Authorization: Bearer`), ensuring they are omitted from the request path.
