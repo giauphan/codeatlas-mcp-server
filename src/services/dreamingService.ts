@@ -124,10 +124,10 @@ export async function queryDreamMemories(params: DreamMemoryQuery): Promise<Drea
       const serverUrl: URL = new URL(serverUrlStr);
 
       const queryParams: URLSearchParams = new URLSearchParams();
-      if (params.query !== undefined) queryParams.set("query", params.query);
-      if (params.project !== undefined) queryParams.set("project", params.project);
-      if (params.limit !== undefined) queryParams.set("limit", String(params.limit));
-      if (params.offset !== undefined) queryParams.set("offset", String(params.offset));
+      if (params.query != null) queryParams.set("query", params.query);
+      if (params.project != null) queryParams.set("project", params.project);
+      if (params.limit != null) queryParams.set("limit", String(params.limit));
+      if (params.offset != null) queryParams.set("offset", String(params.offset));
 
       const queryString = queryParams.toString();
       const options: https.RequestOptions = {

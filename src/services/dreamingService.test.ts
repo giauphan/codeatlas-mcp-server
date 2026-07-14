@@ -180,7 +180,7 @@ describe("Dreaming Service - HTTPS Client", () => {
       assert.ok(!String(capture.options!.path).includes("limit="));
     });
 
-    it("does not include trailing ? when no optional params are sent", async () => {
+    it("includes query string without trailing ? when only query param is provided", async () => {
       const capture: { options?: any } = {};
       requestMock = mockSuccessResponse(200, { memories: [] }, capture);
       await dreamingService.queryDreamMemories({ query: "" });
