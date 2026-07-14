@@ -12,38 +12,38 @@ import * as path from "path";
 import * as os from "os";
 import * as readline from "readline";
 
-const API_URL = process.env.CODEATLAS_API_URL || "https://your-server.com";
+export const API_URL = process.env.CODEATLAS_API_URL || "https://your-server.com";
 
 /* ── Helpers ───────────────────────────────────────────────────── */
 
-function bold(s: string): string {
+export function bold(s: string): string {
   return `\x1b[1m${s}\x1b[0m`;
 }
-function green(s: string): string {
+export function green(s: string): string {
   return `\x1b[32m${s}\x1b[0m`;
 }
-function red(s: string): string {
+export function red(s: string): string {
   return `\x1b[31m${s}\x1b[0m`;
 }
-function yellow(s: string): string {
+export function yellow(s: string): string {
   return `\x1b[33m${s}\x1b[0m`;
 }
-function ok(): string {
+export function ok(): string {
   return green("✓");
 }
-function fail(): string {
+export function fail(): string {
   return red("✗");
 }
-function warn(): string {
+export function warn(): string {
   return yellow("⚠");
 }
 
-function ask(query: string): Promise<string> {
+export function ask(query: string): Promise<string> {
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
   return new Promise((resolve) => rl.question(query, (a) => { rl.close(); resolve(a.trim()); }));
 }
 
-async function cloudFetch(method: string, path_: string, body?: any): Promise<{ ok: boolean; status: number; data: any }> {
+export async function cloudFetch(method: string, path_: string, body?: any): Promise<{ ok: boolean; status: number; data: any }> {
   const url = `${API_URL.replace(/\/+$/, "")}${path_}`;
   const headers: Record<string, string> = {
     "User-Agent": "codeatlas-enterprise-cli/2.0",
@@ -70,125 +70,14 @@ async function cloudFetch(method: string, path_: string, body?: any): Promise<{ 
   }
 }
 
-/* ── Step functions ─────────────────────────────────────────────── */
-
-async function stepAuthenticate(): Promise<boolean> {
-  console.log(`\n${bold("Step 1: Authenticate with CodeAtlas Cloud")}`);
-  const existingKey = process.env.CODEATLAS_API_KEY;
-  if (existingKey) {
-    const r = await cloudFetch("GET", "/api/version");
-    if (r.ok) {
-      console.log(`  ${ok()} Authenticated (key: ${existingKey.substring(0, 8)}...)`);
-      console.log(`  ${ok()} Cloud reachable: ${API_URL} (build: ${r.data?.version || "?"})`);
-      return true;
-    }
-    console.log(`  ${warn()} Key exists but cloud unreachable (${r.status}). Will try later.`);
-  }
-  const key = await ask(`  ${bold("Enter CODEATLAS_API_KEY:")} `);
-  if (key) process.env.CODEATLAS_API_KEY = key;
-  const r = await cloudFetch("GET", "/api/version");
-  if (r.ok) {
-    console.log(`  ${ok()} Authenticated`);
-    return true;
-  }
-  console.log(`  ${fail()} Authentication failed (${r.status})`);
-  return false;
-}
-
-async function stepConnectProject(): Promise<string> {
-  console.log(`\n${bold("Step 2: Connect Project")}`);
-  const project = await ask(`  ${bold("Project name:")} `);
-  if (!project) {
-    console.log(`  ${warn()} Using default: "my-second-brain"`);
-    return "my-second-brain";
-  }
-  console.log(`  ${ok()} Project: ${project}`);
-  return project;
-}
-
-async function stepEnableSecondBrain(project: string): Promise<boolean> {
-  console.log(`\n${bold("Step 3: Enable AI Second Brain")}`);
-  console.log(`  Enabling for project '${project}'...`);
-
-  // Verify cloud connectivity
-  const r = await cloudFetch("GET", `/api/genome/search?limit=1&project=${encodeURIComponent(project)}`);
-  if (r.ok) {
-    console.log(`  ${ok()} Second Brain accessible on Cloud`);
-    return true;
-  }
-  if (r.status === 403) {
-    console.log(`  ${fail()} API key invalid or missing`);
-    return false;
-  }
-  // 404 or empty is fine — new project
-  console.log(`  ${ok()} Second Brain ready (new project will be created on first save)`);
-  return true;
-}
-
-async function stepInitializeServices(project: string): Promise<boolean> {
-  console.log(`\n${bold("Step 4: Initialize Services")}`);
-  const services: [string, string, any][] = [
-    ["Dreams", "POST", "/api/dreams/save"],
-    ["Genome (DNA)", "POST", "/api/genome/gene"],
-    ["Immune System", "POST", "/api/genome/immune"],
-  ];
-  let allOk = true;
-  for (const [name, method, endpoint] of services) {
-    const body: any = { project };
-    if (endpoint.includes("/dreams")) {
-      body.memory_type = "KNOWLEDGE";
-      body.content = "[Init] Second Brain initialized";
-      body.importance = 1;
-      body.session_id = "init-" + Date.now();
-    } else if (endpoint.includes("/gene")) {
-      body.name = "init-gene";
-      body.description = "Initial Second Brain gene";
-      body.problem = "initialization";
-      body.solution = "second brain ready";
-      body.category = "system";
-    } else if (endpoint.includes("/immune")) {
-      body.problem = "INIT";
-      body.failure = "Initial setup";
-      body.prevention = "Second Brain initialized";
-    }
-    const r = await cloudFetch(method, endpoint, body);
-    if (r.ok || r.status === 500) {
-      // HTTP 500 on rate limit is acceptable during init
-      console.log(`  ${ok()} ${name} initialized`);
-    } else {
-      console.log(`  ${fail()} ${name}: HTTP ${r.status}`);
-      allOk = false;
-    }
-  }
-  return allOk;
-}
-
-async function stepVerifySync(): Promise<boolean> {
-  console.log(`\n${bold("Step 5: Verify Synchronization")}`);
-  const r = await cloudFetch("GET", "/api/dreams/query?query=Second+Brain&project=hermes-auto&limit=3");
-  if (r.ok) {
-    console.log(`  ${ok()} Cloud sync verified`);
-    return true;
-  }
-  console.log(`  ${warn()} Sync check inconclusive (${r.status})`);
-  return true;
-}
-
-async function stepHealthCheck(): Promise<boolean> {
-  console.log(`\n${bold("Step 6: Health Check")}`);
-  let allOk = true;
-  const checks: [string, () => Promise<boolean>] [] = [
-    ["Cloud connectivity", async () => (await cloudFetch("GET", "/api/version")).ok],
-    ["MCP server", async () => true], // We're already running
-    ["Authentication", async () => (await cloudFetch("GET", "/api/genome/search?limit=1")).status !== 403],
-  ];
-  for (const [name, fn] of checks) {
-    const ok2 = await fn();
-    if (ok2) console.log(`  ${ok()} ${name}`);
-    else { console.log(`  ${fail()} ${name}`); allOk = false; }
-  }
-  return allOk;
-}
+import {
+  stepAuthenticate,
+  stepConnectProject,
+  stepEnableSecondBrain,
+  stepInitializeServices,
+  stepVerifySync,
+  stepHealthCheck
+} from "./steps.js";
 
 /* ── CLI Commands ───────────────────────────────────────────────── */
 
