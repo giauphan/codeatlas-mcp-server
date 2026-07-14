@@ -23,11 +23,11 @@ export class PythonParser {
         if (baseNode.nodeType === 'Name') return (baseNode as Name).id;
         if (baseNode.nodeType === 'Attribute') {
           const attrNode = baseNode as Attribute;
-          return `${nodeToName(attrNode.value as ASTNodeUnion)}.${attrNode.attr}`;
+          return `${nodeToName(attrNode.value)}.${attrNode.attr}`;
         }
         if (baseNode.nodeType === 'Subscript') {
           const subNode = baseNode as Extract<ASTNodeUnion, { nodeType: 'Subscript' }>;
-          return nodeToName(subNode.value as ASTNodeUnion);
+          return nodeToName(subNode.value);
         }
         return 'object';
       };
