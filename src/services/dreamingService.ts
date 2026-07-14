@@ -129,10 +129,11 @@ export async function queryDreamMemories(params: DreamMemoryQuery): Promise<Drea
       if (params.limit) queryParams.set("limit", String(params.limit));
       if (params.offset) queryParams.set("offset", String(params.offset));
 
+      const queryString = queryParams.toString();
       const options: https.RequestOptions = {
         hostname: serverUrl.hostname,
         port: serverUrl.port || (serverUrl.protocol === "https:" ? 443 : 80),
-        path: queryParams.toString() ? "/api/dreams/query?" + queryParams.toString() : "/api/dreams/query",
+        path: queryString ? "/api/dreams/query?" + queryString : "/api/dreams/query",
         method: "GET",
         headers: {
           "x-api-key": apiKey,
