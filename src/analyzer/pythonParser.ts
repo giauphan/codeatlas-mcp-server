@@ -79,7 +79,7 @@ export class PythonParser {
         Object.values(node).forEach(child => {
           if (Array.isArray(child)) {
             child.forEach(c => traverse(c as ASTNodeUnion));
-          } else if (child && typeof child === 'object' && 'nodeType' in child) {
+          } else if (child && typeof child === 'object') {
             traverse(child as ASTNodeUnion);
           }
         });
