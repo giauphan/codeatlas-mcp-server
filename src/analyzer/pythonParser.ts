@@ -27,7 +27,7 @@ export class PythonParser {
           const classNode = node as ClassDef;
           classes.push({
             name: classNode.name,
-            parents: classNode.bases.map((b) => (b.nodeType === 'Name' ? (b as Name).id : 'object')),
+            parents: classNode.bases.map((b) => b.nodeType === 'Name' ? (b as Name).id : (b.nodeType === 'Attribute' ? (b as Attribute).attr : 'object')),
             line: classNode.lineno ?? 0
           });
         }
