@@ -1,4 +1,4 @@
-import { parse } from 'py-ast';
+import { parse, ASTNodeUnion, ClassDef, FunctionDef, Assign, Name, Call, Attribute, Alias, isASTNode, ASTNode } from 'py-ast';
 
 export class PythonParser {
   public parseFile(filePath: string, code: string): {
@@ -17,58 +17,75 @@ export class PythonParser {
     try {
       const ast = parse(code);
 
-      const traverse = (node: any) => {
+      const traverse = (node: ASTNodeUnion | null | undefined) => {
         if (!node || typeof node !== 'object') return;
 
-        const type = node.type || node.nodeType;
+        // Ensure we are working with AST nodes
+        if (!isASTNode(node)) {
+          // If it's an object/array but not an ASTNode, traverse its properties
+          Object.values(node).forEach(child => {
+            if (Array.isArray(child)) {
+              child.forEach(c => traverse(c as ASTNodeUnion));
+            } else if (child && typeof child === 'object') {
+              traverse(child as ASTNodeUnion);
+            }
+          });
+          return;
+        }
+
+        const type = node.nodeType;
 
         if (type === 'ClassDef') {
+          const classNode = node as ClassDef;
           classes.push({
-            name: node.name,
-            parents: node.bases.map((b: any) => b.id || 'object'),
-            line: node.lineno
+            name: classNode.name,
+            parents: classNode.bases.map((b) => (b.nodeType === 'Name' ? (b as Name).id : 'object')),
+            line: classNode.lineno || 0
           });
         }
 
         if (type === 'FunctionDef' || type === 'AsyncFunctionDef') {
+          const funcNode = node as Extract<ASTNodeUnion, { nodeType: 'FunctionDef' | 'AsyncFunctionDef' }>;
           functions.push({
-            name: node.name,
-            line: node.lineno,
-            indent: node.col_offset
+            name: funcNode.name,
+            line: funcNode.lineno || 0,
+            indent: funcNode.col_offset
           });
         }
 
         if (type === 'Assign') {
-          node.targets?.forEach((target: any) => {
-            const targetType = target.type || target.nodeType;
-            if (targetType === 'Name') {
-              variables.push({ name: target.id, line: node.lineno });
+          const assignNode = node as Assign;
+          assignNode.targets?.forEach((target) => {
+            if (target.nodeType === 'Name') {
+              variables.push({ name: (target as Name).id, line: assignNode.lineno || 0 });
             }
           });
         }
 
         if (type === 'Import' || type === 'ImportFrom') {
+          const importNode = node as Extract<ASTNodeUnion, { nodeType: 'Import' | 'ImportFrom' }>;
           imports.push({
-            source: node.module || '',
-            names: node.names?.map((n: any) => n.name) || [],
-            line: node.lineno
+            source: (importNode.nodeType === 'ImportFrom' ? importNode.module : '') || '',
+            names: importNode.names?.map((n: Alias) => n.name) || [],
+            line: importNode.lineno || 0
           });
         }
 
         if (type === 'Call') {
-          const funcType = node.func?.type || node.func?.nodeType;
+          const callNode = node as Call;
+          const funcType = callNode.func?.nodeType;
           if (funcType === 'Name') {
-            calls.push({ name: node.func.id, line: node.lineno });
+            calls.push({ name: (callNode.func as Name).id, line: callNode.lineno || 0 });
           } else if (funcType === 'Attribute') {
-            calls.push({ name: node.func.attr, line: node.lineno });
+            calls.push({ name: (callNode.func as Attribute).attr, line: callNode.lineno || 0 });
           }
         }
 
         Object.values(node).forEach(child => {
           if (Array.isArray(child)) {
-            child.forEach(c => traverse(c));
-          } else {
-            traverse(child);
+            child.forEach(c => traverse(c as ASTNodeUnion));
+          } else if (child && typeof child === 'object') {
+            traverse(child as ASTNodeUnion);
           }
         });
       };
