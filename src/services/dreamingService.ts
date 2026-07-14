@@ -53,7 +53,7 @@ export async function saveDreamMemory(params: DreamMemoryInput): Promise<{ succe
       const options: https.RequestOptions = {
         hostname: serverUrl.hostname,
         port: serverUrl.port || (serverUrl.protocol === "https:" ? 443 : 80),
-        path: `/api/dreams/save`,
+        path: "/api/dreams/save",
         method: "POST",
         headers: {
           "Content-Type": "application/json",
