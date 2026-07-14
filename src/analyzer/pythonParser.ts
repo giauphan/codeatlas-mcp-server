@@ -1,4 +1,4 @@
-import { parse, ASTNodeUnion, ClassDef, FunctionDef, Assign, Name, Call, Attribute, Alias, isASTNode, ASTNode } from 'py-ast';
+import { parse, ASTNodeUnion, ClassDef, FunctionDef, Assign, Name, Call, Attribute, Alias } from 'py-ast';
 
 export class PythonParser {
   public parseFile(filePath: string, code: string): {
@@ -28,7 +28,7 @@ export class PythonParser {
           classes.push({
             name: classNode.name,
             parents: classNode.bases.map((b) => (b.nodeType === 'Name' ? (b as Name).id : 'object')),
-            line: classNode.lineno!
+            line: classNode.lineno ?? 0
           });
         }
 
@@ -36,7 +36,7 @@ export class PythonParser {
           const funcNode = node as Extract<ASTNodeUnion, { nodeType: 'FunctionDef' | 'AsyncFunctionDef' }>;
           functions.push({
             name: funcNode.name,
-            line: funcNode.lineno!,
+            line: funcNode.lineno ?? 0,
             indent: funcNode.col_offset
           });
         }
@@ -45,7 +45,7 @@ export class PythonParser {
           const assignNode = node as Assign;
           assignNode.targets?.forEach((target) => {
             if (target.nodeType === 'Name') {
-              variables.push({ name: (target as Name).id, line: assignNode.lineno! });
+              variables.push({ name: (target as Name).id, line: assignNode.lineno ?? 0 });
             }
           });
         }
@@ -55,7 +55,7 @@ export class PythonParser {
           imports.push({
             source: (importNode.nodeType === 'ImportFrom' ? importNode.module : '') || '',
             names: importNode.names?.map((n: Alias) => n.name) || [],
-            line: importNode.lineno!
+            line: importNode.lineno ?? 0
           });
         }
 
@@ -63,9 +63,9 @@ export class PythonParser {
           const callNode = node as Call;
           const funcType = callNode.func?.nodeType;
           if (funcType === 'Name') {
-            calls.push({ name: (callNode.func as Name).id, line: callNode.lineno! });
+            calls.push({ name: (callNode.func as Name).id, line: callNode.lineno ?? 0 });
           } else if (funcType === 'Attribute') {
-            calls.push({ name: (callNode.func as Attribute).attr, line: callNode.lineno! });
+            calls.push({ name: (callNode.func as Attribute).attr, line: callNode.lineno ?? 0 });
           }
         }
 
