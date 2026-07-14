@@ -64,7 +64,7 @@ export class PythonParser {
           const importNode = node as Extract<ASTNodeUnion, { nodeType: 'Import' | 'ImportFrom' }>;
           imports.push({
             source: importNode.nodeType === 'ImportFrom' ? (importNode.module ?? '') : '',
-            names: importNode.names?.map((n: Alias) => n.name) || [],
+            names: importNode.names?.map((n: Alias) => n.name) ?? [],
             line: importNode.lineno ?? 0
           });
         }
