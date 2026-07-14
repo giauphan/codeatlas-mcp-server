@@ -13,7 +13,7 @@ export function registerEntityTools(server: McpServer) {
       {
         project: z.string().optional().describe("Project name or path"),
         query: z.string().describe("Search query (case-insensitive, partial match)"),
-        type: z.enum(["all", "module", "class", "function", "variable"]).optional().describe("Filter by entity type"),
+        type: z.enum(["all", "module", "class", "function", "variable"]).optional().describe("Filter by entity type. Choose one of: all, module, class, function, variable"),
       },
       async ({ project, query, type }: { project?: string; query: string; type?: string }) => {
         const auth = await checkAuth();

@@ -123,7 +123,7 @@ export function registerSystemTools(server: McpServer) {
       + "Installs MCP config and auto-retrieval plugin so the AI automatically saves/retrieves knowledge.",
       {
         client: z.enum(["hermes", "claude", "gemini", "all"]).optional().default("all")
-          .describe("Which client to configure"),
+          .describe("Which client to configure. Choose one of: hermes, claude, gemini, all"),
         apiKey: z.string().optional().describe("CODEATLAS_API_KEY (will use env var if not provided)"),
         autoPlugin: z.boolean().optional().default(true)
           .describe("Also install Hermes auto Second Brain plugin (pre/post LLM hooks)"),

@@ -12,7 +12,7 @@ export function registerMemoryTools(server: McpServer) {
       "save_dream_memory",
       "Save a dream memory (mistake, preference, knowledge, or pattern) to CodeAtlas Cloud for long-term AI recall. The AI uses this to persist learnings across conversations.",
       {
-        memory_type: z.enum(["MISTAKE", "PREFERENCE", "KNOWLEDGE", "PATTERN"]).describe("Category of the memory"),
+        memory_type: z.enum(["MISTAKE", "PREFERENCE", "KNOWLEDGE", "PATTERN"]).describe("Category of the memory. Choose one of: MISTAKE, PREFERENCE, KNOWLEDGE, PATTERN"),
         content: z.string().describe("The actual memory content or insight"),
         importance: z.number().min(1).max(10).optional().describe("Importance level from 1 (low) to 10 (critical). Defaults to 5."),
         session_id: z.string().optional().describe("Optional session identifier for grouping related memories"),
@@ -103,7 +103,7 @@ export function registerMemoryTools(server: McpServer) {
       "sync_dreams",
       "Check dream memory sync status. Returns count of stored dreams grouped by type and project. Use this to verify dreams are syncing to the cloud correctly. Can be called from any AI IDE, CLI, or Hermes cron.",
       {
-        type: z.enum(["MISTAKE", "PREFERENCE", "KNOWLEDGE", "PATTERN"]).optional().describe("Filter by memory type"),
+        type: z.enum(["MISTAKE", "PREFERENCE", "KNOWLEDGE", "PATTERN"]).optional().describe("Filter by memory type. Choose one of: MISTAKE, PREFERENCE, KNOWLEDGE, PATTERN"),
         project: z.string().optional().describe("Filter by project name"),
       },
       async ({ type, project }: { type?: "MISTAKE" | "PREFERENCE" | "KNOWLEDGE" | "PATTERN"; project?: string }) => {
@@ -257,7 +257,7 @@ export function registerMemoryTools(server: McpServer) {
       "get_system_memory",
       "Retrieve the auto-generated system documentation and episodic memories (business rules and change logs) for a project from CodeAtlas Cloud / Oracle 26ai.",
       {
-        project: z.string().optional().describe("Project name or path"),
+        project: z.string().optional().describe("Project name or path. Choose one of: all, BUSINESS_RULE, CHANGE_LOG"),
         eventType: z.enum(["all", "BUSINESS_RULE", "CHANGE_LOG"]).optional().default("all").describe("Filter by event type"),
       },
       async ({ project, eventType }: { project?: string; eventType?: "all" | "BUSINESS_RULE" | "CHANGE_LOG" }) => {

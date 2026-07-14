@@ -13,7 +13,7 @@ export function registerFlowTools(server: McpServer) {
       "Auto-generate a Mermaid flowchart diagram showing how modules, classes, and functions connect in the system. Returns a Mermaid diagram string that AI can read to understand the full system flow without reading every file.",
       {
         project: z.string().optional().describe("Project name or path"),
-        scope: z.enum(["full", "modules-only", "feature"]).optional().describe("Scope of the diagram: 'full' shows all entities, 'modules-only' shows only module relationships (recommended for large projects), 'feature' requires the 'feature' param"),
+        scope: z.enum(["full", "modules-only", "feature"]).optional().describe("Scope of the diagram: 'full' shows all entities, 'modules-only' shows only module relationships (recommended for large projects), 'feature' requires the 'feature' param. Choose one of: full, modules-only, feature"),
         feature: z.string().optional().describe("Feature keyword to focus the diagram on (e.g. 'auth', 'crawl', 'payment'). Only used when scope='feature'"),
         maxNodes: z.number().optional().describe("Maximum nodes in diagram (default: 60). Reduce for large projects"),
       },
@@ -278,7 +278,7 @@ export function registerFlowTools(server: McpServer) {
       {
         project: z.string().optional().describe("Project name or path"),
         keyword: z.string().describe("Feature keyword to trace (e.g. 'login', 'payment', 'upload', 'auth')"),
-        diagramType: z.enum(["flowchart", "sequence"]).optional().describe("Type of Mermaid diagram: 'flowchart' (default) shows call graph, 'sequence' shows step-by-step execution order"),
+        diagramType: z.enum(["flowchart", "sequence"]).optional().describe("Type of Mermaid diagram: 'flowchart' (default) shows call graph, 'sequence' shows step-by-step execution order. Choose one of: flowchart, sequence"),
         depth: z.number().optional().describe("How many call hops to follow (default: 3)"),
         maxNodes: z.number().optional().describe("Maximum nodes in diagram (default: 40)"),
       },

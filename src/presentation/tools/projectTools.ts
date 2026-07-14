@@ -95,7 +95,7 @@ export function registerProjectTools(server: McpServer) {
       "Get all modules, classes, functions, and variables in the analyzed project. Returns entity type, name, file path, and line number.",
       {
         project: z.string().optional().describe("Project name or path (auto-detects if omitted)"),
-        type: z.enum(["all", "module", "class", "function", "variable"]).optional().describe("Filter by entity type"),
+        type: z.enum(["all", "module", "class", "function", "variable"]).optional().describe("Filter by entity type. Choose one of: all, module, class, function, variable"),
         limit: z.number().optional().describe("Max results to return (default: 100)"),
       },
       async ({ project, type, limit }: { project?: string; type?: string; limit?: number }) => {
@@ -150,7 +150,7 @@ export function registerProjectTools(server: McpServer) {
         project: z.string().optional().describe("Project name or path"),
         source: z.string().optional().describe("Filter by source entity name"),
         target: z.string().optional().describe("Filter by target entity name"),
-        relationship: z.enum(["all", "import", "call", "contains", "implements"]).optional().describe("Filter by relationship type"),
+        relationship: z.enum(["all", "import", "call", "contains", "implements"]).optional().describe("Filter by relationship type. Choose one of: all, import, call, contains, implements"),
         limit: z.number().optional().describe("Max results (default: 100)"),
       },
       async ({ project, source, target, relationship, limit }: { project?: string; source?: string; target?: string; relationship?: string; limit?: number }) => {
