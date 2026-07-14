@@ -187,6 +187,13 @@ describe("Dreaming Service - HTTPS Client", () => {
       assert.strictEqual(String(capture.options!.path), "/api/dreams/query?query=");
     });
 
+    it("does not include trailing ? when no optional params are sent at all", async () => {
+      const capture: { options?: any } = {};
+      requestMock = mockSuccessResponse(200, { memories: [] }, capture);
+      await dreamingService.queryDreamMemories({} as any);
+      assert.strictEqual(String(capture.options!.path), "/api/dreams/query");
+    });
+
     it("does NOT include apiKey in query params but sends x-api-key header for GET", async () => {
       process.env.CODEATLAS_API_KEY = "test-key-query";
       const capture: { options?: any } = {};
