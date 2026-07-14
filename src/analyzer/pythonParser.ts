@@ -1,4 +1,4 @@
-import { parse, ASTNodeUnion, ClassDef, FunctionDef, Assign, Name, Call, Attribute, Alias } from 'py-ast';
+import { parse, ASTNodeUnion, ClassDef, Assign, Name, Call, Attribute, Alias } from 'py-ast';
 
 export class PythonParser {
   public parseFile(filePath: string, code: string): {
@@ -18,9 +18,9 @@ export class PythonParser {
       const ast = parse(code);
 
 
-      const getParentName = (b: ASTNodeUnion): string => {
-        if (b.nodeType === 'Name') return (b as Name).id;
-        if (b.nodeType === 'Attribute') return (b as Attribute).attr;
+      const getParentName = (baseNode: ASTNodeUnion): string => {
+        if (baseNode.nodeType === 'Name') return (baseNode as Name).id;
+        if (baseNode.nodeType === 'Attribute') return (baseNode as Attribute).attr;
         return 'object';
       };
 
@@ -34,7 +34,7 @@ export class PythonParser {
           const classNode = node as ClassDef;
           classes.push({
             name: classNode.name,
-            parents: classNode.bases.map(getParentName),
+            parents: classNode.bases?.map(getParentName),
             line: classNode.lineno ?? 0
           });
         }
