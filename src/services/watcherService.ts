@@ -167,6 +167,5 @@ export function watchProject(dir: string) {
   if (!activeWatchedPaths.has(absPath)) {
     activeWatchedPaths.add(absPath);
     watcher.add(absPath);
-    console.error(`[Watcher] ➕ Dynamically started watching: ${absPath}`);
   }
 }
