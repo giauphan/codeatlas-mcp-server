@@ -184,7 +184,7 @@ describe("Dreaming Service - HTTPS Client", () => {
       const capture: { options?: any } = {};
       requestMock = mockSuccessResponse(200, { memories: [] }, capture);
       await dreamingService.queryDreamMemories({ query: "" });
-      assert.strictEqual(String(capture.options!.path), "/api/dreams/query");
+      assert.strictEqual(String(capture.options!.path), "/api/dreams/query?query=");
     });
 
     it("does NOT include apiKey in query params but sends x-api-key header for GET", async () => {
