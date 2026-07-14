@@ -1,4 +1,4 @@
-import { parse, ASTNodeUnion, ClassDef, Assign, Name, Call, Attribute, Alias } from 'py-ast';
+import { parse, ASTNodeUnion, Name, Call, Attribute } from 'py-ast';
 
 export class PythonParser {
   public parseFile(filePath: string, code: string): {
