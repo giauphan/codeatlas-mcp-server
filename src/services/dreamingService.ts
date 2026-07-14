@@ -11,7 +11,7 @@ export interface DreamMemoryInput {
 }
 
 export interface DreamMemoryQuery {
-  query: string;
+  query?: string;
   project?: string;
   limit?: number;
   offset?: number;
