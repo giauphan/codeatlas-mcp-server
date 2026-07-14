@@ -17,6 +17,13 @@ export class PythonParser {
     try {
       const ast = parse(code);
 
+
+      const getParentName = (b: ASTNodeUnion): string => {
+        if (b.nodeType === 'Name') return (b as Name).id;
+        if (b.nodeType === 'Attribute') return (b as Attribute).attr;
+        return 'object';
+      };
+
       const traverse = (node: ASTNodeUnion | null | undefined) => {
         if (!node || typeof node !== 'object') return;
 
@@ -27,7 +34,7 @@ export class PythonParser {
           const classNode = node as ClassDef;
           classes.push({
             name: classNode.name,
-            parents: classNode.bases.map((b) => b.nodeType === 'Name' ? (b as Name).id : (b.nodeType === 'Attribute' ? (b as Attribute).attr : 'object')),
+            parents: classNode.bases.map(getParentName),
             line: classNode.lineno ?? 0
           });
         }
