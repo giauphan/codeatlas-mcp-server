@@ -37,7 +37,7 @@ export class PythonParser {
           functions.push({
             name: funcNode.name,
             line: funcNode.lineno ?? 0,
-            indent: funcNode.col_offset
+            indent: funcNode.col_offset ?? 0
           });
         }
 
