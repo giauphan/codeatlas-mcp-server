@@ -1560,7 +1560,7 @@ export function registerTools(server: McpServer) {
         try {
           const content = fs.readFileSync(filePath, "utf-8");
 
-          // ⚡ Bolt: Fast path to skip files that definitely don't contain the query
+          // Fast path to skip files that definitely don't contain the query
           // This avoids expensive .split('\n') and per-line iterations for most files
           // Using regex.test avoids creating a massive new string via .toLowerCase()
           if (!searchRegex.test(content)) continue;
