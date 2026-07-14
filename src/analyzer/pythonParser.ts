@@ -20,18 +20,6 @@ export class PythonParser {
       const traverse = (node: ASTNodeUnion | null | undefined) => {
         if (!node || typeof node !== 'object') return;
 
-        // Ensure we are working with AST nodes
-        if (!isASTNode(node)) {
-          // If it's an object/array but not an ASTNode, traverse its properties
-          Object.values(node).forEach(child => {
-            if (Array.isArray(child)) {
-              child.forEach(c => traverse(c as ASTNodeUnion));
-            } else if (child && typeof child === 'object') {
-              traverse(child as ASTNodeUnion);
-            }
-          });
-          return;
-        }
 
         const type = node.nodeType;
 
@@ -40,7 +28,7 @@ export class PythonParser {
           classes.push({
             name: classNode.name,
             parents: classNode.bases.map((b) => (b.nodeType === 'Name' ? (b as Name).id : 'object')),
-            line: classNode.lineno as any
+            line: classNode.lineno!
           });
         }
 
@@ -48,7 +36,7 @@ export class PythonParser {
           const funcNode = node as Extract<ASTNodeUnion, { nodeType: 'FunctionDef' | 'AsyncFunctionDef' }>;
           functions.push({
             name: funcNode.name,
-            line: funcNode.lineno as any,
+            line: funcNode.lineno!,
             indent: funcNode.col_offset
           });
         }
@@ -57,7 +45,7 @@ export class PythonParser {
           const assignNode = node as Assign;
           assignNode.targets?.forEach((target) => {
             if (target.nodeType === 'Name') {
-              variables.push({ name: (target as Name).id, line: assignNode.lineno as any });
+              variables.push({ name: (target as Name).id, line: assignNode.lineno! });
             }
           });
         }
@@ -67,7 +55,7 @@ export class PythonParser {
           imports.push({
             source: (importNode.nodeType === 'ImportFrom' ? importNode.module : '') || '',
             names: importNode.names?.map((n: Alias) => n.name) || [],
-            line: importNode.lineno as any
+            line: importNode.lineno!
           });
         }
 
@@ -75,9 +63,9 @@ export class PythonParser {
           const callNode = node as Call;
           const funcType = callNode.func?.nodeType;
           if (funcType === 'Name') {
-            calls.push({ name: (callNode.func as Name).id, line: callNode.lineno as any });
+            calls.push({ name: (callNode.func as Name).id, line: callNode.lineno! });
           } else if (funcType === 'Attribute') {
-            calls.push({ name: (callNode.func as Attribute).attr, line: callNode.lineno as any });
+            calls.push({ name: (callNode.func as Attribute).attr, line: callNode.lineno! });
           }
         }
 
