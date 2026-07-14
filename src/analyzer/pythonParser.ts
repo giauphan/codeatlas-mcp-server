@@ -60,7 +60,7 @@ export class PythonParser {
         if (type === 'Import' || type === 'ImportFrom') {
           const importNode = node as Extract<ASTNodeUnion, { nodeType: 'Import' | 'ImportFrom' }>;
           imports.push({
-            source: (importNode.nodeType === 'ImportFrom' ? importNode.module : '') || '',
+            source: importNode.nodeType === 'ImportFrom' ? (importNode.module ?? '') : '',
             names: importNode.names?.map((n: Alias) => n.name) || [],
             line: importNode.lineno ?? 0
           });
