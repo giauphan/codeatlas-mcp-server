@@ -40,7 +40,7 @@ export class PythonParser {
           classes.push({
             name: classNode.name,
             parents: classNode.bases.map((b) => (b.nodeType === 'Name' ? (b as Name).id : 'object')),
-            line: classNode.lineno || 0
+            line: classNode.lineno as any
           });
         }
 
@@ -48,7 +48,7 @@ export class PythonParser {
           const funcNode = node as Extract<ASTNodeUnion, { nodeType: 'FunctionDef' | 'AsyncFunctionDef' }>;
           functions.push({
             name: funcNode.name,
-            line: funcNode.lineno || 0,
+            line: funcNode.lineno as any,
             indent: funcNode.col_offset
           });
         }
@@ -57,7 +57,7 @@ export class PythonParser {
           const assignNode = node as Assign;
           assignNode.targets?.forEach((target) => {
             if (target.nodeType === 'Name') {
-              variables.push({ name: (target as Name).id, line: assignNode.lineno || 0 });
+              variables.push({ name: (target as Name).id, line: assignNode.lineno as any });
             }
           });
         }
@@ -67,7 +67,7 @@ export class PythonParser {
           imports.push({
             source: (importNode.nodeType === 'ImportFrom' ? importNode.module : '') || '',
             names: importNode.names?.map((n: Alias) => n.name) || [],
-            line: importNode.lineno || 0
+            line: importNode.lineno as any
           });
         }
 
@@ -75,9 +75,9 @@ export class PythonParser {
           const callNode = node as Call;
           const funcType = callNode.func?.nodeType;
           if (funcType === 'Name') {
-            calls.push({ name: (callNode.func as Name).id, line: callNode.lineno || 0 });
+            calls.push({ name: (callNode.func as Name).id, line: callNode.lineno as any });
           } else if (funcType === 'Attribute') {
-            calls.push({ name: (callNode.func as Attribute).attr, line: callNode.lineno || 0 });
+            calls.push({ name: (callNode.func as Attribute).attr, line: callNode.lineno as any });
           }
         }
 
