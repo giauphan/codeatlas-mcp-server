@@ -190,7 +190,7 @@ describe("Dreaming Service - HTTPS Client", () => {
     it("does not include trailing ? when no optional params are sent at all", async () => {
       const capture: { options?: any } = {};
       requestMock = mockSuccessResponse(200, { memories: [] }, capture);
-      await dreamingService.queryDreamMemories({} as any);
+      await dreamingService.queryDreamMemories({ query: undefined } as unknown as any);
       assert.strictEqual(String(capture.options!.path), "/api/dreams/query");
     });
 
