@@ -508,7 +508,8 @@ export async function scanForCodeatlasProjectsAsync(parentDir: string): Promise<
     }
     
     const entries = await fs.promises.readdir(parentDir, { withFileTypes: true });
-    for (const entry of entries) {
+
+    await Promise.all(entries.map(async (entry) => {
       if (entry.isDirectory() && entry.name !== "node_modules" && !entry.name.startsWith(".")) {
         const subPath = path.join(parentDir, entry.name);
         if (await fileExists(path.join(subPath, ".codeatlas"))) {
@@ -517,18 +518,18 @@ export async function scanForCodeatlasProjectsAsync(parentDir: string): Promise<
           // Check 2nd level
           try {
             const subEntries = await fs.promises.readdir(subPath, { withFileTypes: true });
-            for (const subEntry of subEntries) {
+            await Promise.all(subEntries.map(async (subEntry) => {
               if (subEntry.isDirectory() && subEntry.name !== "node_modules" && !subEntry.name.startsWith(".")) {
                 const subSubPath = path.join(subPath, subEntry.name);
                 if (await fileExists(path.join(subSubPath, ".codeatlas"))) {
                   discovered.push(path.resolve(subSubPath));
                 }
               }
-            }
+            }));
           } catch { /* skip */ }
         }
       }
-    }
+    }));
   } catch (err) {
     console.error(`[Project-Discovery] ❌ Failed async scan for .codeatlas projects: ${err}`);
   }
