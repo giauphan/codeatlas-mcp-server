@@ -1150,7 +1150,7 @@ export class CodeAnalyzer {
     // 1. Large files / God objects
     const modulesWithManyFunctions = Array.from(this.nodes.values()).filter(n => {
       if (n.type !== 'module') return false;
-      const functionCount = graph.links.filter(l => l.source === n.id && l.type === 'import' && l.target.startsWith('function')).length;
+      const functionCount = graph.links.filter(l => l.source === n.id && l.type === 'contains' && l.target.startsWith('function')).length;
       return functionCount > 10; // threshold
     });
 

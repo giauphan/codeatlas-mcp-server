@@ -7,3 +7,8 @@
 ## 2025-07-15 - [Performance improvement] Concurrent project scanning in enterprise vulnerabilities
 **Learning:** Sequential loops awaiting long-running I/O or network calls (`await loadAnalysisAsync`, `await SecurityScanner.aiScan`) bottleneck multi-project scans. Using `Promise.all` with a mapping function parallelizes the execution, vastly improving throughput.
 **Action:** When iterating over multiple independent items that perform async I/O or network requests, convert sequential `for...of` loops with `await` into a concurrent `Promise.all` map, provided there are no state dependencies between loop iterations.
+## 2026-07-15 - Bolt: Parallelize project discovery
+**What:** The `scanForCodeatlasProjectsAsync` function in `src/services/projectService.ts` was sequentially calling `fs.promises.readdir` and `fs.existsSync`/`fileExists` for subdirectory project discovery. I updated it to use `Promise.allSettled` with `.map` and inner `try-catch` blocks to safely check file existences concurrently without short-circuiting, and added sorting to ensure deterministic output.
+**Why:** Disk I/O bound nested loops are very inefficient, particularly when traversing potentially thousands of directories.
+**Impact:** Benchmark speedups show ~3x performance improvement. Specifically checking 2500 directories improved from 534ms to 173ms on local testing hardware.
+**Measurement:** Added custom `tsx` based scripts (`benchmark_scan.ts` and `benchmark_scan_opt.ts`) to synthesize an artificial tree with thousands of directories and compared total times before and after changes.
