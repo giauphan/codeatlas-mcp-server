@@ -19,6 +19,10 @@ import { saveDreamMemory, queryDreamMemories, DreamMemoryResult } from "../servi
 import { CodeAnalyzer } from "../analyzer/parser.js";
 import { SecurityScanner } from "../securityScanner.js";
 
+function escapeRegExp(str: string): string {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 export function registerTools(server: McpServer) {
   // Tool -1: Analyze a project
   server.tool(
@@ -179,16 +183,14 @@ export function registerTools(server: McpServer) {
         links = links.filter((l) => l.type === relationship);
       }
       if (source) {
-        // Bolt: Optimize filter by avoiding toLowerCase() which causes large string allocations
-        const sourceRegex = new RegExp(source.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+        const sourceRegex = new RegExp(escapeRegExp(source), 'i');
         links = links.filter((l) => {
           const label = nodeMap.get(l.source) || l.source;
           return sourceRegex.test(label);
         });
       }
       if (target) {
-        // Bolt: Optimize filter by avoiding toLowerCase() which causes large string allocations
-        const targetRegex = new RegExp(target.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+        const targetRegex = new RegExp(escapeRegExp(target), 'i');
         links = links.filter((l) => {
           const label = nodeMap.get(l.target) || l.target;
           return targetRegex.test(label);
@@ -282,8 +284,7 @@ export function registerTools(server: McpServer) {
         return true;
       });
 
-      // Bolt: Optimize search filter by avoiding toLowerCase()
-      const searchRegex = new RegExp(query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+      const searchRegex = new RegExp(escapeRegExp(query), 'i');
       const matches = nodes.filter((n) => searchRegex.test(n.label));
 
       // For each match, find its relationships
@@ -332,8 +333,7 @@ export function registerTools(server: McpServer) {
         return { content: [{ type: "text" as const, text: "No analysis data found. Run 'analyze' tool first." }] };
       }
 
-      // Bolt: Optimize search filter by avoiding toLowerCase()
-      const searchRegex = new RegExp(filePath.replace(/\\/g, "/").replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+      const searchRegex = new RegExp(escapeRegExp(filePath.replace(/\\/g, "/")), 'i');
       const matches = loaded.analysis.graph.nodes.filter((n) => {
         const fp = (n.filePath || n.id).replace(/\\/g, "/");
         return searchRegex.test(fp);
@@ -404,8 +404,7 @@ export function registerTools(server: McpServer) {
         const nodeIds = new Set(nodes.map((n) => n.id));
         links = links.filter((l) => nodeIds.has(l.source) && nodeIds.has(l.target) && l.type === "import");
       } else if (diagramScope === "feature" && feature) {
-        // Bolt: Optimize feature filtering using regex instead of toLowerCase()
-        const featureRegex = new RegExp(feature.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+        const featureRegex = new RegExp(escapeRegExp(feature), 'i');
         const matchingNodes = new Set<string>();
         nodes.forEach((n) => {
           if (featureRegex.test(n.label) || (n.filePath && featureRegex.test(n.filePath))) {
@@ -940,8 +939,7 @@ export function registerTools(server: McpServer) {
       }
 
       const maxDepth = depth || 2;
-      // Bolt: Use regex instead of toLowerCase() for faster filtering
-      const searchRegex = new RegExp(keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+      const searchRegex = new RegExp(escapeRegExp(keyword), 'i');
       const nodes = loaded.analysis.graph.nodes;
       const links = loaded.analysis.graph.links;
       const nodeMap = new Map(nodes.map((n) => [n.id, n]));
@@ -1079,8 +1077,7 @@ export function registerTools(server: McpServer) {
         return { content: [{ type: "text" as const, text: "No analysis data found. Run 'analyze' tool first." }] };
       }
 
-      // Bolt: Optimize search filter with pre-compiled regex
-      const searchRegex = new RegExp(keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+      const searchRegex = new RegExp(escapeRegExp(keyword), 'i');
       const maxDepth = depth || 3;
       const maxN = maxNodes || 40;
       const dType = diagramType || "flowchart";
@@ -1546,7 +1543,7 @@ export function registerTools(server: McpServer) {
       const ctx = contextLines || 2;
       const q = query.toLowerCase();
       // Fast path regex to pre-filter files without memory-intensive .toLowerCase() on entire file content
-      const searchRegex = new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+      const searchRegex = new RegExp(escapeRegExp(q), 'i');
       const allFiles: string[] = [];
       const extSet = new Set([".ts", ".tsx", ".js", ".jsx", ".py", ".php", ".json", ".yaml", ".yml", ".md", ".css", ".scss", ".html"]);
 
@@ -1618,8 +1615,7 @@ export function registerTools(server: McpServer) {
       const loaded = await loadAnalysisAsync(project);
       if (!loaded) return { content: [{ type: "text" as const, text: "No analysis found. Run 'analyze' first." }] };
 
-      // Bolt: Optimize search filter with regex
-      const searchRegex = new RegExp(symbol.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+      const searchRegex = new RegExp(escapeRegExp(symbol), 'i');
       const maxD = Math.min(depth || 1, 5);
       const nodes = loaded.analysis.graph.nodes;
       const links = loaded.analysis.graph.links;
@@ -1682,8 +1678,7 @@ export function registerTools(server: McpServer) {
       const loaded = await loadAnalysisAsync(project);
       if (!loaded) return { content: [{ type: "text" as const, text: "No analysis found. Run 'analyze' first." }] };
 
-      // Bolt: Optimize search filter with regex
-      const searchRegex = new RegExp(symbol.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+      const searchRegex = new RegExp(escapeRegExp(symbol), 'i');
       const maxD = Math.min(depth || 1, 5);
       const nodes = loaded.analysis.graph.nodes;
       const links = loaded.analysis.graph.links;
@@ -1735,8 +1730,7 @@ export function registerTools(server: McpServer) {
       const loaded = await loadAnalysisAsync(project);
       if (!loaded) return { content: [{ type: "text" as const, text: "No analysis found. Run 'analyze' first." }] };
 
-      // Bolt: Optimize search filter with regex
-      const searchRegex = new RegExp(symbol.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+      const searchRegex = new RegExp(escapeRegExp(symbol), 'i');
       const maxD = Math.min(depth || 2, 5);
       const nodes = loaded.analysis.graph.nodes;
       const links = loaded.analysis.graph.links;
