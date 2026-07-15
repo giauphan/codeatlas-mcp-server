@@ -297,6 +297,7 @@ process.on("SIGQUIT", () => cleanup("SIGQUIT"));
 process.on("uncaughtException", (err) => {
   console.error(`[Fatal] 💥 Uncaught exception: ${err}`);
   cleanup("uncaughtException");
+  process.exit(1);
 });
 // ────────────────────────────────────────────────────────────────────────
 
