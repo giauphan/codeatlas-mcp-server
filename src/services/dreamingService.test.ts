@@ -104,13 +104,13 @@ describe("Dreaming Service - HTTPS Client", () => {
       assert.strictEqual(parsed.project, "p");
     });
 
-    it("sends apiKey in query param and x-api-key header", async () => {
+    it("sends x-api-key header without exposing apiKey in query param", async () => {
       process.env.CODEATLAS_API_KEY = "key-sentinel";
       const capture: { options?: any; written?: string } = {};
       requestMock = mockSuccessResponse(200, { id: "x" }, capture);
       await dreamingService.saveDreamMemory({ memory_type: "MISTAKE", content: "test" });
       const opts = capture.options!;
-      assert.ok(String(opts.path).includes("apiKey=key-sentinel"), `path should contain apiKey, got: ${opts.path}`);
+      assert.ok(!String(opts.path).includes("apiKey="), `path should NOT contain apiKey, got: ${String(opts.path)}`);
       assert.strictEqual(opts.headers["x-api-key"], "key-sentinel");
     });
 
@@ -180,13 +180,13 @@ describe("Dreaming Service - HTTPS Client", () => {
       assert.ok(!String(capture.options!.path).includes("limit="));
     });
 
-    it("includes apiKey in query params and x-api-key header for GET", async () => {
+    it("includes x-api-key header for GET without exposing apiKey in query param", async () => {
       process.env.CODEATLAS_API_KEY = "test-key-query";
       const capture: { options?: any } = {};
       requestMock = mockSuccessResponse(200, { memories: [] }, capture);
       await dreamingService.queryDreamMemories({ query: "test" });
       const path = String(capture.options!.path);
-      assert.ok(path.includes("apiKey=test-key-query"), `Expected apiKey in query, got: ${path}`);
+      assert.ok(!path.includes("apiKey="), `Expected apiKey to NOT be in query, got: ${path}`);
       assert.strictEqual(capture.options!.headers["x-api-key"], "test-key-query");
     });
 
