@@ -20,6 +20,6 @@ export async function checkAuth(apiKey?: string): Promise<{ tier: string; uid: s
  */
 export async function logActivity(auth: { uid: string; keyId: string }, tool: string, params: any, success: boolean = true) {
   if (process.env.DEBUG === "true") {
-    console.error(`[Local-Logger] Tool: ${tool}, Success: ${success}`);
+    console.debug(`[Local-Logger] Tool: ${tool}, Success: ${success}`);
   }
 }
