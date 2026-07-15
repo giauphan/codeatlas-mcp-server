@@ -1530,6 +1530,8 @@ export function registerTools(server: McpServer) {
       const maxRes = Math.min(maxResults || 30, 100);
       const ctx = contextLines || 2;
       const q = query.toLowerCase();
+      // Fast path regex to pre-filter files without memory-intensive .toLowerCase() on entire file content
+      const searchRegex = new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
       const allFiles: string[] = [];
       const extSet = new Set([".ts", ".tsx", ".js", ".jsx", ".py", ".php", ".json", ".yaml", ".yml", ".md", ".css", ".scss", ".html"]);
 
@@ -1557,6 +1559,12 @@ export function registerTools(server: McpServer) {
         if (results.length >= maxRes) break;
         try {
           const content = fs.readFileSync(filePath, "utf-8");
+
+          // Fast path to skip files that definitely don't contain the query
+          // This avoids expensive .split('\n') and per-line iterations for most files
+          // Using regex.test avoids creating a massive new string via .toLowerCase()
+          if (!searchRegex.test(content)) continue;
+
           const lines = content.split("\n");
           for (let i = 0; i < lines.length; i++) {
             if (results.length >= maxRes) break;
