@@ -45,11 +45,14 @@ if (_cmd === "doctor" || _cmd === "init" || _cmd === "setup" || _cmd === "--help
 // Handle --version before PID guard
 if (process.argv.includes('--version') || process.argv.includes('-v')) {
   // Try both relative locations (source: index.ts, dist: dist/index.js)
-  let pkg: any;
+  let version = 'unknown';
   for (const p of ['./package.json', '../package.json']) {
-    try { pkg = JSON.parse(fs.readFileSync(new URL(p, import.meta.url), 'utf-8')); break; } catch { }
+    try {
+      const pkg = JSON.parse(fs.readFileSync(new URL(p, import.meta.url), 'utf-8'));
+      if (pkg.version) { version = pkg.version; break; }
+    } catch { /* try next path */ }
   }
-  if (pkg) console.log(pkg.version);
+  console.log(version);
   process.exit(0);
 }
 
