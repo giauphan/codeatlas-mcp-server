@@ -4,6 +4,9 @@
 ## 2025-07-13 - [Performance improvement] Speed up code_search with early Regex check
 **Learning:** When performing full-text searches across many large files, calling `content.toLowerCase()` on the entire file contents to perform an `.includes()` check causes massive memory spikes due to allocating new strings. Using `new RegExp(escapedQuery, 'i')` allows for a case-insensitive existence check without duplicating the entire string memory, providing both speed and memory efficiency.
 **Action:** When filtering or performing early exit checks on large text blocks, prefer case-insensitive regex checks over converting the entire text to lowercase, to avoid excessive memory allocation and GC overhead.
+## 2025-07-15 - [Performance improvement] Concurrent project scanning in enterprise vulnerabilities
+**Learning:** Sequential loops awaiting long-running I/O or network calls (`await loadAnalysisAsync`, `await SecurityScanner.aiScan`) bottleneck multi-project scans. Using `Promise.all` with a mapping function parallelizes the execution, vastly improving throughput.
+**Action:** When iterating over multiple independent items that perform async I/O or network requests, convert sequential `for...of` loops with `await` into a concurrent `Promise.all` map, provided there are no state dependencies between loop iterations.
 ## 2026-07-15 - Bolt: Parallelize project discovery
 **What:** The `scanForCodeatlasProjectsAsync` function in `src/services/projectService.ts` was sequentially calling `fs.promises.readdir` and `fs.existsSync`/`fileExists` for subdirectory project discovery. I updated it to use `Promise.allSettled` with `.map` and inner `try-catch` blocks to safely check file existences concurrently without short-circuiting, and added sorting to ensure deterministic output.
 **Why:** Disk I/O bound nested loops are very inefficient, particularly when traversing potentially thousands of directories.
