@@ -8,6 +8,11 @@ export async function checkAuth(apiKey?: string): Promise<{ tier: string; uid: s
   if (contextAuth) {
     return contextAuth;
   }
+
+  if (process.env.CODEATLAS_MULTI_TENANT === "true") {
+    throw new Error("Unauthorized: Missing tenant authentication context.");
+  }
+
   return {
     tier: "enterprise",
     uid: "local-user",
