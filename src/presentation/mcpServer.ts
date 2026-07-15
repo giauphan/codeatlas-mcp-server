@@ -2009,11 +2009,11 @@ export function registerTools(server: McpServer) {
             const pluginDir = getHermesPluginDir();
             if (!fs.existsSync(pluginDir)) fs.mkdirSync(pluginDir, { recursive: true });
             const pluginInit = `"""CodeAtlas Second Brain Plugin — Auto activation on every turn"""
-import json, urllib.request, urllib.parse, logging
+import json, os, urllib.request, urllib.parse, logging
 from typing import Any
 log = logging.getLogger(__name__)
-KEY = "${key}"
-URL = process.env.CODEATLAS_API_URL || "https://your-server.com/"
+KEY = os.environ.get("CODEATLAS_API_KEY", "")
+URL = os.environ.get("CODEATLAS_API_URL", "https://your-server.com/")
 UA = "Hermes-SecondBrain-Plugin/1.0"
 def _rq(m, p, b=None, q=None):
     import urllib.error
