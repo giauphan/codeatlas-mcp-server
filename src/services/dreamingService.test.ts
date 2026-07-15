@@ -110,7 +110,7 @@ describe("Dreaming Service - HTTPS Client", () => {
       requestMock = mockSuccessResponse(200, { id: "x" }, capture);
       await dreamingService.saveDreamMemory({ memory_type: "MISTAKE", content: "test" });
       const opts = capture.options!;
-      assert.ok(!String(opts.path).includes("apiKey="), `path should NOT contain apiKey, got: ${opts.path}`);
+      assert.ok(!String(opts.path).includes("apiKey="), `path should NOT contain apiKey, got: ${String(opts.path)}`);
       assert.strictEqual(opts.headers["x-api-key"], "key-sentinel");
     });
 
