@@ -764,15 +764,11 @@ export async function discoverProjectsAsync(tenantId?: string): Promise<{ name: 
             try {
               const stat = await fs.promises.stat(fullPath);
               if (stat.isDirectory()) {
-                return fullPath;
+                searchDirs.push(fullPath);
               }
             } catch { /* skip */ }
-            return null;
           });
-          const results = await Promise.all(statPromises);
-          for (const r of results) {
-            if (r) searchDirs.push(r);
-          }
+          await Promise.all(statPromises);
         } catch { /* skip */ }
       }
     } else if (isSystemAdmin) {
