@@ -1455,10 +1455,10 @@ export function registerTools(server: McpServer) {
       const limit = maxProjects || (isEnterprise ? projects.length : 3);
       const projectsToScan = projects.slice(0, limit);
 
-      for (const p of projectsToScan) {
+      const scanPromises = projectsToScan.map(async (p) => {
         try {
           const loaded = await loadAnalysisAsync(p.name);
-          if (!loaded) continue;
+          if (!loaded) return null;
 
           const vulnerabilities = SecurityScanner.scan(loaded.analysis);
 
@@ -1473,7 +1473,7 @@ export function registerTools(server: McpServer) {
           const riskLevel = allVulnerabilities.length > 10 ? "CRITICAL" : (allVulnerabilities.length > 0 ? "HIGH" : "LOW");
           const securityScore = Math.max(0, 100 - (allVulnerabilities.length * 5) - (circularDeps * 2));
 
-          scanResults.push({
+          return {
             project: p.name,
             riskLevel,
             securityScore: isEnterprise ? securityScore : "Upgrade to view",
@@ -1482,13 +1482,18 @@ export function registerTools(server: McpServer) {
             deadCode: deadCode,
             adminInsights: isEnterprise ? `Project health is ${securityScore > 80 ? 'EXCELLENT' : 'NEEDS ATTENTION'}. Priority: ${riskLevel}.` : null,
             details: { vulnerabilities }
-          });
+          };
         } catch (err: unknown) {
-          scanResults.push({
+          return {
             project: p.name,
             error: `Scan failed: ${(err instanceof Error ? err.message : String(err))}`
-          });
+          };
         }
+      });
+
+      const resolvedResults = await Promise.all(scanPromises);
+      for (const r of resolvedResults) {
+        if (r) scanResults.push(r);
       }
 
       const finalReport = {
