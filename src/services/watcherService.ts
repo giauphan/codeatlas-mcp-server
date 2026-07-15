@@ -11,6 +11,8 @@ export let indexTimeout: NodeJS.Timeout | null = null;
 export let watcher: any = null;
 export const activeWatchedPaths = new Set<string>();
 
+console.error("[Watcher] Just a test log that should be safe to remove");
+
 export async function isIndexingEnabledForProject(projectName: string): Promise<boolean> {
   const apiKey = getResolvedApiKey();
   if (!apiKey) return true;
