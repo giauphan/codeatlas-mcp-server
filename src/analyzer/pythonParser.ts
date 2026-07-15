@@ -38,7 +38,7 @@ export class PythonParser {
         if (node.nodeType === 'ClassDef') {
           classes.push({
             name: node.name,
-            parents: node.bases?.map(nodeToName) ?? [],
+            parents: node.bases?.map((b: ASTNodeUnion) => nodeToName(b)) ?? [],
             line: node.lineno ?? 0
           });
         }
