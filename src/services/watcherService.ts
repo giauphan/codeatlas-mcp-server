@@ -72,7 +72,6 @@ export function stopWatcher() {
     watcher = null;
   }
   activeWatchedPaths.clear();
-  console.error("[Watcher] 🛑 File watcher stopped.");
 }
 
 export function startWatcher() {
@@ -168,6 +167,5 @@ export function watchProject(dir: string) {
   if (!activeWatchedPaths.has(absPath)) {
     activeWatchedPaths.add(absPath);
     watcher.add(absPath);
-    console.error(`[Watcher] ➕ Dynamically started watching: ${absPath}`);
   }
 }
