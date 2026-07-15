@@ -3,7 +3,7 @@ import * as assert from "node:assert";
 import { getWorkspaceFromAncestors, fsWrapper, isSystemIdeDirectory } from "./projectService.js";
 
 // Helper to temporarily stub fsWrapper functions
-function stubFsWrapper(stubs: { existsSync?: (p: string) => boolean; readFileSync?: (p: string, encoding: any) => string; readdirSync?: (p: string) => string[] }) {
+function stubFsWrapper(stubs: { existsSync?: (p: string) => boolean; readFileSync?: (p: string, encoding: "utf8") => string; readdirSync?: (p: string) => string[] }) {
   const originalExists = fsWrapper.existsSync;
   const originalReadFile = fsWrapper.readFileSync;
   const originalReaddir = fsWrapper.readdirSync;
@@ -12,10 +12,10 @@ function stubFsWrapper(stubs: { existsSync?: (p: string) => boolean; readFileSyn
     fsWrapper.existsSync = stubs.existsSync;
   }
   if (stubs.readFileSync) {
-    fsWrapper.readFileSync = stubs.readFileSync as any;
+    fsWrapper.readFileSync = stubs.readFileSync;
   }
   if (stubs.readdirSync) {
-    fsWrapper.readdirSync = stubs.readdirSync as any;
+    fsWrapper.readdirSync = stubs.readdirSync;
   }
 
   return () => {
@@ -34,7 +34,7 @@ describe("Workspace Path Resolution & Discovery Tests", () => {
           if (p.includes("..")) return true;
           return false;
         },
-        readFileSync: (p: string, enc: any) => {
+        readFileSync: (p: string, enc: "utf8") => {
           if (p === "/proc/9999/status") return "PPid: 5000\n";
           if (p === "/proc/5000/status") return "PPid: 1\n";
           if (p === "/proc/5000/cmdline") return "--workspace_id\0file_.._.._etc_passwd\0";
@@ -63,7 +63,7 @@ describe("Workspace Path Resolution & Discovery Tests", () => {
           if (norm === "/home/user") return ["CodeAtlas", "codeatlas-mcp"];
           return [];
         },
-        readFileSync: (p: string, enc: any) => {
+        readFileSync: (p: string, enc: "utf8") => {
           if (p === "/proc/9999/status") return "PPid: 5000\n";
           if (p === "/proc/5000/status") return "PPid: 1\n";
           if (p === "/proc/5000/cmdline") return "--workspace_id\0file_home_user_CodeAtlas\0";
@@ -94,7 +94,7 @@ describe("Workspace Path Resolution & Discovery Tests", () => {
           if (norm === "/home/user") return ["auto-edit-video-reup-tool"];
           return [];
         },
-        readFileSync: (p: string, enc: any) => {
+        readFileSync: (p: string, enc: "utf8") => {
           if (p === "/proc/9999/status") return "PPid: 5000\n";
           if (p === "/proc/5000/status") return "PPid: 1\n";
           if (p === "/proc/5000/cmdline") return "--workspace_id\0file_home_user_auto_edit_video_reup_tool\0";
@@ -126,7 +126,7 @@ describe("Workspace Path Resolution & Discovery Tests", () => {
           if (norm === "/home/user") return ["auto-edit-video-reup-tool"];
           return [];
         },
-        readFileSync: (p: string, enc: any) => {
+        readFileSync: (p: string, enc: "utf8") => {
           if (p === "/proc/9999/status") return "PPid: 5000\n";
           if (p === "/proc/5000/status") return "PPid: 1\n";
           if (p === "/proc/5001/status") return "PPid: 5000\n"; // sibling!
@@ -152,7 +152,7 @@ describe("Workspace Path Resolution & Discovery Tests", () => {
           if (p === "/proc/9999/status" || p === "/proc/9999/cmdline") return true;
           return false;
         },
-        readFileSync: (p: string, enc: any) => {
+        readFileSync: (p: string, enc: "utf8") => {
           if (p === "/proc/9999/status") return "PPid: 9999\n"; // PPid equals currentPid
           if (p === "/proc/9999/cmdline") return "--workspace_id\0file_home_user_CodeAtlas\0";
           return "";
