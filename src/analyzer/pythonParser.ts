@@ -1,4 +1,4 @@
-import { parse, ASTNodeUnion, Name, Call, Attribute } from 'py-ast';
+import { parse, ASTNodeUnion, Name, Attribute } from 'py-ast';
 
 export class PythonParser {
   public parseFile(filePath: string, code: string): {
@@ -23,11 +23,11 @@ export class PythonParser {
         if (baseNode.nodeType === 'Name') return (baseNode as Name).id;
         if (baseNode.nodeType === 'Attribute') {
           const attrNode = baseNode as Attribute;
-          return `${nodeToName(attrNode.value)}.${attrNode.attr}`;
+          return `${nodeToName(attrNode.value as ASTNodeUnion)}.${attrNode.attr}`;
         }
         if (baseNode.nodeType === 'Subscript') {
           const subNode = baseNode as Extract<ASTNodeUnion, { nodeType: 'Subscript' }>;
-          return nodeToName(subNode.value);
+          return nodeToName(subNode.value as ASTNodeUnion);
         }
         return 'object';
       };
@@ -68,11 +68,9 @@ export class PythonParser {
         }
 
         if (node.nodeType === 'Call') {
-          const funcType = node.func?.nodeType;
-          if (funcType === 'Name') {
-            calls.push({ name: (node.func as Name).id, line: node.lineno ?? 0 });
-          } else if (funcType === 'Attribute') {
-            calls.push({ name: (node.func as Attribute).attr, line: node.lineno ?? 0 });
+          const funcNode = node.func;
+          if (funcNode?.nodeType === 'Name' || funcNode?.nodeType === 'Attribute' || funcNode?.nodeType === 'Subscript') {
+            calls.push({ name: nodeToName(funcNode), line: node.lineno ?? 0 });
           }
         }
 
