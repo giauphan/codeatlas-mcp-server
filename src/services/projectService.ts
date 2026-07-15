@@ -2,6 +2,7 @@ import * as fs from "fs";
 import * as path from "path";
 import * as https from "https";
 import * as os from "os";
+import { getHomePath } from "../utils/pathUtils.js";
 import { CodeAnalyzer } from "../analyzer/parser.js";
 import { AnalysisResult } from "../analyzer/types.js";
 import { authStorage } from "../context.js";
@@ -199,7 +200,7 @@ export function getWorkspaceFromAncestors(startPid: number = process.pid): strin
 
 export function registerProject(dir: string): void {
   try {
-    const homeDir = os.homedir();
+    const homeDir = getHomePath();
     const configDir = path.join(homeDir, ".codeatlas");
     if (!fs.existsSync(configDir)) {
       fs.mkdirSync(configDir, { recursive: true });
@@ -419,7 +420,7 @@ export function isSystemIdeDirectory(dir: string): boolean {
     }
     
     // Dynamically resolve ~/.gemini/antigravity across operating systems
-    const homeDir = os.homedir();
+    const homeDir = getHomePath();
     const dynamicAntigravityPath = path.resolve(path.join(homeDir, ".gemini", "antigravity"));
     if (absPath === dynamicAntigravityPath || absPath.startsWith(dynamicAntigravityPath + path.sep)) {
       return true;
@@ -634,7 +635,7 @@ export function discoverProjects(tenantId?: string): { name: string; dir: string
 
     // Load globally registered projects
     try {
-      const homeDir = os.homedir();
+      const homeDir = getHomePath();
       const regPath = path.join(homeDir, ".codeatlas", "registered_projects.json");
       if (fs.existsSync(regPath)) {
         const registered = JSON.parse(fs.readFileSync(regPath, "utf-8"));
@@ -796,7 +797,7 @@ export async function discoverProjectsAsync(tenantId?: string): Promise<{ name: 
 
     // Load globally registered projects
     try {
-      const homeDir = os.homedir();
+      const homeDir = getHomePath();
       const regPath = path.join(homeDir, ".codeatlas", "registered_projects.json");
       if (await fileExists(regPath)) {
         const data = await fs.promises.readFile(regPath, "utf-8");
@@ -966,7 +967,7 @@ export function getResolvedApiKey(): string | undefined {
     return key;
   }
 
-  const homeDir = os.homedir();
+  const homeDir = getHomePath();
   const pathsToTry = [
     path.join(homeDir, ".gemini", "antigravity", "mcp_config.json"),
     path.join(homeDir, ".cursor", "mcp.json"),
