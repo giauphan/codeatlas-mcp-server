@@ -509,31 +509,35 @@ export async function scanForCodeatlasProjectsAsync(parentDir: string): Promise<
     
     const entries = await fs.promises.readdir(parentDir, { withFileTypes: true });
 
-    await Promise.all(entries.map(async (entry) => {
-      if (entry.isDirectory() && entry.name !== "node_modules" && !entry.name.startsWith(".")) {
-        const subPath = path.join(parentDir, entry.name);
-        if (await fileExists(path.join(subPath, ".codeatlas"))) {
-          discovered.push(path.resolve(subPath));
-        } else {
-          // Check 2nd level
-          try {
-            const subEntries = await fs.promises.readdir(subPath, { withFileTypes: true });
-            await Promise.all(subEntries.map(async (subEntry) => {
-              if (subEntry.isDirectory() && subEntry.name !== "node_modules" && !subEntry.name.startsWith(".")) {
-                const subSubPath = path.join(subPath, subEntry.name);
-                if (await fileExists(path.join(subSubPath, ".codeatlas"))) {
-                  discovered.push(path.resolve(subSubPath));
-                }
-              }
-            }));
-          } catch { /* skip */ }
+    await Promise.allSettled(entries.map(async (entry) => {
+      try {
+        if (entry.isDirectory() && entry.name !== "node_modules" && !entry.name.startsWith(".")) {
+          const subPath = path.join(parentDir, entry.name);
+          if (await fileExists(path.join(subPath, ".codeatlas"))) {
+            discovered.push(path.resolve(subPath));
+          } else {
+            // Check 2nd level
+            try {
+              const subEntries = await fs.promises.readdir(subPath, { withFileTypes: true });
+              await Promise.allSettled(subEntries.map(async (subEntry) => {
+                try {
+                  if (subEntry.isDirectory() && subEntry.name !== "node_modules" && !subEntry.name.startsWith(".")) {
+                    const subSubPath = path.join(subPath, subEntry.name);
+                    if (await fileExists(path.join(subSubPath, ".codeatlas"))) {
+                      discovered.push(path.resolve(subSubPath));
+                    }
+                  }
+                } catch { /* skip individual subEntry error */ }
+              }));
+            } catch { /* skip */ }
+          }
         }
-      }
+      } catch { /* skip individual entry error */ }
     }));
   } catch (err) {
     console.error(`[Project-Discovery] ❌ Failed async scan for .codeatlas projects: ${err}`);
   }
-  return discovered;
+  return discovered.sort();
 }
 
 /**
