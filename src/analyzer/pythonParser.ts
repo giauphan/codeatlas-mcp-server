@@ -1,4 +1,4 @@
-import { parse } from 'py-ast';
+import { parse, ASTNodeUnion, Name, Attribute } from 'py-ast';
 
 export class PythonParser {
   public parseFile(filePath: string, code: string): {
@@ -17,58 +17,68 @@ export class PythonParser {
     try {
       const ast = parse(code);
 
-      const traverse = (node: any) => {
+
+      const nodeToName = (baseNode: ASTNodeUnion | null | undefined): string => {
+        if (!baseNode) return 'object';
+        if (baseNode.nodeType === 'Name') return (baseNode as Name).id;
+        if (baseNode.nodeType === 'Attribute') {
+          const attrNode = baseNode as Attribute;
+          return `${nodeToName(attrNode.value as ASTNodeUnion)}.${attrNode.attr}`;
+        }
+        if (baseNode.nodeType === 'Subscript') {
+          const subNode = baseNode as Extract<ASTNodeUnion, { nodeType: 'Subscript' }>;
+          return nodeToName(subNode.value as ASTNodeUnion);
+        }
+        return 'object';
+      };
+
+      const traverse = (node: ASTNodeUnion | null | undefined) => {
         if (!node || typeof node !== 'object') return;
 
-        const type = node.type || node.nodeType;
-
-        if (type === 'ClassDef') {
+        if (node.nodeType === 'ClassDef') {
           classes.push({
             name: node.name,
-            parents: node.bases.map((b: any) => b.id || 'object'),
-            line: node.lineno
+            parents: node.bases?.map(nodeToName) ?? [],
+            line: node.lineno ?? 0
           });
         }
 
-        if (type === 'FunctionDef' || type === 'AsyncFunctionDef') {
+        if (node.nodeType === 'FunctionDef' || node.nodeType === 'AsyncFunctionDef') {
           functions.push({
             name: node.name,
-            line: node.lineno,
-            indent: node.col_offset
+            line: node.lineno ?? 0,
+            indent: node.col_offset ?? 0
           });
         }
 
-        if (type === 'Assign') {
-          node.targets?.forEach((target: any) => {
-            const targetType = target.type || target.nodeType;
-            if (targetType === 'Name') {
-              variables.push({ name: target.id, line: node.lineno });
+        if (node.nodeType === 'Assign') {
+          node.targets?.forEach((target) => {
+            if (target.nodeType === 'Name') {
+              variables.push({ name: target.id, line: node.lineno ?? 0 });
             }
           });
         }
 
-        if (type === 'Import' || type === 'ImportFrom') {
+        if (node.nodeType === 'Import' || node.nodeType === 'ImportFrom') {
           imports.push({
-            source: node.module || '',
-            names: node.names?.map((n: any) => n.name) || [],
-            line: node.lineno
+            source: node.nodeType === 'ImportFrom' ? (node.module ?? '') : '',
+            names: node.names?.map((n) => n.name) ?? [],
+            line: node.lineno ?? 0
           });
         }
 
-        if (type === 'Call') {
-          const funcType = node.func?.type || node.func?.nodeType;
-          if (funcType === 'Name') {
-            calls.push({ name: node.func.id, line: node.lineno });
-          } else if (funcType === 'Attribute') {
-            calls.push({ name: node.func.attr, line: node.lineno });
+        if (node.nodeType === 'Call') {
+          const funcNode = node.func;
+          if (funcNode?.nodeType === 'Name' || funcNode?.nodeType === 'Attribute' || funcNode?.nodeType === 'Subscript') {
+            calls.push({ name: nodeToName(funcNode), line: node.lineno ?? 0 });
           }
         }
 
         Object.values(node).forEach(child => {
           if (Array.isArray(child)) {
-            child.forEach(c => traverse(c));
-          } else {
-            traverse(child);
+            child.forEach(c => traverse(c as ASTNodeUnion));
+          } else if (child && typeof child === 'object') {
+            traverse(child as ASTNodeUnion);
           }
         });
       };
