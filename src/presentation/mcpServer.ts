@@ -106,7 +106,7 @@ export function registerTools(server: McpServer) {
     "Get all modules, classes, functions, and variables in the analyzed project. Returns entity type, name, file path, and line number.",
     {
       project: z.string().optional().describe("Project name or path (auto-detects if omitted)"),
-      type: z.enum(["all", "module", "class", "function", "variable"]).optional().describe("Filter by entity type"),
+      type: z.enum(["all", "module", "class", "function", "variable"]).optional().describe("Filter by entity type. Choose one of: all, module, class, function, variable"),
       limit: z.number().optional().describe("Max results to return (default: 100)"),
     },
     async ({ project, type, limit }: { project?: string; type?: string; limit?: number }) => {
@@ -161,7 +161,7 @@ export function registerTools(server: McpServer) {
       project: z.string().optional().describe("Project name or path"),
       source: z.string().optional().describe("Filter by source entity name"),
       target: z.string().optional().describe("Filter by target entity name"),
-      relationship: z.enum(["all", "import", "call", "contains", "implements"]).optional().describe("Filter by relationship type"),
+      relationship: z.enum(["all", "import", "call", "contains", "implements"]).optional().describe("Filter by relationship type. Choose one of: all, import, call, contains, implements"),
       limit: z.number().optional().describe("Max results (default: 100)"),
     },
     async ({ project, source, target, relationship, limit }: { project?: string; source?: string; target?: string; relationship?: string; limit?: number }) => {
@@ -251,7 +251,7 @@ export function registerTools(server: McpServer) {
     {
       project: z.string().optional().describe("Project name or path"),
       query: z.string().describe("Search query (case-insensitive, partial match)"),
-      type: z.enum(["all", "module", "class", "function", "variable"]).optional().describe("Filter by entity type"),
+      type: z.enum(["all", "module", "class", "function", "variable"]).optional().describe("Filter by entity type. Choose one of: all, module, class, function, variable"),
     },
     async ({ project, query, type }: { project?: string; query: string; type?: string }) => {
       const auth = await checkAuth();
@@ -374,7 +374,7 @@ export function registerTools(server: McpServer) {
     "Auto-generate a Mermaid flowchart diagram showing how modules, classes, and functions connect in the system. Returns a Mermaid diagram string that AI can read to understand the full system flow without reading every file.",
     {
       project: z.string().optional().describe("Project name or path"),
-      scope: z.enum(["full", "modules-only", "feature"]).optional().describe("Scope of the diagram: 'full' shows all entities, 'modules-only' shows only module relationships (recommended for large projects), 'feature' requires the 'feature' param"),
+      scope: z.enum(["full", "modules-only", "feature"]).optional().describe("Scope of the diagram: 'full' shows all entities, 'modules-only' shows only module relationships (recommended for large projects), 'feature' requires the 'feature' param. Choose one of: full, modules-only, feature"),
       feature: z.string().optional().describe("Feature keyword to focus the diagram on (e.g. 'auth', 'crawl', 'payment'). Only used when scope='feature'"),
       maxNodes: z.number().optional().describe("Maximum nodes in diagram (default: 60). Reduce for large projects"),
     },
@@ -565,7 +565,7 @@ export function registerTools(server: McpServer) {
     "Retrieve the auto-generated system documentation and episodic memories (business rules and change logs) for a project from CodeAtlas Cloud / Oracle 26ai.",
     {
       project: z.string().optional().describe("Project name or path"),
-      eventType: z.enum(["all", "BUSINESS_RULE", "CHANGE_LOG"]).optional().default("all").describe("Filter by event type"),
+      eventType: z.enum(["all", "BUSINESS_RULE", "CHANGE_LOG"]).optional().default("all").describe("Filter by event type. Choose one of: all, BUSINESS_RULE, CHANGE_LOG"),
     },
     async ({ project, eventType }: { project?: string; eventType?: "all" | "BUSINESS_RULE" | "CHANGE_LOG" }) => {
       const auth = await checkAuth();
@@ -598,7 +598,7 @@ export function registerTools(server: McpServer) {
     "save_dream_memory",
     "Save a dream memory (mistake, preference, knowledge, or pattern) to CodeAtlas Cloud for long-term AI recall. The AI uses this to persist learnings across conversations.",
     {
-      memory_type: z.enum(["MISTAKE", "PREFERENCE", "KNOWLEDGE", "PATTERN"]).describe("Category of the memory"),
+      memory_type: z.enum(["MISTAKE", "PREFERENCE", "KNOWLEDGE", "PATTERN"]).describe("Category of the memory. Choose one of: MISTAKE, PREFERENCE, KNOWLEDGE, PATTERN"),
       content: z.string().describe("The actual memory content or insight"),
       importance: z.number().min(1).max(10).optional().describe("Importance level from 1 (low) to 10 (critical). Defaults to 5."),
       session_id: z.string().optional().describe("Optional session identifier for grouping related memories"),
@@ -689,7 +689,7 @@ export function registerTools(server: McpServer) {
     "sync_dreams",
     "Check dream memory sync status. Returns count of stored dreams grouped by type and project. Use this to verify dreams are syncing to the cloud correctly. Can be called from any AI IDE, CLI, or Hermes cron.",
     {
-      type: z.enum(["MISTAKE", "PREFERENCE", "KNOWLEDGE", "PATTERN"]).optional().describe("Filter by memory type"),
+      type: z.enum(["MISTAKE", "PREFERENCE", "KNOWLEDGE", "PATTERN"]).optional().describe("Filter by memory type. Choose one of: MISTAKE, PREFERENCE, KNOWLEDGE, PATTERN"),
       project: z.string().optional().describe("Filter by project name"),
     },
     async ({ type, project }: { type?: "MISTAKE" | "PREFERENCE" | "KNOWLEDGE" | "PATTERN"; project?: string }) => {
@@ -1059,7 +1059,7 @@ export function registerTools(server: McpServer) {
     {
       project: z.string().optional().describe("Project name or path"),
       keyword: z.string().describe("Feature keyword to trace (e.g. 'login', 'payment', 'upload', 'auth')"),
-      diagramType: z.enum(["flowchart", "sequence"]).optional().describe("Type of Mermaid diagram: 'flowchart' (default) shows call graph, 'sequence' shows step-by-step execution order"),
+      diagramType: z.enum(["flowchart", "sequence"]).optional().describe("Type of Mermaid diagram: 'flowchart' (default) shows call graph, 'sequence' shows step-by-step execution order. Choose one of: flowchart, sequence"),
       depth: z.number().optional().describe("How many call hops to follow (default: 3)"),
       maxNodes: z.number().optional().describe("Maximum nodes in diagram (default: 40)"),
     },
@@ -1961,7 +1961,7 @@ export function registerTools(server: McpServer) {
     + "Installs MCP config and auto-retrieval plugin so the AI automatically saves/retrieves knowledge.",
     {
       client: z.enum(["hermes", "claude", "gemini", "all"]).optional().default("all")
-        .describe("Which client to configure"),
+        .describe("Which client to configure. Choose one of: hermes, claude, gemini, all"),
       apiKey: z.string().optional().describe("CODEATLAS_API_KEY (will use env var if not provided)"),
       autoPlugin: z.boolean().optional().default(true)
         .describe("Also install Hermes auto Second Brain plugin (pre/post LLM hooks)"),
