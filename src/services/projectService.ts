@@ -759,14 +759,19 @@ export async function discoverProjectsAsync(tenantId?: string): Promise<{ name: 
       if (await fileExists(userDir)) {
         try {
           const userProjects = await fs.promises.readdir(userDir);
-          for (const p of userProjects) {
+          const statPromises = userProjects.map(async (p) => {
             const fullPath = path.join(userDir, p);
             try {
               const stat = await fs.promises.stat(fullPath);
               if (stat.isDirectory()) {
-                searchDirs.push(fullPath);
+                return fullPath;
               }
             } catch { /* skip */ }
+            return null;
+          });
+          const results = await Promise.all(statPromises);
+          for (const r of results) {
+            if (r) searchDirs.push(r);
           }
         } catch { /* skip */ }
       }
