@@ -5,7 +5,7 @@ import { authStorage } from "../context.js";
  */
 export async function checkAuth(apiKey?: string): Promise<{ tier: string; uid: string; keyId: string }> {
   const contextAuth = authStorage.getStore();
-  if (contextAuth) {
+  if (contextAuth && Object.keys(contextAuth).length > 0) {
     return contextAuth;
   }
 
