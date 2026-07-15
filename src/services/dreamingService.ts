@@ -125,7 +125,7 @@ export async function queryDreamMemories(params: DreamMemoryQuery): Promise<Drea
 
       const queryParams: URLSearchParams = new URLSearchParams();
       if (params.query != null) queryParams.set("query", params.query);
-      if (params.project != null && params.project !== "") queryParams.set("project", params.project);
+      if (params.project != null) queryParams.set("project", params.project);
       if (params.limit != null) queryParams.set("limit", String(params.limit));
       if (params.offset != null) queryParams.set("offset", String(params.offset));
 
