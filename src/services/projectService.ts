@@ -605,10 +605,10 @@ export function discoverProjects(tenantId?: string): { name: string; dir: string
       if (fs.existsSync(userDir)) {
         try {
           const userProjects = fs.readdirSync(userDir, { withFileTypes: true });
-          for (const p of userProjects) {
-            const fullPath = path.join(userDir, p.name);
-            let isDir = p.isDirectory();
-            if (!isDir && p.isSymbolicLink()) {
+          for (const entry of userProjects) {
+            const fullPath = path.join(userDir, entry.name);
+            let isDir = entry.isDirectory();
+            if (!isDir && entry.isSymbolicLink()) {
               try {
                 isDir = fs.statSync(fullPath).isDirectory();
               } catch {}
@@ -770,10 +770,10 @@ export async function discoverProjectsAsync(tenantId?: string): Promise<{ name: 
       if (await fileExists(userDir)) {
         try {
           const userProjects = await fs.promises.readdir(userDir, { withFileTypes: true });
-          const statPromises = userProjects.map(async (p) => {
-            const fullPath = path.join(userDir, p.name);
-            let isDir = p.isDirectory();
-            if (!isDir && p.isSymbolicLink()) {
+          const statPromises = userProjects.map(async (entry) => {
+            const fullPath = path.join(userDir, entry.name);
+            let isDir = entry.isDirectory();
+            if (!isDir && entry.isSymbolicLink()) {
               try {
                 const stat = await fs.promises.stat(fullPath);
                 isDir = stat.isDirectory();
