@@ -19,6 +19,10 @@ import { saveDreamMemory, queryDreamMemories, DreamMemoryResult } from "../servi
 import { CodeAnalyzer } from "../analyzer/parser.js";
 import { SecurityScanner } from "../securityScanner.js";
 
+function escapeRegExp(str: string): string {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 export function registerTools(server: McpServer) {
   // Tool -1: Analyze a project
   server.tool(
@@ -179,15 +183,17 @@ export function registerTools(server: McpServer) {
         links = links.filter((l) => l.type === relationship);
       }
       if (source) {
+        const sourceRegex = new RegExp(escapeRegExp(source), 'i');
         links = links.filter((l) => {
           const label = nodeMap.get(l.source) || l.source;
-          return label.toLowerCase().includes(source.toLowerCase());
+          return sourceRegex.test(label);
         });
       }
       if (target) {
+        const targetRegex = new RegExp(escapeRegExp(target), 'i');
         links = links.filter((l) => {
           const label = nodeMap.get(l.target) || l.target;
-          return label.toLowerCase().includes(target.toLowerCase());
+          return targetRegex.test(label);
         });
       }
 
@@ -278,8 +284,8 @@ export function registerTools(server: McpServer) {
         return true;
       });
 
-      const q = query.toLowerCase();
-      const matches = nodes.filter((n) => n.label.toLowerCase().includes(q));
+      const searchRegex = new RegExp(escapeRegExp(query), 'i');
+      const matches = nodes.filter((n) => searchRegex.test(n.label));
 
       // For each match, find its relationships
       const links = loaded.analysis.graph.links;
@@ -327,10 +333,10 @@ export function registerTools(server: McpServer) {
         return { content: [{ type: "text" as const, text: "No analysis data found. Run 'analyze' tool first." }] };
       }
 
-      const q = filePath.toLowerCase().replace(/\\/g, "/");
+      const searchRegex = new RegExp(escapeRegExp(filePath.replace(/\\/g, "/")), 'i');
       const matches = loaded.analysis.graph.nodes.filter((n) => {
-        const fp = (n.filePath || n.id).toLowerCase().replace(/\\/g, "/");
-        return fp.includes(q);
+        const fp = (n.filePath || n.id).replace(/\\/g, "/");
+        return searchRegex.test(fp);
       });
 
       const links = loaded.analysis.graph.links;
@@ -398,10 +404,10 @@ export function registerTools(server: McpServer) {
         const nodeIds = new Set(nodes.map((n) => n.id));
         links = links.filter((l) => nodeIds.has(l.source) && nodeIds.has(l.target) && l.type === "import");
       } else if (diagramScope === "feature" && feature) {
-        const q = feature.toLowerCase();
+        const featureRegex = new RegExp(escapeRegExp(feature), 'i');
         const matchingNodes = new Set<string>();
         nodes.forEach((n) => {
-          if (n.label.toLowerCase().includes(q) || (n.filePath && n.filePath.toLowerCase().includes(q))) {
+          if (featureRegex.test(n.label) || (n.filePath && featureRegex.test(n.filePath))) {
             matchingNodes.add(n.id);
           }
         });
@@ -933,7 +939,7 @@ export function registerTools(server: McpServer) {
       }
 
       const maxDepth = depth || 2;
-      const q = keyword.toLowerCase();
+      const searchRegex = new RegExp(escapeRegExp(keyword), 'i');
       const nodes = loaded.analysis.graph.nodes;
       const links = loaded.analysis.graph.links;
       const nodeMap = new Map(nodes.map((n) => [n.id, n]));
@@ -950,9 +956,9 @@ export function registerTools(server: McpServer) {
         )) continue;
 
         if (
-          node.label.toLowerCase().includes(q) ||
-          (node.filePath && node.filePath.toLowerCase().includes(q)) ||
-          node.id.toLowerCase().includes(q)
+          searchRegex.test(node.label) ||
+          (node.filePath && searchRegex.test(node.filePath)) ||
+          searchRegex.test(node.id)
         ) {
           seedNodes.add(node.id);
         }
@@ -1071,7 +1077,7 @@ export function registerTools(server: McpServer) {
         return { content: [{ type: "text" as const, text: "No analysis data found. Run 'analyze' tool first." }] };
       }
 
-      const q = keyword.toLowerCase();
+      const searchRegex = new RegExp(escapeRegExp(keyword), 'i');
       const maxDepth = depth || 3;
       const maxN = maxNodes || 40;
       const dType = diagramType || "flowchart";
@@ -1092,9 +1098,9 @@ export function registerTools(server: McpServer) {
         )) continue;
 
         if (
-          node.label.toLowerCase().includes(q) ||
-          (node.filePath && node.filePath.toLowerCase().includes(q)) ||
-          node.id.toLowerCase().includes(q)
+          searchRegex.test(node.label) ||
+          (node.filePath && searchRegex.test(node.filePath)) ||
+          searchRegex.test(node.id)
         ) {
           seedNodes.add(node.id);
         }
@@ -1535,9 +1541,8 @@ export function registerTools(server: McpServer) {
 
       const maxRes = Math.min(maxResults || 30, 100);
       const ctx = contextLines || 2;
-      const q = query.toLowerCase();
       // Fast path regex to pre-filter files without memory-intensive .toLowerCase() on entire file content
-      const searchRegex = new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+      const searchRegex = new RegExp(escapeRegExp(query), 'i');
       const allFiles: string[] = [];
       const extSet = new Set([".ts", ".tsx", ".js", ".jsx", ".py", ".php", ".json", ".yaml", ".yml", ".md", ".css", ".scss", ".html"]);
 
@@ -1574,7 +1579,7 @@ export function registerTools(server: McpServer) {
           const lines = content.split("\n");
           for (let i = 0; i < lines.length; i++) {
             if (results.length >= maxRes) break;
-            if (lines[i].toLowerCase().includes(q)) {
+            if (searchRegex.test(lines[i])) {
               results.push({
                 file: path.relative(loaded.projectDir, filePath),
                 line: i + 1,
@@ -1609,7 +1614,7 @@ export function registerTools(server: McpServer) {
       const loaded = await loadAnalysisAsync(project);
       if (!loaded) return { content: [{ type: "text" as const, text: "No analysis found. Run 'analyze' first." }] };
 
-      const q = symbol.toLowerCase();
+      const searchRegex = new RegExp(escapeRegExp(symbol), 'i');
       const maxD = Math.min(depth || 1, 5);
       const nodes = loaded.analysis.graph.nodes;
       const links = loaded.analysis.graph.links;
@@ -1617,7 +1622,7 @@ export function registerTools(server: McpServer) {
       const targetNames = new Map<string, string>();
 
       for (const node of nodes) {
-        if (node.label.toLowerCase().includes(q) && !node.id.startsWith("external:")) {
+        if (searchRegex.test(node.label) && !node.id.startsWith("external:")) {
           targetIds.add(node.id);
           targetNames.set(node.id, node.label);
         }
@@ -1672,14 +1677,14 @@ export function registerTools(server: McpServer) {
       const loaded = await loadAnalysisAsync(project);
       if (!loaded) return { content: [{ type: "text" as const, text: "No analysis found. Run 'analyze' first." }] };
 
-      const q = symbol.toLowerCase();
+      const searchRegex = new RegExp(escapeRegExp(symbol), 'i');
       const maxD = Math.min(depth || 1, 5);
       const nodes = loaded.analysis.graph.nodes;
       const links = loaded.analysis.graph.links;
       const sourceIds = new Set<string>();
 
       for (const node of nodes) {
-        if (node.label.toLowerCase().includes(q) && !node.id.startsWith("external:")) sourceIds.add(node.id);
+        if (searchRegex.test(node.label) && !node.id.startsWith("external:")) sourceIds.add(node.id);
       }
       if (sourceIds.size === 0) return { content: [{ type: "text" as const, text: JSON.stringify({ symbol, matchCount: 0, message: `No symbol '${symbol}' found.` }) }] };
 
@@ -1724,7 +1729,7 @@ export function registerTools(server: McpServer) {
       const loaded = await loadAnalysisAsync(project);
       if (!loaded) return { content: [{ type: "text" as const, text: "No analysis found. Run 'analyze' first." }] };
 
-      const q = symbol.toLowerCase();
+      const searchRegex = new RegExp(escapeRegExp(symbol), 'i');
       const maxD = Math.min(depth || 2, 5);
       const nodes = loaded.analysis.graph.nodes;
       const links = loaded.analysis.graph.links;
@@ -1732,7 +1737,7 @@ export function registerTools(server: McpServer) {
       const symbolIds = new Set<string>();
 
       for (const node of nodes) {
-        if (node.label.toLowerCase().includes(q) && !node.id.startsWith("external:")) symbolIds.add(node.id);
+        if (searchRegex.test(node.label) && !node.id.startsWith("external:")) symbolIds.add(node.id);
       }
       if (symbolIds.size === 0) return { content: [{ type: "text" as const, text: JSON.stringify({ symbol, matchCount: 0, message: `No symbol '${symbol}' found.` }) }] };
 
