@@ -1541,9 +1541,8 @@ export function registerTools(server: McpServer) {
 
       const maxRes = Math.min(maxResults || 30, 100);
       const ctx = contextLines || 2;
-      const q = query.toLowerCase();
       // Fast path regex to pre-filter files without memory-intensive .toLowerCase() on entire file content
-      const searchRegex = new RegExp(escapeRegExp(q), 'i');
+      const searchRegex = new RegExp(escapeRegExp(query), 'i');
       const allFiles: string[] = [];
       const extSet = new Set([".ts", ".tsx", ".js", ".jsx", ".py", ".php", ".json", ".yaml", ".yml", ".md", ".css", ".scss", ".html"]);
 
@@ -1580,7 +1579,7 @@ export function registerTools(server: McpServer) {
           const lines = content.split("\n");
           for (let i = 0; i < lines.length; i++) {
             if (results.length >= maxRes) break;
-            if (lines[i].toLowerCase().includes(q)) {
+            if (searchRegex.test(lines[i])) {
               results.push({
                 file: path.relative(loaded.projectDir, filePath),
                 line: i + 1,
