@@ -5,9 +5,15 @@ import { authStorage } from "../context.js";
  */
 export async function checkAuth(apiKey?: string): Promise<{ tier: string; uid: string; keyId: string }> {
   const contextAuth = authStorage.getStore();
-  if (contextAuth) {
+  if (contextAuth && Object.keys(contextAuth).length > 0) {
     return contextAuth;
   }
+
+  const multiTenant = process.env.CODEATLAS_MULTI_TENANT;
+  if (multiTenant === "true" || multiTenant === "1") {
+    throw new Error("Unauthorized: Missing tenant authentication context.");
+  }
+
   return {
     tier: "enterprise",
     uid: "local-user",
