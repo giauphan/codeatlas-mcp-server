@@ -604,10 +604,18 @@ export function discoverProjects(tenantId?: string): { name: string; dir: string
       const userDir = path.join(tenantRoot, tenantId);
       if (fs.existsSync(userDir)) {
         try {
-          const userProjects = fs.readdirSync(userDir);
-          for (const p of userProjects) {
-            const fullPath = path.join(userDir, p);
-            if (fs.statSync(fullPath).isDirectory()) {
+          const userProjects = fs.readdirSync(userDir, { withFileTypes: true });
+          for (const entry of userProjects) {
+            const fullPath = path.join(userDir, entry.name);
+            let isDirectory = entry.isDirectory();
+            if (!isDirectory && entry.isSymbolicLink()) {
+              try {
+                isDirectory = fs.statSync(fullPath).isDirectory();
+              } catch {
+                continue;
+              }
+            }
+            if (isDirectory) {
               searchDirs.push(fullPath);
             }
           }
@@ -763,15 +771,21 @@ export async function discoverProjectsAsync(tenantId?: string): Promise<{ name: 
       const userDir = path.join(tenantRoot, tenantId);
       if (await fileExists(userDir)) {
         try {
-          const userProjects = await fs.promises.readdir(userDir);
-          const statPromises = userProjects.map(async (p) => {
-            const fullPath = path.join(userDir, p);
-            try {
-              const stat = await fs.promises.stat(fullPath);
-              if (stat.isDirectory()) {
-                searchDirs.push(fullPath);
+          const userProjects = await fs.promises.readdir(userDir, { withFileTypes: true });
+          const statPromises = userProjects.map(async (entry) => {
+            const fullPath = path.join(userDir, entry.name);
+            let isDirectory = entry.isDirectory();
+            if (!isDirectory && entry.isSymbolicLink()) {
+              try {
+                const stat = await fs.promises.stat(fullPath);
+                isDirectory = stat.isDirectory();
+              } catch {
+                return;
               }
-            } catch { /* skip */ }
+            }
+            if (isDirectory) {
+              searchDirs.push(fullPath);
+            }
           });
           await Promise.all(statPromises);
         } catch { /* skip */ }
