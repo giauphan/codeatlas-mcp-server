@@ -14,3 +14,7 @@
 **Vulnerability:** The `checkAuth` function used for multi-tenant authorization fell back to granting full 'enterprise' privileges via a mock local user if no authentication context was found.
 **Learning:** When software supports both single-tenant (local) and multi-tenant (cloud) deployment modes, mock security fallbacks designed for local development can inadvertently bypass authentication in production if they are not conditionally gated.
 **Prevention:** Always check deployment/configuration flags (e.g., `CODEATLAS_MULTI_TENANT`) before returning mock credentials or bypassing security checks. Throw an explicit unauthorized error when running in a multi-tenant environment.
+## 2026-07-16 - YAML Injection in MCP Server Configuration
+**Vulnerability:** The `CODEATLAS_API_KEY` was being interpolated directly into a YAML string via a template literal (`"${key}"`), which exposed the configuration to YAML injection if the key contained double quotes and newline characters.
+**Learning:** Interpolating unvalidated input strings into YAML without proper escaping creates a risk of structural injection, potentially allowing an attacker to overwrite configuration blocks or execute arbitrary commands.
+**Prevention:** Always use `JSON.stringify(key)` instead of raw string interpolation (`"${key}"`) when injecting string values into generated YAML or JSON configuration blocks to securely escape quotes and newlines.
