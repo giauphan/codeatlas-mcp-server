@@ -15,8 +15,6 @@ export class CodeAnalyzer {
   private readonly excludedFiles: string[];
   private readonly fileExtensions: string[];
 
-  private dirCache = new Map<string, Set<string> | null>();
-
   private ignoreFilter: ReturnType<typeof ignore> | null = null;
 
   constructor(
@@ -33,19 +31,6 @@ export class CodeAnalyzer {
     this.excludedDirectories = excludedDirectories;
     this.excludedFiles = excludedFiles;
     this.fileExtensions = fileExtensions;
-  }
-
-  private getDirContents(dirPath: string): Set<string> | null {
-    let contents = this.dirCache.get(dirPath);
-    if (contents === undefined) {
-      try {
-        contents = new Set(fs.readdirSync(dirPath));
-      } catch {
-        contents = null;
-      }
-      this.dirCache.set(dirPath, contents);
-    }
-    return contents;
   }
 
   private getIgnoreFilter(): ReturnType<typeof ignore> {
@@ -86,7 +71,6 @@ export class CodeAnalyzer {
   private totalSkippedCount = 0;
 
   public async analyzeProject(onProgress?: (percent: number, done: number, total: number, currentFile?: string) => void): Promise<AnalysisResult> {
-    this.dirCache.clear();
     this.nodes.clear();
     this.links = [];
 
@@ -95,7 +79,7 @@ export class CodeAnalyzer {
       console.warn(`[CodeAnalyzer] Workspace has ${files.length} files, which exceeds maxFiles (${this.maxFiles}). Truncating to ${this.maxFiles} files.`);
       files = files.slice(0, this.maxFiles);
     }
-    
+
     this.allFiles = [...files];
     const total = files.length;
 
@@ -127,9 +111,8 @@ export class CodeAnalyzer {
   }
 
   public async analyzeFileIncremental(filePath: string): Promise<AnalysisResult> {
-    this.dirCache.clear();
     const absPath = path.resolve(filePath);
-    
+
     // 1. Remove all existing nodes belonging to this file
     const nodesToRemove = new Set<string>();
     this.nodes.forEach((node, id) => {
@@ -137,7 +120,7 @@ export class CodeAnalyzer {
         nodesToRemove.add(id);
       }
     });
-    
+
     // Also remove module node matching this file's module ID
     const relativePath = path.relative(this.workspaceRoot, absPath);
     const normalizedRelativePath = relativePath.replace(/\\/g, '/');
@@ -395,7 +378,7 @@ export class CodeAnalyzer {
    */
   private detectCircularDeps(): number {
     const adjList = new Map<string, string[]>();
-    
+
     // Adjacency list drives cycle detection and impact analysis.
     for (const link of this.links) {
       if (link.type === 'import' && link.source.startsWith('module:') && link.target.startsWith('module:')) {
@@ -437,34 +420,34 @@ export class CodeAnalyzer {
 
   private getFiles(dir: string, fileList: string[] = [], depth: number = 0): string[] {
     if (!fs.existsSync(dir)) return fileList;
-    
+
     // Safety: max recursion depth = 20 levels (prevents runaway on broad paths)
     const MAX_DEPTH = 20;
     if (depth > MAX_DEPTH) {
       console.warn(`[CodeAnalyzer] Max depth (${MAX_DEPTH}) reached at ${dir}. Stopping recursion.`);
       return fileList;
     }
-    
+
     // Check if current directory itself is ignored
     if (dir !== this.workspaceRoot && this.isIgnored(dir, true)) {
       return fileList;
     }
-    
+
     let entries: fs.Dirent[];
     try {
       entries = fs.readdirSync(dir, { withFileTypes: true });
     } catch {
       return fileList;
     }
-    
+
     for (const entry of entries) {
       // Keep safety check for hidden files/folders (starting with .)
       if (entry.name.startsWith('.')) {
         continue;
       }
-      
+
       const filePath = path.join(dir, entry.name);
-      
+
       let isDirectory = entry.isDirectory();
       if (!isDirectory && entry.isSymbolicLink()) {
         try {
@@ -473,19 +456,19 @@ export class CodeAnalyzer {
           continue;
         }
       }
-      
+
       // Check if file/directory is ignored via .gitignore or default rules
       if (this.isIgnored(filePath, isDirectory)) {
         continue;
       }
-      
+
       if (isDirectory) {
         this.getFiles(filePath, fileList, depth + 1);
       } else if (this.fileExtensions.some(ext => entry.name.endsWith(ext))) {
         fileList.push(filePath);
       }
     }
-    
+
     return fileList;
   }
 
@@ -934,7 +917,7 @@ export class CodeAnalyzer {
   private handleVariableDeclarator(node: any, currentModuleId: string, filePath: string, currentScopeId: string): string {
     if (node.id?.name) {
       const varName = node.id.name;
-      
+
       if (node.init && (node.init.type === 'ArrowFunctionExpression' || node.init.type === 'FunctionExpression')) {
         const funcId = `function:${currentModuleId}:${varName}`;
         this.addNode({
@@ -1055,49 +1038,38 @@ export class CodeAnalyzer {
     if (importPath.startsWith('.')) {
       try {
         let absolutePath = path.resolve(path.dirname(currentFilePath), importPath);
-        
+
         let foundPath = absolutePath;
         const extensions = this.fileExtensions;
         let matched = false;
 
-        const dName = path.dirname(absolutePath);
-        const bName = path.basename(absolutePath);
-        const parentContents = this.getDirContents(dName);
-
-        if (parentContents) {
-          if (parentContents.has(bName)) {
-            try {
-              const stat = fs.statSync(absolutePath);
-              if (stat.isDirectory()) {
-                const dirContents = this.getDirContents(absolutePath);
-                if (dirContents) {
-                  for (const ext of extensions) {
-                    if (dirContents.has(`index${ext}`)) {
-                      foundPath = path.join(absolutePath, `index${ext}`);
-                      matched = true;
-                      break;
-                    }
-                  }
-                }
-              } else {
-                matched = true;
-              }
-            } catch (e) {
-              // Ignore broken symlinks or missing files
-            }
-          }
-
-          if (!matched) {
+        if (fs.existsSync(absolutePath)) {
+          const stat = fs.statSync(absolutePath);
+          if (stat.isDirectory()) {
             for (const ext of extensions) {
-              if (parentContents.has(`${bName}${ext}`)) {
-                foundPath = `${absolutePath}${ext}`;
+              const indexPath = path.join(absolutePath, `index${ext}`);
+              if (fs.existsSync(indexPath)) {
+                foundPath = indexPath;
                 matched = true;
                 break;
               }
             }
+          } else {
+            matched = true;
           }
         }
-        
+
+        if (!matched) {
+          for (const ext of extensions) {
+            const extPath = `${absolutePath}${ext}`;
+            if (fs.existsSync(extPath)) {
+              foundPath = extPath;
+              matched = true;
+              break;
+            }
+          }
+        }
+
         const relativeToWorkspace = path.relative(this.workspaceRoot, foundPath);
         // Normalize slashes
         return `module:${relativeToWorkspace.replace(/\\/g, '/')}`;
@@ -1131,19 +1103,14 @@ export class CodeAnalyzer {
 
     for (const baseDir of searchDirs) {
       const targetPath = path.join(baseDir, subPath);
-      
-      const dName = path.dirname(targetPath);
-      const bName = path.basename(targetPath);
-      const parentContents = this.getDirContents(dName);
 
-      if (parentContents && parentContents.has(`${bName}.py`)) {
-        const pyPath = `${targetPath}.py`;
+      const pyPath = `${targetPath}.py`;
+      if (fs.existsSync(pyPath)) {
         return `module:${path.relative(this.workspaceRoot, pyPath).replace(/\\/g, '/')}`;
       }
 
-      const dirContents = this.getDirContents(targetPath);
-      if (dirContents && dirContents.has('__init__.py')) {
-        const initPyPath = path.join(targetPath, '__init__.py');
+      const initPyPath = path.join(targetPath, '__init__.py');
+      if (fs.existsSync(initPyPath)) {
         return `module:${path.relative(this.workspaceRoot, initPyPath).replace(/\\/g, '/')}`;
       }
     }
@@ -1177,9 +1144,9 @@ export class CodeAnalyzer {
 
   private generateAIInsights(graph: GraphData): AIInsight[] {
     const insights: AIInsight[] = [];
-    
+
     // Mock AI Insights generation based on simple heuristics
-    
+
     // 1. Large files / God objects
     const modulesWithManyFunctions = Array.from(this.nodes.values()).filter(n => {
       if (n.type !== 'module') return false;
@@ -1205,7 +1172,7 @@ export class CodeAnalyzer {
         moduleDependencies.set(l.source, (moduleDependencies.get(l.source) || 0) + 1);
       }
     });
-    
+
     const highlyCoupled = Array.from(moduleDependencies.entries()).filter(([_, count]) => count > 15).map(([id]) => id);
     if (highlyCoupled.length > 0) {
       insights.push({
