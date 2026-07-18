@@ -1889,8 +1889,29 @@ export function registerTools(server: McpServer) {
 
       try {
         const cp = require("child_process");
-        const parsedArgs = args ? args.split(" ").filter(Boolean) : [];
-        const result = cp.spawnSync("npm", ["run", script, ...parsedArgs], {
+        let parsedArgs: string[] = [];
+        if (args) {
+          const match = args.match(/(?:[^\s"']+|"[^"]*"|'[^']*')+/g);
+          if (match) {
+            parsedArgs = match.map(m => {
+              if ((m.startsWith('"') && m.endsWith('"')) || (m.startsWith("'") && m.endsWith("'"))) {
+                return m.substring(1, m.length - 1);
+              }
+              return m;
+            });
+          }
+        }
+
+        // Security: Prevent npm argument injection (e.g. --prefix) by forcing all args to be passed to the script
+        const finalArgs = ["run", script];
+        if (parsedArgs.length > 0) {
+          if (parsedArgs[0] !== "--") {
+            finalArgs.push("--");
+          }
+          finalArgs.push(...parsedArgs);
+        }
+
+        const result = cp.spawnSync("npm", finalArgs, {
           timeout: maxTime * 1000,
           shell: false, // Security: explicit shell false
           maxBuffer: 1024 * 1024,
