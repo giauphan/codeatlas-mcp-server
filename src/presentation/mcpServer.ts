@@ -1744,12 +1744,42 @@ export function registerTools(server: McpServer) {
       const callers = new Map<string, { name: string; type: string; filePath: string | null; depth: number }>();
       const callees = new Map<string, { name: string; type: string; filePath: string | null; depth: number }>();
 
+      // Build adjacency lists for fast traversal
+      const fwdAdj = new Map<string, typeof links>();
+      const revAdj = new Map<string, typeof links>();
+      for (let i = 0; i < links.length; i++) {
+        const l = links[i];
+        if (l.type === "call" || l.type === "import") {
+          let fList = fwdAdj.get(l.source);
+          if (!fList) { fList = []; fwdAdj.set(l.source, fList); }
+          fList.push(l);
+
+          let rList = revAdj.get(l.target);
+          if (!rList) { rList = []; revAdj.set(l.target, rList); }
+          rList.push(l);
+        }
+      }
+
       // Forward (callees)
       let fF = new Set(symbolIds);
       const fV = new Set(symbolIds);
       for (let d = 1; d <= maxD; d++) {
+        if (fF.size === 0) break;
         const n = new Set<string>();
-        for (const l of links) if ((l.type === "call" || l.type === "import") && fF.has(l.source) && !fV.has(l.target)) { fV.add(l.target); n.add(l.target); const nd = nodeMap.get(l.target); if (nd && !nd.id.startsWith("external:")) callees.set(l.target, { name: nd.label, type: nd.type, filePath: nd.filePath || null, depth: d }); }
+        for (const sourceId of fF) {
+          const targets = fwdAdj.get(sourceId);
+          if (targets) {
+            for (let i = 0; i < targets.length; i++) {
+              const l = targets[i];
+              if (!fV.has(l.target)) {
+                fV.add(l.target);
+                n.add(l.target);
+                const nd = nodeMap.get(l.target);
+                if (nd && !nd.id.startsWith("external:")) callees.set(l.target, { name: nd.label, type: nd.type, filePath: nd.filePath || null, depth: d });
+              }
+            }
+          }
+        }
         fF = n;
       }
 
@@ -1757,8 +1787,22 @@ export function registerTools(server: McpServer) {
       let rF = new Set(symbolIds);
       const rV = new Set(symbolIds);
       for (let d = 1; d <= maxD; d++) {
+        if (rF.size === 0) break;
         const n = new Set<string>();
-        for (const l of links) if ((l.type === "call" || l.type === "import") && rF.has(l.target) && !rV.has(l.source)) { rV.add(l.source); n.add(l.source); const nd = nodeMap.get(l.source); if (nd && !nd.id.startsWith("external:")) callers.set(l.source, { name: nd.label, type: nd.type, filePath: nd.filePath || null, depth: d }); }
+        for (const targetId of rF) {
+          const sources = revAdj.get(targetId);
+          if (sources) {
+            for (let i = 0; i < sources.length; i++) {
+              const l = sources[i];
+              if (!rV.has(l.source)) {
+                rV.add(l.source);
+                n.add(l.source);
+                const nd = nodeMap.get(l.source);
+                if (nd && !nd.id.startsWith("external:")) callers.set(l.source, { name: nd.label, type: nd.type, filePath: nd.filePath || null, depth: d });
+              }
+            }
+          }
+        }
         rF = n;
       }
 
