@@ -1822,9 +1822,16 @@ export function registerTools(server: McpServer) {
 
       // Config files
       ctx.configFiles = {};
-      for (const [key, f] of Object.entries({ tsconfig: "tsconfig.json", eslint: ".eslintrc.js", prettier: ".prettierrc", jest: "jest.config.js", vitest: "vitest.config.ts", playwright: "playwright.config.ts", docker: "Dockerfile" })) {
-        ctx.configFiles[key] = fs.existsSync(path.join(projectDir, f));
-      }
+      await Promise.all(
+        Object.entries({ tsconfig: "tsconfig.json", eslint: ".eslintrc.js", prettier: ".prettierrc", jest: "jest.config.js", vitest: "vitest.config.ts", playwright: "playwright.config.ts", docker: "Dockerfile" }).map(async ([key, f]) => {
+          try {
+            await fs.promises.access(path.join(projectDir, f));
+            ctx.configFiles[key] = true;
+          } catch {
+            ctx.configFiles[key] = false;
+          }
+        })
+      );
 
       // README
       for (const r of ["README.md", "README"]) {
