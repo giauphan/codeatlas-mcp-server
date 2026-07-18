@@ -1933,6 +1933,17 @@ export function registerTools(server: McpServer) {
       if (!loaded) return { content: [{ type: "text" as const, text: "No analysis found. Run 'analyze' first." }] };
 
       const projectDir = loaded.projectDir;
+
+      // 🛡️ Sentinel Security Validation
+      // Ensure the project directory is an authorized workspace to prevent path traversal
+      const authorizedProjects = await discoverProjectsAsync(auth.uid);
+      const isAuthorized = authorizedProjects.some(p =>
+        projectDir === p.dir || projectDir.startsWith(p.dir + path.sep)
+      );
+      if (!isAuthorized) {
+        return { content: [{ type: "text" as const, text: JSON.stringify({ error: "Unauthorized project directory" }) }] };
+      }
+
       if (!fs.existsSync(path.join(projectDir, ".git"))) return { content: [{ type: "text" as const, text: JSON.stringify({ error: "Not a git repository" }) }] };
 
       const maxC = Math.min(commits || 5, 20);
