@@ -14,3 +14,7 @@
 **Vulnerability:** The `checkAuth` function used for multi-tenant authorization fell back to granting full 'enterprise' privileges via a mock local user if no authentication context was found.
 **Learning:** When software supports both single-tenant (local) and multi-tenant (cloud) deployment modes, mock security fallbacks designed for local development can inadvertently bypass authentication in production if they are not conditionally gated.
 **Prevention:** Always check deployment/configuration flags (e.g., `CODEATLAS_MULTI_TENANT`) before returning mock credentials or bypassing security checks. Throw an explicit unauthorized error when running in a multi-tenant environment.
+## 2024-07-18 - [YAML Injection Risk in Configuration Generator]
+**Vulnerability:** The `CODEATLAS_API_KEY` was directly interpolated into a YAML string using string interpolation and double quotes (`"${key}"`).
+**Learning:** Directly embedding strings into structured data formats like YAML or JSON can lead to injection vulnerabilities if the string contains quotes or newlines.
+**Prevention:** Always use `JSON.stringify(value)` to securely escape variables when generating YAML or JSON configuration strings programmatically.
