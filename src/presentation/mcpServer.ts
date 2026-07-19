@@ -23,6 +23,34 @@ function escapeRegExp(str: string): string {
   return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
+// ⚡ Bolt Optimization: Use explicit for-loops to instantiate Maps/Sets to avoid the
+// massive memory spikes and GC overhead caused by intermediate `nodes.map(n => [n.id, n])` arrays.
+function createNodeMap<T extends { id: string }>(nodes: T[]): Map<string, T> {
+  const map = new Map<string, T>();
+  for (let i = 0; i < nodes.length; i++) {
+    map.set(nodes[i].id, nodes[i]);
+  }
+  return map;
+}
+
+// ⚡ Bolt Optimization: Avoid intermediate array allocations for id -> label mapping
+function createNodeLabelMap<T extends { id: string; label: string }>(nodes: T[]): Map<string, string> {
+  const map = new Map<string, string>();
+  for (let i = 0; i < nodes.length; i++) {
+    map.set(nodes[i].id, nodes[i].label);
+  }
+  return map;
+}
+
+// ⚡ Bolt Optimization: Avoid intermediate array allocations for id sets
+function createNodeIdSet<T extends { id: string }>(nodes: T[]): Set<string> {
+  const set = new Set<string>();
+  for (let i = 0; i < nodes.length; i++) {
+    set.add(nodes[i].id);
+  }
+  return set;
+}
+
 export function registerTools(server: McpServer) {
   // Tool -1: Analyze a project
   server.tool(
@@ -176,7 +204,7 @@ export function registerTools(server: McpServer) {
         return { content: [{ type: "text" as const, text: "No analysis data found. Run 'analyze' tool first." }] };
       }
 
-      const nodeMap = new Map(loaded.analysis.graph.nodes.map((n) => [n.id, n.label]));
+      const nodeMap = createNodeLabelMap(loaded.analysis.graph.nodes);
       let links = loaded.analysis.graph.links;
 
       if (relationship && relationship !== "all") {
@@ -289,7 +317,7 @@ export function registerTools(server: McpServer) {
 
       // For each match, find its relationships
       const links = loaded.analysis.graph.links;
-      const nodeMap = new Map(loaded.analysis.graph.nodes.map((n) => [n.id, n.label]));
+      const nodeMap = createNodeLabelMap(loaded.analysis.graph.nodes);
 
       const result = {
         query,
@@ -340,7 +368,7 @@ export function registerTools(server: McpServer) {
       });
 
       const links = loaded.analysis.graph.links;
-      const nodeMap = new Map(loaded.analysis.graph.nodes.map((n) => [n.id, n.label]));
+      const nodeMap = createNodeLabelMap(loaded.analysis.graph.nodes);
 
       // Group by file
       const byFile = new Map<string, typeof matches>();
@@ -396,12 +424,12 @@ export function registerTools(server: McpServer) {
       const diagramScope = scope || "modules-only";
       let nodes = loaded.analysis.graph.nodes;
       let links = loaded.analysis.graph.links;
-      const nodeMap = new Map(nodes.map((n) => [n.id, n]));
+      const nodeMap = createNodeMap(nodes);
 
       // Filter by scope
       if (diagramScope === "modules-only") {
         nodes = nodes.filter((n) => n.type === "module" && (n.filePath || n.id.startsWith("external:")));
-        const nodeIds = new Set(nodes.map((n) => n.id));
+        const nodeIds = createNodeIdSet(nodes);
         links = links.filter((l) => nodeIds.has(l.source) && nodeIds.has(l.target) && l.type === "import");
       } else if (diagramScope === "feature" && feature) {
         const featureRegex = new RegExp(escapeRegExp(feature), 'i');
@@ -416,7 +444,7 @@ export function registerTools(server: McpServer) {
           if (matchingNodes.has(l.target)) matchingNodes.add(l.source);
         });
         nodes = nodes.filter((n) => matchingNodes.has(n.id));
-        const nodeIds = new Set(nodes.map((n) => n.id));
+        const nodeIds = createNodeIdSet(nodes);
         links = links.filter((l) => nodeIds.has(l.source) && nodeIds.has(l.target));
       }
 
@@ -431,7 +459,7 @@ export function registerTools(server: McpServer) {
         nodes = nodes.slice(0, max);
       }
 
-      const truncatedNodeIds = new Set(nodes.map((n) => n.id));
+      const truncatedNodeIds = createNodeIdSet(nodes);
       links = links.filter((l) => truncatedNodeIds.has(l.source) && truncatedNodeIds.has(l.target));
 
       // Remove duplicate links
@@ -942,7 +970,7 @@ export function registerTools(server: McpServer) {
       const searchRegex = new RegExp(escapeRegExp(keyword), 'i');
       const nodes = loaded.analysis.graph.nodes;
       const links = loaded.analysis.graph.links;
-      const nodeMap = new Map(nodes.map((n) => [n.id, n]));
+      const nodeMap = createNodeMap(nodes);
 
       const seedNodes = new Set<string>();
       for (const node of nodes) {
@@ -1083,8 +1111,8 @@ export function registerTools(server: McpServer) {
       const dType = diagramType || "flowchart";
       const nodes = loaded.analysis.graph.nodes;
       const links = loaded.analysis.graph.links;
-      const nodeMap = new Map(nodes.map((n) => [n.id, n]));
-      const nodeNameMap = new Map(nodes.map((n) => [n.id, n.label]));
+      const nodeMap = createNodeMap(nodes);
+      const nodeNameMap = createNodeLabelMap(nodes);
 
       const seedNodes = new Set<string>();
       for (const node of nodes) {
@@ -1162,7 +1190,7 @@ export function registerTools(server: McpServer) {
         traceNodes = traceNodes.slice(0, maxN);
       }
 
-      const traceNodeIds = new Set(traceNodes.map((n) => n.id));
+      const traceNodeIds = createNodeIdSet(traceNodes);
       const traceLinks = links.filter(
         (l) => traceNodeIds.has(l.source) && traceNodeIds.has(l.target) && l.type === "call"
       );
@@ -1632,7 +1660,7 @@ export function registerTools(server: McpServer) {
       const callers = new Map<string, { name: string; type: string; filePath: string | null; line: number | null; depth: number; via: string[] }>();
       let frontier = new Set(targetIds);
       const visited = new Set(targetIds);
-      const nodeMap = new Map(nodes.map((n) => [n.id, n]));
+      const nodeMap = createNodeMap(nodes);
 
       for (let d = 1; d <= maxD; d++) {
         const next = new Set<string>();
@@ -1691,7 +1719,7 @@ export function registerTools(server: McpServer) {
       const callees = new Map<string, { name: string; type: string; filePath: string | null; line: number | null; depth: number }>();
       let frontier = new Set(sourceIds);
       const visited = new Set(sourceIds);
-      const nodeMap = new Map(nodes.map((n) => [n.id, n]));
+      const nodeMap = createNodeMap(nodes);
 
       for (let d = 1; d <= maxD; d++) {
         const next = new Set<string>();
@@ -1707,7 +1735,7 @@ export function registerTools(server: McpServer) {
       }
 
       const maxRes = maxResults || 30;
-      const nodeMap2 = new Map(nodes.map((n) => [n.id, n]));
+      const nodeMap2 = createNodeMap(nodes);
       const sourceDetails = Array.from(sourceIds).map(id => { const n = nodeMap2.get(id); return n ? { name: n.label, type: n.type, filePath: n.filePath || null, line: n.line || null } : { name: id, type: "unknown", filePath: null, line: null }; });
 
       return { content: [{ type: "text" as const, text: JSON.stringify({ symbol, project: loaded.projectName, sources: sourceDetails, totalCallees: callees.size, maxDepth: maxD, callees: Array.from(callees.values()).slice(0, maxRes) }, null, 2) }] };
@@ -1733,7 +1761,7 @@ export function registerTools(server: McpServer) {
       const maxD = Math.min(depth || 2, 5);
       const nodes = loaded.analysis.graph.nodes;
       const links = loaded.analysis.graph.links;
-      const nodeMap = new Map(nodes.map((n) => [n.id, n]));
+      const nodeMap = createNodeMap(nodes);
       const symbolIds = new Set<string>();
 
       for (const node of nodes) {

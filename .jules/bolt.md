@@ -19,3 +19,6 @@
 ## 2025-07-28 - [Performance improvement] fs.promises.readdir withFileTypes
 **Learning:** When asynchronously discovering projects or reading large directories, iterating `fs.promises.readdir` results and mapping an `fs.promises.stat` on each creates enormous blocking async loads. Using `fs.promises.readdir` with `withFileTypes: true` yields `Dirent` instances directly, reducing disk I/O significantly.
 **Action:** In directory traversal operations (sync or async), always pass `{ withFileTypes: true }` to `readdir` to prevent mapping massive arrays of `stat` operations. Remember to manually handle `symlinks` (`isSymbolicLink`) to ensure correctness.
+## 2025-07-28 - [Performance improvement] Avoid massive intermediate arrays via nodes.map(...)
+**Learning:** Using `new Map(nodes.map(n => [n.id, n]))` creates a gigantic intermediate array of tuples proportional to the size of `nodes` (which can be tens of thousands of items in AST graph representations). This leads to massive, immediate memory allocations and aggressive GC spikes. Utilizing simple `for`-loops that explicitly invoke `map.set()` completely circumvents this overhead and operates in O(1) extra space.
+**Action:** When converting large arrays to Maps or Sets, use an explicit `for`-loop iteration strategy rather than using chained `.map()` operations to prevent explosive memory footprints.
