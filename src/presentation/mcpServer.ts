@@ -2037,7 +2037,7 @@ export function registerTools(server: McpServer) {
       }, null, 2) }] };
 
       const results: any[] = [];
-      const mcpEntry = `  codeatlas:\n    command: npx\n    args: ["-y", "codeatlas-enterprise"]\n    env:\n      CODEATLAS_API_KEY: "${key}"\n    enabled: true\n`;
+      const mcpEntry = `  codeatlas:\n    command: npx\n    args: ["-y", "codeatlas-enterprise"]\n    env:\n      CODEATLAS_API_KEY: ${JSON.stringify(key)}\n    enabled: true\n`;
 
       // Hermes MCP config
       if (client === "hermes" || client === "all") {
