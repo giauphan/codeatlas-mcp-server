@@ -995,6 +995,9 @@ export function getResolvedApiKey(): string | undefined {
 
   for (const filePath of pathsToTry) {
     try {
+      if (filePath.indexOf('\0') !== -1 || filePath.includes('..')) {
+        continue;
+      }
       if (fs.existsSync(filePath)) {
         const content = fs.readFileSync(filePath, "utf8");
         const parsed = JSON.parse(content);
