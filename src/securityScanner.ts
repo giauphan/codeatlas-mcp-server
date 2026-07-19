@@ -18,23 +18,14 @@ export class SecurityScanner {
     const findings: SecurityFinding[] = [];
     const nodes = analysis.graph.nodes;
 
-    const secretKeywords = ["api_key", "secret", "password", "token", "private_key", "access_key"];
-    const unsafeFuncs = ["eval", "exec", "system", "child_process", "spawn", "shell_exec"];
+    // ⚡ Bolt Optimization: Use precompiled regexes to avoid intermediate string allocations (e.g. .toLowerCase())
+    const secretRegex = /api_key|secret|password|token|private_key|access_key/i;
+    const unsafeRegex = /^(?:eval|exec|system|child_process|spawn|shell_exec)$/i;
+    const testMockDiagnosticRegex = /(?:[\/\\](?:tests?|__tests__|mocks?|scratch|diagnostic)[\/\\]|\.(?:test|spec)\.)/i;
 
     // Helper to identify test, mock or diagnostic files
     const isTestOrMockFile = (filePath: string): boolean => {
-      const fp = filePath.toLowerCase().replace(/\\/g, "/");
-      return (
-        fp.includes("/tests/") ||
-        fp.includes("/test/") ||
-        fp.includes("/__tests__/") ||
-        fp.includes(".test.") ||
-        fp.includes(".spec.") ||
-        fp.includes("/mocks/") ||
-        fp.includes("/mock/") ||
-        fp.includes("/scratch/") ||
-        fp.includes("/diagnostic/")
-      );
+      return testMockDiagnosticRegex.test(filePath);
     };
 
     nodes.forEach((node: GraphNode) => {
@@ -43,11 +34,9 @@ export class SecurityScanner {
         return;
       }
 
-      const labelLower = node.label.toLowerCase();
-
       // 1. Detect Hardcoded Secrets
       if (node.type === "variable") {
-        if (secretKeywords.some(k => labelLower.includes(k))) {
+        if (secretRegex.test(node.label)) {
           findings.push({
             severity: "HIGH",
             type: "HARDCODED_SECRET",
@@ -60,7 +49,7 @@ export class SecurityScanner {
 
       // 2. Detect Unsafe Functions (eval, exec, etc.)
       else if (node.type === "function") {
-        if (unsafeFuncs.includes(labelLower)) {
+        if (unsafeRegex.test(node.label)) {
           findings.push({
             severity: "CRITICAL",
             type: "UNSAFE_FUNCTION",
