@@ -117,8 +117,9 @@ export class PhpParser {
         const name = scMatch[1];
         if (!PhpParser.phpKeywords.has(name) && 
             !['function', 'class', 'interface', 'trait', 'enum', 'namespace', 'use'].includes(name) &&
-            name !== name.toLowerCase().replace(/[^a-z]/g, '')) {
+            /[^a-z]/.test(name)) {
           // Only capture PascalCase or camelCase calls (likely class/method calls)
+          // Optimization: Avoid .toLowerCase().replace() string allocation for regex testing
         }
       }
     }

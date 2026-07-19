@@ -12,3 +12,10 @@
 **Why:** Disk I/O bound nested loops are very inefficient, particularly when traversing potentially thousands of directories.
 **Impact:** Benchmark speedups show ~3x performance improvement. Specifically checking 2500 directories improved from 534ms to 173ms on local testing hardware.
 **Measurement:** Added custom `tsx` based scripts (`benchmark_scan.ts` and `benchmark_scan_opt.ts`) to synthesize an artificial tree with thousands of directories and compared total times before and after changes.
+## 2025-07-28 - [Performance improvement] Regex testing vs String manipulation
+**Learning:** Checking character matching (like finding non-lowercase alphabetical characters) by applying string allocations via `.toLowerCase().replace()` and comparing to the original is incredibly slow. Using a regular expression `.test()` without memory allocation provides almost 3x performance speedups inside parser loops.
+**Action:** When filtering or performing early exit checks on large text blocks or frequently inside loops, prefer case-insensitive regex checks over converting strings with `toLowerCase()`, to avoid excessive memory allocation and GC overhead.
+
+## 2025-07-28 - [Performance improvement] fs.promises.readdir withFileTypes
+**Learning:** When asynchronously discovering projects or reading large directories, iterating `fs.promises.readdir` results and mapping an `fs.promises.stat` on each creates enormous blocking async loads. Using `fs.promises.readdir` with `withFileTypes: true` yields `Dirent` instances directly, reducing disk I/O significantly.
+**Action:** In directory traversal operations (sync or async), always pass `{ withFileTypes: true }` to `readdir` to prevent mapping massive arrays of `stat` operations. Remember to manually handle `symlinks` (`isSymbolicLink`) to ensure correctness.
