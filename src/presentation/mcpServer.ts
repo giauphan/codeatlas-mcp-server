@@ -1815,7 +1815,8 @@ export function registerTools(server: McpServer) {
           try {
             const entries = fs.readdirSync(path.dirname(absPath));
             const base = path.basename(absPath).replace(path.extname(absPath), "");
-            for (const e of entries) if ((e.includes(".test.") || e.includes(".spec.")) && e.toLowerCase().includes(base.toLowerCase())) testFiles.add(path.join(path.dirname(absPath), e));
+            const baseRegex = new RegExp(escapeRegExp(base), "i");
+            for (const e of entries) if ((e.includes(".test.") || e.includes(".spec.")) && baseRegex.test(e)) testFiles.add(path.join(path.dirname(absPath), e));
           } catch { /* skip */ }
         }
       }
