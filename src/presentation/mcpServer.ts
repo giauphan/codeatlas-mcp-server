@@ -1913,9 +1913,9 @@ export function registerTools(server: McpServer) {
     "run_script",
     "Run an npm/pnpm/yarn script from package.json. Returns exit code, stdout/stderr, and duration. Handles cd to project dir automatically.",
     {
-      project: z.string().optional().describe("Project name or path"),
-      script: z.string().describe("Script name from package.json (e.g. 'build', 'test', 'lint')"),
-      args: z.string().optional().describe("Optional args (e.g. '-- --watch')"),
+      project: z.string().max(255).optional().describe("Project name or path"),
+      script: z.string().max(100).describe("Script name from package.json (e.g. 'build', 'test', 'lint')"),
+      args: z.string().max(1000).optional().describe("Optional args (e.g. '-- --watch')"),
       timeout: z.number().optional().describe("Timeout in seconds (default: 60, max: 300)"),
     },
     async ({ project, script, args, timeout }: { project?: string; script: string; args?: string; timeout?: number }) => {
