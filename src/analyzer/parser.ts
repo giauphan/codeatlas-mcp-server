@@ -15,7 +15,7 @@ export class CodeAnalyzer {
   private readonly excludedFiles: string[];
   private readonly fileExtensions: string[];
 
-  private dirCache = new Map<string, Set<string> | null>();
+  private dirCache = new Map<string, Map<string, fs.Dirent> | null>();
 
   private ignoreFilter: ReturnType<typeof ignore> | null = null;
 
@@ -35,11 +35,15 @@ export class CodeAnalyzer {
     this.fileExtensions = fileExtensions;
   }
 
-  private getDirContents(dirPath: string): Set<string> | null {
+  private getDirContents(dirPath: string): Map<string, fs.Dirent> | null {
     let contents = this.dirCache.get(dirPath);
     if (contents === undefined) {
       try {
-        contents = new Set(fs.readdirSync(dirPath));
+        contents = new Map();
+        const entries = fs.readdirSync(dirPath, { withFileTypes: true });
+        for (const entry of entries) {
+          contents.set(entry.name, entry);
+        }
       } catch {
         contents = null;
       }
@@ -1067,8 +1071,16 @@ export class CodeAnalyzer {
         if (parentContents) {
           if (parentContents.has(bName)) {
             try {
-              const stat = fs.statSync(absolutePath);
-              if (stat.isDirectory()) {
+              const entry = parentContents.get(bName);
+              let isDir = entry?.isDirectory() || false;
+              if (entry && !isDir && entry.isSymbolicLink()) {
+                try {
+                  isDir = fs.statSync(absolutePath).isDirectory();
+                } catch {
+                  // ignore broken symlink
+                }
+              }
+              if (isDir) {
                 const dirContents = this.getDirContents(absolutePath);
                 if (dirContents) {
                   for (const ext of extensions) {
