@@ -1942,6 +1942,10 @@ export function registerTools(server: McpServer) {
         const cp = require("child_process");
         let parsedArgs: string[] = [];
         if (args) {
+          // Security: Block shell metacharacters to prevent indirect command injection in the target script
+          if (/[&|;<>$`\\\n\r]/.test(args)) {
+            return { content: [{ type: "text" as const, text: JSON.stringify({ error: "Security Error: Arguments contain forbidden shell metacharacters" }, null, 2) }] };
+          }
           const match = args.match(/(?:[^\s"']+|"[^"]*"|'[^']*')+/g);
           if (match) {
             parsedArgs = match.map(m => {
