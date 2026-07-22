@@ -123,7 +123,7 @@ export async function cmdDoctor(): Promise<void> {
 
   const checks: [string, () => Promise<{ status: string; detail?: string }>][] = [
     ["CODEATLAS_API_KEY", async () => {
-      if (process.env.CODEATLAS_API_KEY) return { status: "ok", detail: `***` };
+      if (process.env.CODEATLAS_API_KEY) return { status: "ok", detail: "Set" };
       return { status: "fail", detail: "not set" };
     }],
     ["Cloud connection", async () => {
