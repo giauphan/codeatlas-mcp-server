@@ -1930,9 +1930,11 @@ export function registerTools(server: McpServer) {
 
       // Ensure the project directory is an authorized workspace to prevent path traversal
       const authorizedProjects = await discoverProjectsAsync(auth.uid);
-      const isAuthorized = authorizedProjects.some(p =>
-        projectDir === p.dir || projectDir.startsWith(p.dir + path.sep)
-      );
+      const isAuthorized = authorizedProjects.some(p => {
+        const resolvedProj = fs.realpathSync(path.resolve(projectDir));
+        const resolvedAuth = fs.realpathSync(path.resolve(p.dir));
+        return resolvedProj === resolvedAuth || resolvedProj.startsWith(resolvedAuth + path.sep);
+      });
       if (!isAuthorized) {
         return { content: [{ type: "text" as const, text: JSON.stringify({ error: "Unauthorized project directory" }) }] };
       }
@@ -2019,9 +2021,11 @@ export function registerTools(server: McpServer) {
       // 🛡️ Sentinel Security Validation
       // Ensure the project directory is an authorized workspace to prevent path traversal
       const authorizedProjects = await discoverProjectsAsync(auth.uid);
-      const isAuthorized = authorizedProjects.some(p =>
-        projectDir === p.dir || projectDir.startsWith(p.dir + path.sep)
-      );
+      const isAuthorized = authorizedProjects.some(p => {
+        const resolvedProj = fs.realpathSync(path.resolve(projectDir));
+        const resolvedAuth = fs.realpathSync(path.resolve(p.dir));
+        return resolvedProj === resolvedAuth || resolvedProj.startsWith(resolvedAuth + path.sep);
+      });
       if (!isAuthorized) {
         return { content: [{ type: "text" as const, text: JSON.stringify({ error: "Unauthorized project directory" }) }] };
       }

@@ -896,7 +896,22 @@ export async function loadAnalysisAsync(
       registerProject(target.dir);
     } else if (await isProjectDirectoryAsync(absPath)) {
       // Security Validation: Ensure the loaded path is inside an authorized workspace
-      const isAuthorized = projects.some(p => absPath === p.dir || absPath.startsWith(p.dir + path.sep));
+      let resolvedAbsPath: string;
+      try {
+        resolvedAbsPath = fs.realpathSync(absPath);
+      } catch (err) {
+        console.error(`[Auto-Scan] ⚠️ Could not resolve path ${absPath}:`, err);
+        return null;
+      }
+
+      const isAuthorized = projects.some(p => {
+        try {
+          const resolvedAuth = fs.realpathSync(path.resolve(p.dir));
+          return resolvedAbsPath === resolvedAuth || resolvedAbsPath.startsWith(resolvedAuth + path.sep);
+        } catch {
+          return false;
+        }
+      });
       if (!isAuthorized) {
         console.error(`[Auto-Scan] 🛡️ Blocked unauthorized access to directory outside workspace: ${absPath}`);
         return null;
