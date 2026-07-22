@@ -895,6 +895,12 @@ export async function loadAnalysisAsync(
       target = match;
       registerProject(target.dir);
     } else if (await isProjectDirectoryAsync(absPath)) {
+      // Security Validation: Ensure the loaded path is inside an authorized workspace
+      const isAuthorized = projects.some(p => absPath === p.dir || absPath.startsWith(p.dir + path.sep));
+      if (!isAuthorized) {
+        console.error(`[Auto-Scan] 🛡️ Blocked unauthorized access to directory outside workspace: ${absPath}`);
+        return null;
+      }
       registerProject(absPath);
       target = {
         name: path.basename(absPath),

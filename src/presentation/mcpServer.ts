@@ -1927,6 +1927,16 @@ export function registerTools(server: McpServer) {
       // 🛡️ Sentinel Security Validation
       // Use spawnSync without a shell to prevent command injection entirely
       const projectDir = loaded.projectDir;
+
+      // Ensure the project directory is an authorized workspace to prevent path traversal
+      const authorizedProjects = await discoverProjectsAsync(auth.uid);
+      const isAuthorized = authorizedProjects.some(p =>
+        projectDir === p.dir || projectDir.startsWith(p.dir + path.sep)
+      );
+      if (!isAuthorized) {
+        return { content: [{ type: "text" as const, text: JSON.stringify({ error: "Unauthorized project directory" }) }] };
+      }
+
       const pkgPath = path.join(projectDir, "package.json");
       if (fs.existsSync(pkgPath)) {
         try {
