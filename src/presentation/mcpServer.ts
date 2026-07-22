@@ -23,6 +23,8 @@ function escapeRegExp(str: string): string {
   return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
+const SHELL_METACHAR_RE = /[&|;<>$`\\\n\r]/;
+
 export function registerTools(server: McpServer) {
   // Tool -1: Analyze a project
   server.tool(
@@ -1943,8 +1945,9 @@ export function registerTools(server: McpServer) {
         let parsedArgs: string[] = [];
         if (args) {
           // Security: Block shell metacharacters to prevent indirect command injection in the target script
-          if (/[&|;<>$`\\\n\r]/.test(args)) {
-            return { content: [{ type: "text" as const, text: JSON.stringify({ error: "Security Error: Arguments contain forbidden shell metacharacters" }, null, 2) }] };
+          if (SHELL_METACHAR_RE.test(args)) {
+            const truncatedArgs = args.length > 50 ? args.substring(0, 50) + "..." : args;
+            return { content: [{ type: "text" as const, text: JSON.stringify({ error: `Security Error: Arguments contain forbidden shell metacharacters (& | ; < > $ \` \\). Received: ${truncatedArgs}` }, null, 2) }] };
           }
           const match = args.match(/(?:[^\s"']+|"[^"]*"|'[^']*')+/g);
           if (match) {
