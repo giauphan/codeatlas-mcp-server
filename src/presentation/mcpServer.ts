@@ -7,6 +7,7 @@ import { getHomePath, getHermesConfigPath, getHermesPluginDir, getClaudeConfigPa
 import { checkAuth, logActivity } from "../services/authService.js";
 import {
   discoverProjectsAsync,
+  isPathInAuthorizedProjects,
   loadAnalysisAsync,
   getStats,
   fileExists,
@@ -22,6 +23,8 @@ import { SecurityScanner } from "../securityScanner.js";
 function escapeRegExp(str: string): string {
   return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
+
+const SHELL_METACHAR_RE = /[&|;<>$`\\\n\r]/;
 
 export function registerTools(server: McpServer) {
   // Tool -1: Analyze a project
@@ -1815,7 +1818,9 @@ export function registerTools(server: McpServer) {
           try {
             const entries = fs.readdirSync(path.dirname(absPath));
             const base = path.basename(absPath).replace(path.extname(absPath), "");
-            for (const e of entries) if ((e.includes(".test.") || e.includes(".spec.")) && e.toLowerCase().includes(base.toLowerCase())) testFiles.add(path.join(path.dirname(absPath), e));
+            // ⚡ Bolt Optimization: Use precompiled regex to avoid memory-intensive .toLowerCase() string allocations in tight loops
+            const baseRegex = new RegExp(base.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), "i");
+            for (const e of entries) if ((e.includes(".test.") || e.includes(".spec.")) && baseRegex.test(e)) testFiles.add(path.join(path.dirname(absPath), e));
           } catch { /* skip */ }
         }
       }
@@ -1927,6 +1932,13 @@ export function registerTools(server: McpServer) {
       // 🛡️ Sentinel Security Validation
       // Use spawnSync without a shell to prevent command injection entirely
       const projectDir = loaded.projectDir;
+
+      // Ensure the project directory is an authorized workspace to prevent path traversal
+      const authorizedProjects = await discoverProjectsAsync(auth.uid);
+      if (!isPathInAuthorizedProjects(projectDir, authorizedProjects)) {
+        return { content: [{ type: "text" as const, text: JSON.stringify({ error: "Unauthorized project directory" }) }] };
+      }
+
       const pkgPath = path.join(projectDir, "package.json");
       if (fs.existsSync(pkgPath)) {
         try {
@@ -1942,6 +1954,11 @@ export function registerTools(server: McpServer) {
         const cp = require("child_process");
         let parsedArgs: string[] = [];
         if (args) {
+          // Security: Block shell metacharacters to prevent indirect command injection in the target script
+          if (SHELL_METACHAR_RE.test(args)) {
+            const truncatedArgs = args.length > 50 ? args.substring(0, 50) + "..." : args;
+            return { content: [{ type: "text" as const, text: JSON.stringify({ error: `Security Error: Arguments contain forbidden shell metacharacters (& | ; < > $ \` \\). Received: ${truncatedArgs}` }, null, 2) }] };
+          }
           const match = args.match(/(?:[^\s"']+|"[^"]*"|'[^']*')+/g);
           if (match) {
             parsedArgs = match.map(m => {
@@ -2009,10 +2026,7 @@ export function registerTools(server: McpServer) {
       // 🛡️ Sentinel Security Validation
       // Ensure the project directory is an authorized workspace to prevent path traversal
       const authorizedProjects = await discoverProjectsAsync(auth.uid);
-      const isAuthorized = authorizedProjects.some(p =>
-        projectDir === p.dir || projectDir.startsWith(p.dir + path.sep)
-      );
-      if (!isAuthorized) {
+      if (!isPathInAuthorizedProjects(projectDir, authorizedProjects)) {
         return { content: [{ type: "text" as const, text: JSON.stringify({ error: "Unauthorized project directory" }) }] };
       }
 
