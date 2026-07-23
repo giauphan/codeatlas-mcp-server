@@ -85,6 +85,9 @@ function findDirMatchingNormalized(normalized: string): string | null {
         const normFileParts = normFile.split("_").filter(Boolean);
         if (normFileParts.length === 0) continue;
         
+        // ⚡ Bolt Optimization: Precompute lowercased parts for the target file as well
+        const normFilePartsLower = normFileParts.map(p => p.toLowerCase());
+
         let match = true;
         let isExactCase = true;
         for (let j = 0; j < normFileParts.length; j++) {
@@ -98,7 +101,7 @@ function findDirMatchingNormalized(normalized: string): string | null {
           if (partA !== partB) {
             isExactCase = false;
             // ⚡ Bolt Optimization: Avoid partA.toLowerCase() allocation. Note: Not using length check to avoid Unicode casing edge cases
-            if (lowerParts[i + j] !== partB.toLowerCase()) {
+            if (lowerParts[i + j] !== normFilePartsLower[j]) {
               match = false;
               break;
             }
