@@ -18,10 +18,6 @@
 **Vulnerability:** The `CODEATLAS_API_KEY` was directly interpolated into a YAML string using string interpolation and double quotes (`"${key}"`).
 **Learning:** Directly embedding strings into structured data formats like YAML or JSON can lead to injection vulnerabilities if the string contains quotes or newlines.
 **Prevention:** Always use `JSON.stringify(value)` to securely escape variables when generating YAML or JSON configuration strings programmatically.
-## 2026-07-22 - [Indirect Command Injection]
-**Vulnerability:** Indirect command injection vulnerability in `run_script` tool via arguments passed to `npm run` which executes the target script in a shell environment.
-**Learning:** Even when `spawnSync` is used with `shell: false`, passing untrusted arguments to commands like `npm run` (which in turn launch subshells) can lead to command injection if the arguments are appended directly to the target script and contain shell metacharacters.
-**Prevention:** Strictly validate or sanitize untrusted input destined for command-line arguments by blocking shell metacharacters (`&|;<>$`\n\r`) before passing them to process executors.
 ## 2024-07-25 - [DoS Risk in MCP Zod Schemas]
 **Vulnerability:** MCP tools allowed unbounded string lengths in Zod schemas (`z.string()`).
 **Learning:** Missing input length validation allows attackers to submit extremely large strings causing excessive memory usage and parsing overhead (CWE-400), leading to Denial of Service (DoS).
