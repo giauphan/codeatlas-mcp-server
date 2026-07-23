@@ -26,3 +26,8 @@
 **Vulnerability:** MCP tools allowed unbounded string lengths in Zod schemas (`z.string()`).
 **Learning:** Missing input length validation allows attackers to submit extremely large strings causing excessive memory usage and parsing overhead (CWE-400), leading to Denial of Service (DoS).
 **Prevention:** Always explicitly set maximum string lengths (e.g., `.max(255)`) on all `z.string()` schemas.
+
+## 2024-05-18 - Missing Authorization Check in Tool
+**Vulnerability:** The `project_context` tool in `src/presentation/mcpServer.ts` was missing an authorization validation check (`isPathInAuthorizedProjects`) before reading configuration files, reading the README, and fetching git status from the provided project directory.
+**Learning:** Even tools that only read data (like `project_context`) and seem harmless can still be exploited if they take a `project` path as an argument and construct arbitrary paths without validating against authorized workspace boundaries. An attacker might provide an absolute path like `/etc` as the project directory to read the file structure or specific configuration files.
+**Prevention:** Always use the `isPathInAuthorizedProjects` check in any tool that accepts a user-provided project directory or path before proceeding with any file system operations.

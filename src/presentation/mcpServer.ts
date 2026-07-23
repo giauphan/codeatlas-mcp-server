@@ -1882,6 +1882,14 @@ export function registerTools(server: McpServer) {
       if (!loaded) return { content: [{ type: "text" as const, text: "No analysis found. Run 'analyze' first." }] };
 
       const projectDir = loaded.projectDir;
+
+      // 🛡️ Sentinel Security Validation
+      // Ensure the project directory is an authorized workspace to prevent path traversal
+      const authorizedProjects = await discoverProjectsAsync(auth.uid);
+      if (!isPathInAuthorizedProjects(projectDir, authorizedProjects)) {
+        return { content: [{ type: "text" as const, text: JSON.stringify({ error: "Unauthorized project directory" }) }] };
+      }
+
       const ctx: any = { name: loaded.projectName, path: projectDir };
 
       // package.json
