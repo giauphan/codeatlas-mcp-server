@@ -100,7 +100,7 @@ function findDirMatchingNormalized(normalized: string): string | null {
 
           if (partA !== partB) {
             isExactCase = false;
-            // Avoid partA.toLowerCase() allocation on the inner loop mismatch
+            // Avoid .toLowerCase() allocation during case-insensitive comparison
             if (lowerParts[i + j] !== normFilePartsLower[j]) {
               match = false;
               break;
