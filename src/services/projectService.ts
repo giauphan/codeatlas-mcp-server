@@ -85,8 +85,7 @@ function findDirMatchingNormalized(normalized: string): string | null {
         const normFileParts = normFile.split("_").filter(Boolean);
         if (normFileParts.length === 0) continue;
         
-        // Precompute lowercased parts for the directory entry to prevent repeated allocations
-        const normFilePartsLower = normFileParts.map(p => p.toLowerCase());
+        let normFilePartsLower: string[] | null = null;
 
         let match = true;
         let isExactCase = true;
@@ -100,6 +99,12 @@ function findDirMatchingNormalized(normalized: string): string | null {
 
           if (partA !== partB) {
             isExactCase = false;
+
+            // Lazy-compute lowercased parts for the directory entry to prevent allocations on exact matches
+            if (!normFilePartsLower) {
+              normFilePartsLower = normFileParts.map(p => p.toLowerCase());
+            }
+
             // Avoid .toLowerCase() allocation during case-insensitive comparison
             if (lowerParts[i + j] !== normFilePartsLower[j]) {
               match = false;
