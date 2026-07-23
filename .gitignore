@@ -12,3 +12,4 @@ pnpm-debug.log*
 # Build output
 dist/
 .jules/
+.codeatlas/
