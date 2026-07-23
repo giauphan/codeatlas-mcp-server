@@ -17,6 +17,28 @@ export const fsWrapper = {
   readdirSync: (p: string) => fs.readdirSync(p)
 };
 
+/**
+ * Validates if a target path is safely contained within an authorized workspace path.
+ * Resolves symlinks and normalizes paths before comparison to prevent path traversal.
+ */
+export function isPathInAuthorizedProjects(targetPath: string, authorizedProjects: { dir: string }[]): boolean {
+  let resolvedTarget: string;
+  try {
+    resolvedTarget = fs.realpathSync(path.resolve(targetPath));
+  } catch (err) {
+    return false;
+  }
+
+  return authorizedProjects.some(p => {
+    try {
+      const resolvedAuth = fs.realpathSync(path.resolve(p.dir));
+      return resolvedTarget === resolvedAuth || resolvedTarget.startsWith(resolvedAuth + path.sep);
+    } catch {
+      return false;
+    }
+  });
+}
+
 /** Unified stats helper */
 export function getStats(analysis: AnalysisResultLocal) {
   const ec = analysis.entityCounts;
@@ -895,6 +917,11 @@ export async function loadAnalysisAsync(
       target = match;
       registerProject(target.dir);
     } else if (await isProjectDirectoryAsync(absPath)) {
+      // Security Validation: Ensure the loaded path is inside an authorized workspace
+      if (!isPathInAuthorizedProjects(absPath, projects)) {
+        console.error(`[Auto-Scan] 🛡️ Blocked unauthorized access to directory outside workspace: ${absPath}`);
+        return null;
+      }
       registerProject(absPath);
       target = {
         name: path.basename(absPath),
