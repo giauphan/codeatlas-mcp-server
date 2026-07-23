@@ -270,7 +270,6 @@ export class CodeAnalyzer {
 
     // Within-chunk links keep the layout cohesive; cross-chunk edges become thin connectors.
     for (const [folder, nodes] of folderNodeMap) {
-      // ⚡ Bolt: Use for-loop instead of .map() to avoid massive intermediate array allocations
       const nodeIds = new Set<string>();
       for (const n of nodes) {
         nodeIds.add(n.id);
@@ -386,7 +385,6 @@ export class CodeAnalyzer {
     }
 
     // Filter links to only include those where both endpoints are loaded
-    // ⚡ Bolt: Use for-loop instead of .map() to avoid massive intermediate array allocations
     const loadedNodeIds = new Set<string>();
     for (const n of loadedNodes) {
       loadedNodeIds.add(n.id);
