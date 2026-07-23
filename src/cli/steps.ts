@@ -19,7 +19,7 @@ export async function stepAuthenticate(): Promise<boolean> {
   if (existingKey) {
     const r = await cloudFetch("GET", "/api/version");
     if (r.ok) {
-      console.log(`  ${ok()} Authenticated (key: ${existingKey.substring(0, 8)}...)`);
+      console.log(`  ${ok()} Authenticated (key: ***)`);
       console.log(`  ${ok()} Cloud reachable: ${API_URL} (build: ${r.data?.version || "?"})`);
       return true;
     }
