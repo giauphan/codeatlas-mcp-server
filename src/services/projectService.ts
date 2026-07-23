@@ -67,7 +67,7 @@ function findDirMatchingNormalized(normalized: string): string | null {
   const parts = normalized.split("_").filter(Boolean);
   if (parts.length === 0) return null;
   
-  // Bolt Optimization: Precompute lowercase parts to avoid string allocations inside the nested loop
+  // Precompute lowercase parts to avoid string allocations inside the nested loop
   const lowerParts = parts.map(p => p.toLowerCase());
 
   let currentPath = "/";
@@ -85,7 +85,7 @@ function findDirMatchingNormalized(normalized: string): string | null {
         const normFileParts = normFile.split("_").filter(Boolean);
         if (normFileParts.length === 0) continue;
         
-        // Bolt Optimization: Precompute lowercased parts for the directory entry
+        // Precompute lowercased parts for the directory entry to prevent repeated allocations
         const normFilePartsLower = normFileParts.map(p => p.toLowerCase());
 
         let match = true;
@@ -100,7 +100,7 @@ function findDirMatchingNormalized(normalized: string): string | null {
 
           if (partA !== partB) {
             isExactCase = false;
-            // Bolt Optimization: Avoid partA.toLowerCase() allocation
+            // Avoid partA.toLowerCase() allocation on the inner loop mismatch
             if (lowerParts[i + j] !== normFilePartsLower[j]) {
               match = false;
               break;
