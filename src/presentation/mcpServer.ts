@@ -32,7 +32,7 @@ export function registerTools(server: McpServer) {
     "analyze",
     "Perform deep code analysis on a local project directory. Generates AST analysis in memory and syncs to CodeAtlas Cloud.",
     {
-      path: z.string().describe("Absolute path to the project directory to analyze"),
+      path: z.string().max(255).describe("Absolute path to the project directory to analyze"),
       maxFiles: z.number().optional().describe("Maximum files to analyze (default: 5000)"),
     },
     async ({ path: projectPath, maxFiles }: { path: string; maxFiles?: number }) => {
@@ -112,7 +112,7 @@ export function registerTools(server: McpServer) {
     "get_project_structure",
     "Get all modules, classes, functions, and variables in the analyzed project. Returns entity type, name, file path, and line number.",
     {
-      project: z.string().optional().describe("Project name or path (auto-detects if omitted)"),
+      project: z.string().max(255).optional().describe("Project name or path (auto-detects if omitted)"),
       type: z.enum(["all", "module", "class", "function", "variable"]).optional().describe("Filter by entity type. Choose one of: all, module, class, function, variable"),
       limit: z.number().optional().describe("Max results to return (default: 100)"),
     },
@@ -165,9 +165,9 @@ export function registerTools(server: McpServer) {
     "get_dependencies",
     "Get import/call/containment/implements relationships between entities. Shows how modules, classes, and functions are connected.",
     {
-      project: z.string().optional().describe("Project name or path"),
-      source: z.string().optional().describe("Filter by source entity name"),
-      target: z.string().optional().describe("Filter by target entity name"),
+      project: z.string().max(255).optional().describe("Project name or path"),
+      source: z.string().max(255).optional().describe("Filter by source entity name"),
+      target: z.string().max(255).optional().describe("Filter by target entity name"),
       relationship: z.enum(["all", "import", "call", "contains", "implements"]).optional().describe("Filter by relationship type. Choose one of: all, import, call, contains, implements"),
       limit: z.number().optional().describe("Max results (default: 100)"),
     },
@@ -258,8 +258,8 @@ export function registerTools(server: McpServer) {
     "search_entities",
     "Search for functions, classes, modules, or variables by name. Supports fuzzy matching.",
     {
-      project: z.string().optional().describe("Project name or path"),
-      query: z.string().describe("Search query (case-insensitive, partial match)"),
+      project: z.string().max(255).optional().describe("Project name or path"),
+      query: z.string().max(255).describe("Search query (case-insensitive, partial match)"),
       type: z.enum(["all", "module", "class", "function", "variable"]).optional().describe("Filter by entity type. Choose one of: all, module, class, function, variable"),
     },
     async ({ project, query, type }: { project?: string; query: string; type?: string }) => {
@@ -325,8 +325,8 @@ export function registerTools(server: McpServer) {
     "get_file_entities",
     "Get all entities (classes, functions, variables) defined in a specific file.",
     {
-      project: z.string().optional().describe("Project name or path"),
-      filePath: z.string().describe("File path (partial match, e.g. 'User.php' or 'src/models')"),
+      project: z.string().max(255).optional().describe("Project name or path"),
+      filePath: z.string().max(255).describe("File path (partial match, e.g. 'User.php' or 'src/models')"),
     },
     async ({ filePath, project }: { project?: string; filePath: string }) => {
       const auth = await checkAuth();
@@ -382,9 +382,9 @@ export function registerTools(server: McpServer) {
     "generate_system_flow",
     "Auto-generate a Mermaid flowchart diagram showing how modules, classes, and functions connect in the system. Returns a Mermaid diagram string that AI can read to understand the full system flow without reading every file.",
     {
-      project: z.string().optional().describe("Project name or path"),
+      project: z.string().max(255).optional().describe("Project name or path"),
       scope: z.enum(["full", "modules-only", "feature"]).optional().describe("Scope of the diagram: 'full' shows all entities, 'modules-only' shows only module relationships (recommended for large projects), 'feature' requires the 'feature' param. Choose one of: full, modules-only, feature"),
-      feature: z.string().optional().describe("Feature keyword to focus the diagram on (e.g. 'auth', 'crawl', 'payment'). Only used when scope='feature'"),
+      feature: z.string().max(255).optional().describe("Feature keyword to focus the diagram on (e.g. 'auth', 'crawl', 'payment'). Only used when scope='feature'"),
       maxNodes: z.number().optional().describe("Maximum nodes in diagram (default: 60). Reduce for large projects"),
     },
     async ({ project, scope, feature, maxNodes }: { project?: string; scope?: string; feature?: string; maxNodes?: number }) => {
@@ -509,9 +509,9 @@ export function registerTools(server: McpServer) {
     "sync_system_memory",
     "Create or update the .agents/memory/ folder with auto-generated system documentation. This folder serves as AI's 'long-term memory' — it persists between conversations. After calling this, AI in any future conversation can read these files to understand the full system flow without re-analyzing. Call this after completing any code changes.",
     {
-      project: z.string().optional().describe("Project name or path"),
-      businessRule: z.string().optional().describe("Optional: A new business rule to add to the memory (e.g. 'VIP users get free shipping')"),
-      changeDescription: z.string().optional().describe("Optional: Description of what was just changed (for the changelog)"),
+      project: z.string().max(255).optional().describe("Project name or path"),
+      businessRule: z.string().max(255).optional().describe("Optional: A new business rule to add to the memory (e.g. 'VIP users get free shipping')"),
+      changeDescription: z.string().max(50000).optional().describe("Optional: Description of what was just changed (for the changelog)"),
       enableEnterpriseSync: z.boolean().optional().default(true).describe("If true, syncs data to Oracle 26ai Knowledge Graph (Pro/Plus feature). Default is true."),
     },
     async ({ project, businessRule, changeDescription, enableEnterpriseSync }: { project?: string; businessRule?: string; changeDescription?: string; enableEnterpriseSync?: boolean }) => {
@@ -573,7 +573,7 @@ export function registerTools(server: McpServer) {
     "get_system_memory",
     "Retrieve the auto-generated system documentation and episodic memories (business rules and change logs) for a project from CodeAtlas Cloud / Oracle 26ai.",
     {
-      project: z.string().optional().describe("Project name or path"),
+      project: z.string().max(255).optional().describe("Project name or path"),
       eventType: z.enum(["all", "BUSINESS_RULE", "CHANGE_LOG"]).optional().default("all").describe("Filter by event type. Choose one of: all, BUSINESS_RULE, CHANGE_LOG"),
     },
     async ({ project, eventType }: { project?: string; eventType?: "all" | "BUSINESS_RULE" | "CHANGE_LOG" }) => {
@@ -608,10 +608,10 @@ export function registerTools(server: McpServer) {
     "Save a dream memory (mistake, preference, knowledge, or pattern) to CodeAtlas Cloud for long-term AI recall. The AI uses this to persist learnings across conversations.",
     {
       memory_type: z.enum(["MISTAKE", "PREFERENCE", "KNOWLEDGE", "PATTERN"]).describe("Category of the memory. Choose one of: MISTAKE, PREFERENCE, KNOWLEDGE, PATTERN"),
-      content: z.string().describe("The actual memory content or insight"),
+      content: z.string().max(50000).describe("The actual memory content or insight"),
       importance: z.number().min(1).max(10).optional().describe("Importance level from 1 (low) to 10 (critical). Defaults to 5."),
-      session_id: z.string().optional().describe("Optional session identifier for grouping related memories"),
-      project: z.string().optional().describe("Optional project name to associate this memory with"),
+      session_id: z.string().max(255).optional().describe("Optional session identifier for grouping related memories"),
+      project: z.string().max(255).optional().describe("Optional project name to associate this memory with"),
     },
     async ({ memory_type, content, importance, session_id, project }: { memory_type: "MISTAKE" | "PREFERENCE" | "KNOWLEDGE" | "PATTERN"; content: string; importance?: number; session_id?: string; project?: string }) => {
       const auth = await checkAuth();
@@ -654,8 +654,8 @@ export function registerTools(server: McpServer) {
     "query_dream_memories",
     "Query previously saved dream memories from CodeAtlas Cloud. Uses semantic search to find relevant memories based on the query text. Returns memories with relevance scores.",
     {
-      query: z.string().describe("Natural language query to search for relevant memories"),
-      project: z.string().optional().describe("Optional project name filter to scope the search"),
+      query: z.string().max(255).describe("Natural language query to search for relevant memories"),
+      project: z.string().max(255).optional().describe("Optional project name filter to scope the search"),
       limit: z.number().min(1).max(100).optional().default(10).describe("Maximum number of results to return (default: 10, max: 100)"),
     },
     async ({ query, project, limit }: { query: string; project?: string; limit?: number }) => {
@@ -699,7 +699,7 @@ export function registerTools(server: McpServer) {
     "Check dream memory sync status. Returns count of stored dreams grouped by type and project. Use this to verify dreams are syncing to the cloud correctly. Can be called from any AI IDE, CLI, or Hermes cron.",
     {
       type: z.enum(["MISTAKE", "PREFERENCE", "KNOWLEDGE", "PATTERN"]).optional().describe("Filter by memory type. Choose one of: MISTAKE, PREFERENCE, KNOWLEDGE, PATTERN"),
-      project: z.string().optional().describe("Filter by project name"),
+      project: z.string().max(255).optional().describe("Filter by project name"),
     },
     async ({ type, project }: { type?: "MISTAKE" | "PREFERENCE" | "KNOWLEDGE" | "PATTERN"; project?: string }) => {
       const auth = await checkAuth();
@@ -788,8 +788,8 @@ export function registerTools(server: McpServer) {
     "search_genome",
     "Search CodeAtlas Genome for relevant genes. Uses semantic search to find the most relevant genes.",
     {
-      query: z.string().describe("Natural language search query"),
-      project: z.string().optional().describe("Filter by project"),
+      query: z.string().max(255).describe("Natural language search query"),
+      project: z.string().max(255).optional().describe("Filter by project"),
       limit: z.number().min(1).max(50).optional().default(10).describe("Max results (default: 10)"),
     },
     async ({ query, project, limit }) => {
@@ -824,7 +824,7 @@ export function registerTools(server: McpServer) {
     "get_gene",
     "Get a specific gene by ID from the CodeAtlas Genome.",
     {
-      geneId: z.string().describe("The gene ID to retrieve"),
+      geneId: z.string().max(255).describe("The gene ID to retrieve"),
     },
     async ({ geneId }) => {
       const auth = await checkAuth();
@@ -858,8 +858,8 @@ export function registerTools(server: McpServer) {
     "scan_immune_genes",
     "Scan the CodeAtlas Immune System for previously encountered failures matching a problem description. Returns prevention context to inject into prompts.",
     {
-      problem: z.string().describe("Describe the problem or error to scan for"),
-      project: z.string().optional().describe("Filter by project"),
+      problem: z.string().max(50000).describe("Describe the problem or error to scan for"),
+      project: z.string().max(255).optional().describe("Filter by project"),
     },
     async ({ problem, project }) => {
       const auth = await checkAuth();
@@ -893,10 +893,10 @@ export function registerTools(server: McpServer) {
     "save_immune_gene",
     "Record a failure pattern as an immune gene in CodeAtlas Genome. This helps prevent future agents from repeating the same mistake.",
     {
-      problem: z.string().describe("The problem or task context"),
-      failure: z.string().describe("What went wrong — the failure description"),
-      prevention: z.string().describe("How to prevent or fix this failure"),
-      project: z.string().optional().describe("Project to associate with this immune gene"),
+      problem: z.string().max(50000).describe("The problem or task context"),
+      failure: z.string().max(50000).describe("What went wrong — the failure description"),
+      prevention: z.string().max(50000).describe("How to prevent or fix this failure"),
+      project: z.string().max(255).optional().describe("Project to associate with this immune gene"),
     },
     async ({ problem, failure, prevention, project }) => {
       const auth = await checkAuth();
@@ -929,8 +929,8 @@ export function registerTools(server: McpServer) {
     "trace_feature_flow",
     "Trace the complete flow of a feature through the codebase. Given a keyword (e.g. 'login', 'payment', 'crawl'), finds all related files, classes, and functions, then orders them by dependency chain to show the execution flow. This helps AI understand which files to read when working on a feature.",
     {
-      project: z.string().optional().describe("Project name or path"),
-      keyword: z.string().describe("Feature keyword to trace (e.g. 'auth', 'crawl', 'payment', 'upload')"),
+      project: z.string().max(255).optional().describe("Project name or path"),
+      keyword: z.string().max(255).describe("Feature keyword to trace (e.g. 'auth', 'crawl', 'payment', 'upload')"),
       depth: z.number().optional().describe("How many hops to follow from matching nodes (default: 2)"),
     },
     async ({ keyword, project, depth }: { keyword: string; project?: string; depth?: number }) => {
@@ -1066,8 +1066,8 @@ export function registerTools(server: McpServer) {
     "generate_feature_flow_diagram",
     "Generate a Mermaid diagram showing the EXECUTION FLOW of a feature. Unlike generate_system_flow (which shows module imports), this traces the actual call chain: entry point → controller → service → model → database. Given a keyword, it finds all related functions and classes, then builds a flowchart or sequence diagram showing how they call each other at runtime. This is the best tool for understanding HOW a feature works step-by-step.",
     {
-      project: z.string().optional().describe("Project name or path"),
-      keyword: z.string().describe("Feature keyword to trace (e.g. 'login', 'payment', 'upload', 'auth')"),
+      project: z.string().max(255).optional().describe("Project name or path"),
+      keyword: z.string().max(255).describe("Feature keyword to trace (e.g. 'login', 'payment', 'upload', 'auth')"),
       diagramType: z.enum(["flowchart", "sequence"]).optional().describe("Type of Mermaid diagram: 'flowchart' (default) shows call graph, 'sequence' shows step-by-step execution order. Choose one of: flowchart, sequence"),
       depth: z.number().optional().describe("How many call hops to follow (default: 3)"),
       maxNodes: z.number().optional().describe("Maximum nodes in diagram (default: 40)"),
@@ -1374,7 +1374,7 @@ export function registerTools(server: McpServer) {
     "detect_architectural_smells",
     "Knowledge Graph Reasoning: Use Oracle 26ai Graph features to automatically detect architectural weaknesses, circular dependencies, God objects, and dead code.",
     {
-      project: z.string().optional().describe("Project name or path"),
+      project: z.string().max(255).optional().describe("Project name or path"),
     },
     async ({ project }: { project?: string }) => {
       const auth = await checkAuth();
@@ -1528,9 +1528,9 @@ export function registerTools(server: McpServer) {
     "code_search",
     "Search source FILE CONTENTS across the entire project for any text string. Unlike 'search_entities' (which only searches entity names), this searches the actual code — comments, strings, variable names, function bodies, etc.",
     {
-      project: z.string().optional().describe("Project name or path (auto-detects if omitted)"),
-      query: z.string().describe("Text to search for in source file contents (case-insensitive)"),
-      filePattern: z.string().optional().describe("Optional file glob pattern to narrow search (e.g. '*.ts', '*.py'). Default: all supported files"),
+      project: z.string().max(255).optional().describe("Project name or path (auto-detects if omitted)"),
+      query: z.string().max(255).describe("Text to search for in source file contents (case-insensitive)"),
+      filePattern: z.string().max(255).optional().describe("Optional file glob pattern to narrow search (e.g. '*.ts', '*.py'). Default: all supported files"),
       maxResults: z.number().optional().describe("Maximum results to return (default: 30, max: 100)"),
       contextLines: z.number().optional().describe("Number of context lines around each match (default: 2)"),
     },
@@ -1606,8 +1606,8 @@ export function registerTools(server: McpServer) {
     "get_callers",
     "Find ALL functions, methods, or classes that call or reference a specific symbol. The 'reverse dependency' view — given a function/class name, trace everything that depends on it. Use before refactoring or deleting code.",
     {
-      project: z.string().optional().describe("Project name or path"),
-      symbol: z.string().describe("Function or class name to find callers (case-insensitive, partial match)"),
+      project: z.string().max(255).optional().describe("Project name or path"),
+      symbol: z.string().max(255).describe("Function or class name to find callers (case-insensitive, partial match)"),
       maxResults: z.number().optional().describe("Maximum callers to return (default: 30)"),
       depth: z.number().optional().describe("How many levels deep (default: 1, max: 5)"),
     },
@@ -1669,8 +1669,8 @@ export function registerTools(server: McpServer) {
     "get_callees",
     "Find everything a function, method, or class calls or depends on. The 'forward dependency' view — given a function name, trace what it imports and calls. Use to understand function dependencies before modifying.",
     {
-      project: z.string().optional().describe("Project name or path"),
-      symbol: z.string().describe("Function or class name to find callees (case-insensitive, partial match)"),
+      project: z.string().max(255).optional().describe("Project name or path"),
+      symbol: z.string().max(255).describe("Function or class name to find callees (case-insensitive, partial match)"),
       maxResults: z.number().optional().describe("Maximum callees (default: 30)"),
       depth: z.number().optional().describe("How many levels deep (default: 1, max: 5)"),
     },
@@ -1722,8 +1722,8 @@ export function registerTools(server: McpServer) {
     "impact_analysis",
     "Full BLAST RADIUS analysis for changing a symbol. Traces BOTH callers (what depends on this) AND callees (what this depends on) in one view. Also finds related test files. Use BEFORE any significant code change.",
     {
-      project: z.string().optional().describe("Project name or path"),
-      symbol: z.string().describe("Function, class, or module name (case-insensitive, partial match)"),
+      project: z.string().max(255).optional().describe("Project name or path"),
+      symbol: z.string().max(255).describe("Function, class, or module name (case-insensitive, partial match)"),
       depth: z.number().optional().describe("How many levels deep (default: 2, max: 5)"),
     },
     async ({ project, symbol, depth }: { project?: string; symbol: string; depth?: number }) => {
@@ -1845,7 +1845,7 @@ export function registerTools(server: McpServer) {
     "project_context",
     "Get a comprehensive overview of a project in ONE call: package.json (name, version, scripts, deps, devDeps), config files detected, README summary, test framework, git branch. Saves 5-10 individual read_file calls when starting work.",
     {
-      project: z.string().optional().describe("Project name or path (auto-detects if omitted)"),
+      project: z.string().max(255).optional().describe("Project name or path (auto-detects if omitted)"),
     },
     async ({ project }: { project?: string }) => {
       const auth = await checkAuth();
@@ -1918,9 +1918,9 @@ export function registerTools(server: McpServer) {
     "run_script",
     "Run an npm/pnpm/yarn script from package.json. Returns exit code, stdout/stderr, and duration. Handles cd to project dir automatically.",
     {
-      project: z.string().optional().describe("Project name or path"),
-      script: z.string().describe("Script name from package.json (e.g. 'build', 'test', 'lint')"),
-      args: z.string().optional().describe("Optional args (e.g. '-- --watch')"),
+      project: z.string().max(255).optional().describe("Project name or path"),
+      script: z.string().max(255).describe("Script name from package.json (e.g. 'build', 'test', 'lint')"),
+      args: z.string().max(255).optional().describe("Optional args (e.g. '-- --watch')"),
       timeout: z.number().optional().describe("Timeout in seconds (default: 60, max: 300)"),
     },
     async ({ project, script, args, timeout }: { project?: string; script: string; args?: string; timeout?: number }) => {
@@ -2012,7 +2012,7 @@ export function registerTools(server: McpServer) {
     "git_changes",
     "Get recent git changes: last N commits (hash, author, date, message, files changed), uncommitted changes (modified/added/deleted), branch status (ahead/behind). Saves multiple git commands.",
     {
-      project: z.string().optional().describe("Project name or path"),
+      project: z.string().max(255).optional().describe("Project name or path"),
       commits: z.number().optional().describe("Number of recent commits (default: 5, max: 20)"),
     },
     async ({ project, commits }: { project?: string; commits?: number }) => {
@@ -2069,7 +2069,7 @@ export function registerTools(server: McpServer) {
     {
       client: z.enum(["hermes", "claude", "gemini", "all"]).optional().default("all")
         .describe("Which client to configure. Choose one of: hermes, claude, gemini, all"),
-      apiKey: z.string().optional().describe("CODEATLAS_API_KEY (will use env var if not provided)"),
+      apiKey: z.string().max(255).optional().describe("CODEATLAS_API_KEY (will use env var if not provided)"),
       autoPlugin: z.boolean().optional().default(true)
         .describe("Also install Hermes auto Second Brain plugin (pre/post LLM hooks)"),
     },

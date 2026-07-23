@@ -22,3 +22,7 @@
 **Vulnerability:** Indirect command injection vulnerability in `run_script` tool via arguments passed to `npm run` which executes the target script in a shell environment.
 **Learning:** Even when `spawnSync` is used with `shell: false`, passing untrusted arguments to commands like `npm run` (which in turn launch subshells) can lead to command injection if the arguments are appended directly to the target script and contain shell metacharacters.
 **Prevention:** Strictly validate or sanitize untrusted input destined for command-line arguments by blocking shell metacharacters (`&|;<>$`\n\r`) before passing them to process executors.
+## 2024-07-25 - [DoS Risk in MCP Zod Schemas]
+**Vulnerability:** MCP tools allowed unbounded string lengths in Zod schemas (`z.string()`).
+**Learning:** Missing input length validation allows attackers to submit extremely large strings causing excessive memory usage and parsing overhead (CWE-400), leading to Denial of Service (DoS).
+**Prevention:** Always explicitly set maximum string lengths (e.g., `.max(255)`) on all `z.string()` schemas.
