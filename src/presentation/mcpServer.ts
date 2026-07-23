@@ -7,6 +7,7 @@ import { getHomePath, getHermesConfigPath, getHermesPluginDir, getClaudeConfigPa
 import { checkAuth, logActivity } from "../services/authService.js";
 import {
   discoverProjectsAsync,
+  isPathInAuthorizedProjects,
   loadAnalysisAsync,
   getStats,
   fileExists,
@@ -1927,6 +1928,13 @@ export function registerTools(server: McpServer) {
       // 🛡️ Sentinel Security Validation
       // Use spawnSync without a shell to prevent command injection entirely
       const projectDir = loaded.projectDir;
+
+      // Ensure the project directory is an authorized workspace to prevent path traversal
+      const authorizedProjects = await discoverProjectsAsync(auth.uid);
+      if (!isPathInAuthorizedProjects(projectDir, authorizedProjects)) {
+        return { content: [{ type: "text" as const, text: JSON.stringify({ error: "Unauthorized project directory" }) }] };
+      }
+
       const pkgPath = path.join(projectDir, "package.json");
       if (fs.existsSync(pkgPath)) {
         try {
@@ -2009,10 +2017,7 @@ export function registerTools(server: McpServer) {
       // 🛡️ Sentinel Security Validation
       // Ensure the project directory is an authorized workspace to prevent path traversal
       const authorizedProjects = await discoverProjectsAsync(auth.uid);
-      const isAuthorized = authorizedProjects.some(p =>
-        projectDir === p.dir || projectDir.startsWith(p.dir + path.sep)
-      );
-      if (!isAuthorized) {
+      if (!isPathInAuthorizedProjects(projectDir, authorizedProjects)) {
         return { content: [{ type: "text" as const, text: JSON.stringify({ error: "Unauthorized project directory" }) }] };
       }
 
