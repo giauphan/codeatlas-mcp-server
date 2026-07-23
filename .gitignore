@@ -13,4 +13,4 @@ pnpm-debug.log*
 dist/
 .jules/
 
-*plan.md
+plan.md
