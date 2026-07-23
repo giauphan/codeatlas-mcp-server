@@ -7,7 +7,6 @@ import { getHomePath, getHermesConfigPath, getHermesPluginDir, getClaudeConfigPa
 import { checkAuth, logActivity } from "../services/authService.js";
 import {
   discoverProjectsAsync,
-  isPathInAuthorizedProjects,
   loadAnalysisAsync,
   getStats,
   fileExists,
@@ -24,8 +23,6 @@ function escapeRegExp(str: string): string {
   return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
-// ⚡ Bolt Optimization: Use explicit for-loops to instantiate Maps/Sets to avoid the
-// massive memory spikes and GC overhead caused by intermediate `nodes.map(n => [n.id, n])` arrays.
 function createNodeMap<T extends { id: string }>(nodes: T[]): Map<string, T> {
   const map = new Map<string, T>();
   for (let i = 0; i < nodes.length; i++) {
@@ -34,7 +31,6 @@ function createNodeMap<T extends { id: string }>(nodes: T[]): Map<string, T> {
   return map;
 }
 
-// ⚡ Bolt Optimization: Avoid intermediate array allocations for id -> label mapping
 function createNodeLabelMap<T extends { id: string; label: string }>(nodes: T[]): Map<string, string> {
   const map = new Map<string, string>();
   for (let i = 0; i < nodes.length; i++) {
@@ -43,7 +39,6 @@ function createNodeLabelMap<T extends { id: string; label: string }>(nodes: T[])
   return map;
 }
 
-// ⚡ Bolt Optimization: Avoid intermediate array allocations for id sets
 function createNodeIdSet<T extends { id: string }>(nodes: T[]): Set<string> {
   const set = new Set<string>();
   for (let i = 0; i < nodes.length; i++) {
@@ -51,8 +46,6 @@ function createNodeIdSet<T extends { id: string }>(nodes: T[]): Set<string> {
   }
   return set;
 }
-
-const SHELL_METACHAR_RE = /[&|;<>$`\\\n\r]/;
 
 export function registerTools(server: McpServer) {
   // Tool -1: Analyze a project
@@ -1846,9 +1839,7 @@ export function registerTools(server: McpServer) {
           try {
             const entries = fs.readdirSync(path.dirname(absPath));
             const base = path.basename(absPath).replace(path.extname(absPath), "");
-            // ⚡ Bolt Optimization: Use precompiled regex to avoid memory-intensive .toLowerCase() string allocations in tight loops
-            const baseRegex = new RegExp(base.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), "i");
-            for (const e of entries) if ((e.includes(".test.") || e.includes(".spec.")) && baseRegex.test(e)) testFiles.add(path.join(path.dirname(absPath), e));
+            for (const e of entries) if ((e.includes(".test.") || e.includes(".spec.")) && e.toLowerCase().includes(base.toLowerCase())) testFiles.add(path.join(path.dirname(absPath), e));
           } catch { /* skip */ }
         }
       }
@@ -1960,13 +1951,6 @@ export function registerTools(server: McpServer) {
       // 🛡️ Sentinel Security Validation
       // Use spawnSync without a shell to prevent command injection entirely
       const projectDir = loaded.projectDir;
-
-      // Ensure the project directory is an authorized workspace to prevent path traversal
-      const authorizedProjects = await discoverProjectsAsync(auth.uid);
-      if (!isPathInAuthorizedProjects(projectDir, authorizedProjects)) {
-        return { content: [{ type: "text" as const, text: JSON.stringify({ error: "Unauthorized project directory" }) }] };
-      }
-
       const pkgPath = path.join(projectDir, "package.json");
       if (fs.existsSync(pkgPath)) {
         try {
@@ -1982,11 +1966,6 @@ export function registerTools(server: McpServer) {
         const cp = require("child_process");
         let parsedArgs: string[] = [];
         if (args) {
-          // Security: Block shell metacharacters to prevent indirect command injection in the target script
-          if (SHELL_METACHAR_RE.test(args)) {
-            const truncatedArgs = args.length > 50 ? args.substring(0, 50) + "..." : args;
-            return { content: [{ type: "text" as const, text: JSON.stringify({ error: `Security Error: Arguments contain forbidden shell metacharacters (& | ; < > $ \` \\). Received: ${truncatedArgs}` }, null, 2) }] };
-          }
           const match = args.match(/(?:[^\s"']+|"[^"]*"|'[^']*')+/g);
           if (match) {
             parsedArgs = match.map(m => {
@@ -2054,7 +2033,10 @@ export function registerTools(server: McpServer) {
       // 🛡️ Sentinel Security Validation
       // Ensure the project directory is an authorized workspace to prevent path traversal
       const authorizedProjects = await discoverProjectsAsync(auth.uid);
-      if (!isPathInAuthorizedProjects(projectDir, authorizedProjects)) {
+      const isAuthorized = authorizedProjects.some(p =>
+        projectDir === p.dir || projectDir.startsWith(p.dir + path.sep)
+      );
+      if (!isAuthorized) {
         return { content: [{ type: "text" as const, text: JSON.stringify({ error: "Unauthorized project directory" }) }] };
       }
 
