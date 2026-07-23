@@ -85,7 +85,7 @@ function findDirMatchingNormalized(normalized: string): string | null {
         const normFileParts = normFile.split("_").filter(Boolean);
         if (normFileParts.length === 0) continue;
         
-        // ⚡ Bolt Optimization: Precompute lowercased parts for the target file as well
+        // ⚡ Bolt Optimization: Precompute lowercased parts for the directory entry
         const normFilePartsLower = normFileParts.map(p => p.toLowerCase());
 
         let match = true;
