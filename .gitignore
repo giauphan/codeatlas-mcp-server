@@ -12,3 +12,5 @@ pnpm-debug.log*
 # Build output
 dist/
 .jules/
+plan.md
+fix_plan.md
