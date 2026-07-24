@@ -16,17 +16,36 @@ export interface ADR {
   supersededBy?: string;
 }
 
+const PROJECT_NAME_RE = /^[a-zA-Z0-9_-]+$/;
+const ID_RE = /^[a-zA-Z0-9_-]+$/;
+
+function sanitizeProject(project: string): string {
+  if (!PROJECT_NAME_RE.test(project)) {
+    throw new Error(`Invalid project name: must match /^[a-zA-Z0-9_-]+$/`);
+  }
+  return project;
+}
+
+function sanitizeID(id: string): string {
+  if (!ID_RE.test(id)) {
+    throw new Error(`Invalid ADR ID: must match /^[a-zA-Z0-9_-]+$/`);
+  }
+  return id;
+}
+
 function ensureDir(project: string): string {
-  const dir = path.join(ADR_DIR, project);
+  const safeProject = sanitizeProject(project);
+  const dir = path.join(ADR_DIR, safeProject);
   fs.mkdirSync(dir, { recursive: true });
   return dir;
 }
 
 export function listADRs(project?: string): ADR[] {
-  const base = project ? path.join(ADR_DIR, project) : ADR_DIR;
+  const safeProject = project ? sanitizeProject(project) : undefined;
+  const base = safeProject ? path.join(ADR_DIR, safeProject) : ADR_DIR;
   if (!fs.existsSync(base)) return [];
   const all: ADR[] = [];
-  if (project) {
+  if (safeProject) {
     for (const f of fs.readdirSync(base)) {
       if (f.endsWith(".json")) {
         try {
@@ -51,7 +70,9 @@ export function listADRs(project?: string): ADR[] {
 }
 
 export function getADR(id: string, project: string): ADR | null {
-  const file = path.join(ADR_DIR, project, `${id}.json`);
+  const safeProject = sanitizeProject(project);
+  const safeId = sanitizeID(id);
+  const file = path.join(ADR_DIR, safeProject, `${safeId}.json`);
   if (!fs.existsSync(file)) return null;
   try {
     return JSON.parse(fs.readFileSync(file, "utf-8"));
@@ -67,7 +88,9 @@ export function saveADR(adr: ADR): ADR {
 }
 
 export function deleteADR(id: string, project: string): boolean {
-  const file = path.join(ADR_DIR, project, `${id}.json`);
+  const safeProject = sanitizeProject(project);
+  const safeId = sanitizeID(id);
+  const file = path.join(ADR_DIR, safeProject, `${safeId}.json`);
   if (!fs.existsSync(file)) return false;
   fs.unlinkSync(file);
   return true;

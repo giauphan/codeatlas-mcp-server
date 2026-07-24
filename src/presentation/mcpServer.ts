@@ -2333,9 +2333,14 @@ def register(ctx):
           case "create": {
             if (!project || !title || !decision) return { content: [{ type: "text" as const, text: JSON.stringify({ error: "project, title, and decision are required" }) }] };
             const existing = listADRs(project);
-            const num = existing.length + 1;
+            let num = existing.length + 1;
+            let id = `adr-${String(num).padStart(3, "0")}`;
+            while (existing.some(adr => adr.id === id)) {
+              num++;
+              id = `adr-${String(num).padStart(3, "0")}`;
+            }
             const newAdr: ADR = {
-              id: `adr-${String(num).padStart(3, "0")}`,
+              id,
               title,
               status: "proposed",
               context: ctxText || "",
