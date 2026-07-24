@@ -85,7 +85,7 @@ function findDirMatchingNormalized(normalized: string): string | null {
         const normFileParts = normFile.split("_").filter(Boolean);
         if (normFileParts.length === 0) continue;
         
-        let normFilePartsLower: string[] | null = null;
+        let normFilePartsLower: string[] | undefined;
 
         let match = true;
         let isExactCase = true;
