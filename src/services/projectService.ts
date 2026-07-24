@@ -67,6 +67,8 @@ function findDirMatchingNormalized(normalized: string): string | null {
   const parts = normalized.split("_").filter(Boolean);
   if (parts.length === 0) return null;
   
+  let lowerParts: string[] | null = null;
+
   let currentPath = "/";
   for (let i = 0; i < parts.length; i++) {
     if (!fsWrapper.existsSync(currentPath)) return null;
@@ -82,6 +84,8 @@ function findDirMatchingNormalized(normalized: string): string | null {
         const normFileParts = normFile.split("_").filter(Boolean);
         if (normFileParts.length === 0) continue;
         
+        let normFilePartsLower: string[] | null = null;
+
         let match = true;
         let isExactCase = true;
         for (let j = 0; j < normFileParts.length; j++) {
@@ -91,12 +95,23 @@ function findDirMatchingNormalized(normalized: string): string | null {
           }
           const partA = parts[i + j];
           const partB = normFileParts[j];
-          if (partA.toLowerCase() !== partB.toLowerCase()) {
-            match = false;
-            break;
-          }
+
           if (partA !== partB) {
             isExactCase = false;
+
+            // Lazy-compute lowercase arrays to avoid allocations on exact matches
+            if (normFilePartsLower === null) {
+              normFilePartsLower = normFileParts.map(p => p.toLowerCase());
+            }
+            if (lowerParts === null) {
+              lowerParts = parts.map(p => p.toLowerCase());
+            }
+
+            // Avoid .toLowerCase() allocation during case-insensitive comparison
+            if (lowerParts[i + j] !== normFilePartsLower[j]) {
+              match = false;
+              break;
+            }
           }
         }
         
