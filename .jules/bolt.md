@@ -38,3 +38,7 @@
 ## 2026-07-25 - [Performance improvement] Regex and early exit for node arrays
 **Learning:** Chaining `.filter(n => n.label.toLowerCase().includes(query)).slice(0, N)` on extremely large sets of graph nodes is incredibly inefficient as it enforces an O(N) traversal of all nodes and creates hundreds of thousands of intermediate string allocations from `toLowerCase()`. Using a regex to achieve case-insensitivity (`new RegExp(query, 'i')`) along with a traditional `for` loop that performs an early exit when `N` elements are found, turns this into a highly optimized O(1) best-case operation with virtually no string GC overhead.
 **Action:** When filtering a large collection but only needing a limited subset of results, avoid chained `.filter().slice()`. Instead, use standard control structures (`for` / `break`) to exit as soon as the target slice size is reached. Always prefer precompiled regex over mapping properties to lower case during such iterations.
+
+## 2024-05-19 - CodeAnalyzer AST Parsing Graph Build Bottleneck
+**Learning:** Found an O(N*E) bottleneck in `buildAnalysisResult` where calculating degree involved repeatedly filtering `this.links` array for each node.
+**Action:** Replace `this.links.filter` with a single `nodeDegrees` Map that tallies edges across `this.links` in O(E), improving huge graph generation times significantly. Also optimized `entityCounts` grouping to O(N) by collapsing multiple `Array.from().filter()` calls into a single loop.
