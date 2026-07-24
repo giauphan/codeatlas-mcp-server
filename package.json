@@ -1,7 +1,7 @@
 {
-  "name": "codeatlas-mcp-enterprise",
-  "version": "2.20.1",
-  "description": "Enterprise-grade local-first MCP server for CodeAtlas — AST analysis, codebase intelligence, and semantic memory powered by Oracle 26ai.",
+  "name": "codeatlas-mcp-server",
+  "version": "3.0.1",
+  "description": "Local-first MCP server for CodeAtlas — AST analysis, codebase intelligence, semantic memory, and A2A orchestration.",
   "type": "module",
   "bin": {
     "codeatlas-enterprise": "dist/index.js",
@@ -14,11 +14,11 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/giauphan/codeatlas-mcp-enterprise.git"
+    "url": "git+https://github.com/giauphan/codeatlas-mcp-server.git"
   },
-  "homepage": "https://github.com/giauphan/codeatlas-mcp-enterprise#readme",
+  "homepage": "https://github.com/giauphan/codeatlas-mcp-server#readme",
   "bugs": {
-    "url": "https://github.com/giauphan/codeatlas-mcp-enterprise/issues"
+    "url": "https://github.com/giauphan/codeatlas-mcp-server/issues"
   },
   "scripts": {
     "build": "tsc",

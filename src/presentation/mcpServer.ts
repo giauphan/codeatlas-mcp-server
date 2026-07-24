@@ -19,6 +19,10 @@ import {
 import { saveDreamMemory, queryDreamMemories, DreamMemoryResult } from "../services/dreamingService.js";
 import { CodeAnalyzer } from "../analyzer/parser.js";
 import { SecurityScanner } from "../securityScanner.js";
+import {
+  listADRs, getADR, saveADR, deleteADR,
+  ADR
+} from "../services/adrService.js";
 
 function escapeRegExp(str: string): string {
   return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -2293,6 +2297,612 @@ def register(ctx):
       }
 
       return { content: [{ type: "text" as const, text: JSON.stringify(results, null, 2) }] };
+    }
+  );
+
+  // ══════════════════════════════════════════════════════════════════════
+  //  NEW TOOLS — Features from codebase-memory-mcp
+  // ══════════════════════════════════════════════════════════════════════
+
+  // ── Tool 20: Manage Architecture Decision Records ──────────────────
+  server.tool(
+    "manage_adr",
+    "Manage Architecture Decision Records (ADRs) — persistent decisions that survive context resets. Use when documenting architecture choices, listing past decisions, updating status, or checking what was decided and why. ADRs persist at ~/.codeatlas/adr/<project>/.",
+    {
+      action: z.enum(["list", "get", "create", "update_status", "delete"]).describe("CRUD operation"),
+      project: z.string().optional().describe("Project name (required for create)"),
+      id: z.string().optional().describe("ADR ID (e.g. 'adr-001') — required for get/update_status/delete"),
+      title: z.string().optional().describe("Decision title (required for create)"),
+      status: z.enum(["proposed", "accepted", "deprecated", "superseded"]).optional().describe("New status for update_status"),
+      context: z.string().optional().describe("Why this decision was needed (create)"),
+      decision: z.string().optional().describe("What was decided (create)"),
+      consequences: z.string().optional().describe("Expected outcomes — positive, negative, risks (create)"),
+      supersededBy: z.string().optional().describe("ADR ID that supersedes this one (required when status is superseded)"),
+    },
+    async ({ action, project, id, title, status, context: ctxText, decision, consequences, supersededBy }) => {
+      const auth = await checkAuth();
+      await logActivity(auth, "manage_adr", { action, project, id, title: title?.substring(0, 100) });
+
+      try {
+        switch (action) {
+          case "list": {
+            const adrs = listADRs(project);
+            return { content: [{ type: "text" as const, text: JSON.stringify({
+              count: adrs.length,
+              adrs: adrs.map(a => ({ id: a.id, title: a.title, status: a.status, date: a.date, project: a.project })),
+            }, null, 2) }] };
+          }
+          case "get": {
+            if (!id || !project) return { content: [{ type: "text" as const, text: JSON.stringify({ error: "id and project required" }) }] };
+            const adr = getADR(id, project);
+            if (!adr) return { content: [{ type: "text" as const, text: JSON.stringify({ error: `ADR '${id}' not found` }) }] };
+            return { content: [{ type: "text" as const, text: JSON.stringify(adr, null, 2) }] };
+          }
+          case "create": {
+            if (!project || !title || !decision) return { content: [{ type: "text" as const, text: JSON.stringify({ error: "project, title, and decision are required" }) }] };
+            const existing = listADRs(project);
+            let num = existing.length + 1;
+            let id = `adr-${String(num).padStart(3, "0")}`;
+            while (existing.some(adr => adr.id === id)) {
+              num++;
+              id = `adr-${String(num).padStart(3, "0")}`;
+            }
+            const newAdr: ADR = {
+              id,
+              title,
+              status: "proposed",
+              context: ctxText || "",
+              decision,
+              consequences: consequences || "",
+              project,
+              date: new Date().toISOString().split("T")[0],
+            };
+            saveADR(newAdr);
+            return { content: [{ type: "text" as const, text: JSON.stringify({ success: true, adr: newAdr }, null, 2) }] };
+          }
+          case "update_status": {
+            if (!id || !project || !status) return { content: [{ type: "text" as const, text: JSON.stringify({ error: "id, project, and status required" }) }] };
+            const adr = getADR(id, project);
+            if (!adr) return { content: [{ type: "text" as const, text: JSON.stringify({ error: `ADR '${id}' not found` }) }] };
+            adr.status = status;
+            if (status === "superseded" && supersededBy) adr.supersededBy = supersededBy;
+            saveADR(adr);
+            return { content: [{ type: "text" as const, text: JSON.stringify({ success: true, adr }, null, 2) }] };
+          }
+          case "delete": {
+            if (!id || !project) return { content: [{ type: "text" as const, text: JSON.stringify({ error: "id and project required" }) }] };
+            const deleted = deleteADR(id, project);
+            return { content: [{ type: "text" as const, text: JSON.stringify({ success: deleted, message: deleted ? `Deleted ${id}` : `${id} not found` }) }] };
+          }
+          default:
+            return { content: [{ type: "text" as const, text: `Unknown action: ${action}` }] };
+        }
+      } catch (err: unknown) {
+        return { content: [{ type: "text" as const, text: `ADR error: ${err instanceof Error ? err.message : String(err)}` }], isError: true };
+      }
+    }
+  );
+
+  // ── Tool 21: Get Code Snippet by Symbol ────────────────────────────
+  server.tool(
+    "get_code_snippet",
+    "Read source code of a specific function/class/module by its qualified name. Returns the exact file path, line range, and raw source. Use when you need to see the actual implementation — not just that it exists.",
+    {
+      project: z.string().optional().describe("Project name or path"),
+      symbol: z.string().describe("Qualified name or partial match (e.g. 'UserService', 'parseRequest', 'Auth.login')"),
+      contextLines: z.number().optional().describe("Extra context lines around the symbol (default: 5, max: 30)"),
+    },
+    async ({ project, symbol, contextLines }) => {
+      const auth = await checkAuth();
+      await logActivity(auth, "get_code_snippet", { project, symbol });
+      const loaded = await loadAnalysisAsync(project);
+      if (!loaded) return { content: [{ type: "text" as const, text: "No analysis found. Run 'analyze' first." }] };
+
+      const q = symbol.toLowerCase();
+      const matches = loaded.analysis.graph.nodes.filter(
+        n => n.label.toLowerCase().includes(q) && n.filePath && !n.id.startsWith("external:")
+      ).slice(0, 10);
+
+      if (matches.length === 0)
+        return { content: [{ type: "text" as const, text: JSON.stringify({ symbol, matchCount: 0, message: `No symbol '${symbol}' found.` }) }] };
+
+      const ctx = Math.min(contextLines ?? 5, 30);
+      const results: any[] = [];
+
+      for (const node of matches) {
+        const absPath = path.isAbsolute(node.filePath!)
+          ? node.filePath!
+          : path.resolve(loaded.projectDir, node.filePath!);
+
+        if (!fs.existsSync(absPath)) { results.push({ symbol: node.label, file: absPath, error: "File not found" }); continue; }
+        try {
+          const content = fs.readFileSync(absPath, "utf-8");
+          const lines = content.split("\n");
+          const targetLine = (node.line || 1) - 1;
+
+          // Find function/class boundaries by walking from targetLine
+          let startLine = targetLine;
+          let endLine = targetLine;
+
+          // Walk backward to find the start (indent level or blank line)
+          const targetIndent = lines[targetLine]?.search(/\S/) ?? 0;
+          for (let i = targetLine - 1; i >= Math.max(0, targetLine - 80); i--) {
+            const line = lines[i];
+            if (!line || line.trim() === "") { startLine = i + 1; break; }
+            if (line.trim().startsWith("export ") || line.trim().startsWith("import ") ||
+                line.trim().startsWith("class ") || line.trim().startsWith("def ") ||
+                line.trim().startsWith("function ") || line.trim().startsWith("async function") ||
+                line.trim().startsWith("const ") || line.trim().startsWith("let ") ||
+                line.trim().startsWith("private ") || line.trim().startsWith("public ") ||
+                line.trim().startsWith("protected ") || line.trim().startsWith("readonly ")) {
+              startLine = i; break;
+            }
+            if (i === Math.max(0, targetLine - 80)) startLine = i;
+          }
+
+          // Walk forward to find end (next definition or blank line after indent reset)
+          for (let i = targetLine + 1; i < Math.min(lines.length, targetLine + 200); i++) {
+            const line = lines[i];
+            if (!line || line.trim() === "") { endLine = i; break; }
+            const indent = line.search(/\S/);
+            if (indent <= targetIndent && line.trim().length > 0 &&
+                (line.trim().startsWith("function ") || line.trim().startsWith("class ") ||
+                 line.trim().startsWith("def ") || line.trim().startsWith("export ") ||
+                 line.trim().startsWith("const ") || line.trim().startsWith("async "))) {
+              endLine = i - 1; break;
+            }
+            if (i === Math.min(lines.length - 1, targetLine + 200)) endLine = i;
+          }
+
+          const paddedStart = Math.max(0, startLine - ctx);
+          const paddedEnd = Math.min(lines.length - 1, endLine + ctx);
+          const snippet = lines.slice(paddedStart, paddedEnd + 1)
+            .map((l, i) => `${paddedStart + i + 1}: ${l}`).join("\n");
+
+          results.push({
+            symbol: node.label,
+            type: node.type,
+            file: path.relative(loaded.projectDir, absPath),
+            lineRange: `${startLine + 1}-${endLine + 1}`,
+            lines: endLine - startLine + 1,
+            snippet,
+          });
+        } catch (err: any) {
+          results.push({ symbol: node.label, file: absPath, error: err.message?.substring(0, 200) });
+        }
+      }
+
+      return { content: [{ type: "text" as const, text: JSON.stringify({ symbol, project: loaded.projectName, matches: results.length, results }, null, 2) }] };
+    }
+  );
+
+  // ── Tool 22: Index Coverage Report ─────────────────────────────────
+  server.tool(
+    "index_coverage",
+    "Check what files and entity types are indexed for a project. Returns: file count, entity distribution, files with most entities, and files that might be missing (not indexed). Use after 'analyze' to verify coverage.",
+    {
+      project: z.string().optional().describe("Project name or path"),
+    },
+    async ({ project }) => {
+      const auth = await checkAuth();
+      await logActivity(auth, "index_coverage", { project });
+      const loaded = await loadAnalysisAsync(project);
+      if (!loaded) return { content: [{ type: "text" as const, text: "No analysis found. Run 'analyze' first." }] };
+
+      const nodes = loaded.analysis.graph.nodes.filter(n => !n.id.startsWith("external:"));
+      const links = loaded.analysis.graph.links;
+
+      // Entity type distribution
+      const typeCounts: Record<string, number> = {};
+      for (const n of nodes) typeCounts[n.type] = (typeCounts[n.type] || 0) + 1;
+
+      // File distribution
+      const fileEntityCount = new Map<string, number>();
+      const fileTypeMap = new Map<string, Set<string>>();
+      for (const n of nodes) {
+        if (!n.filePath) continue;
+        const fp = path.isAbsolute(n.filePath) ? path.relative(loaded.projectDir, n.filePath) : n.filePath;
+        fileEntityCount.set(fp, (fileEntityCount.get(fp) || 0) + 1);
+        if (!fileTypeMap.has(fp)) fileTypeMap.set(fp, new Set());
+        fileTypeMap.get(fp)!.add(n.type);
+      }
+
+      const topFiles = Array.from(fileEntityCount.entries())
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 15)
+        .map(([f, c]) => ({ file: f, entities: c }));
+
+      // Extension distribution
+      const extCounts: Record<string, number> = {};
+      for (const fp of fileEntityCount.keys()) {
+        const ext = path.extname(fp) || "(no ext)";
+        extCounts[ext] = (extCounts[ext] || 0) + 1;
+      }
+
+      // Coverage quality score
+      const withFilePath = nodes.filter(n => n.filePath).length;
+      const coveragePct = nodes.length > 0 ? Math.round((withFilePath / nodes.length) * 100) : 0;
+      const orphanNodes = nodes.filter(n => {
+        if (n.type === "variable") return false;
+        return !links.some(l => l.source === n.id || l.target === n.id);
+      }).length;
+
+      // Discover actual project files not indexed
+      const indexedFiles = new Set(fileEntityCount.keys());
+      const projectExtSet = new Set([".ts", ".tsx", ".js", ".jsx", ".py", ".php", ".go", ".rs", ".java", ".rb", ".vue", ".svelte"]);
+      const unindexedFiles: string[] = [];
+
+      const walkForMissing = (dir: string, depth: number) => {
+        if (depth > 8 || unindexedFiles.length > 20) return;
+        try {
+          for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+            if (entry.name.startsWith(".") || ["node_modules", "dist", "build", "venv", ".venv", "__pycache__"].includes(entry.name)) continue;
+            const fp = path.join(dir, entry.name);
+            if (entry.isDirectory()) { walkForMissing(fp, depth + 1); }
+            else if (projectExtSet.has(path.extname(entry.name))) {
+              const rel = path.relative(loaded.projectDir, fp);
+              if (!indexedFiles.has(rel)) unindexedFiles.push(rel);
+            }
+          }
+        } catch { /* skip */ }
+      };
+      try { walkForMissing(loaded.projectDir, 0); } catch { /* skip */ }
+
+      const result = {
+        project: loaded.projectName,
+        summary: {
+          totalEntities: nodes.length,
+          totalRelationships: links.length,
+          uniqueFiles: fileEntityCount.size,
+          coveragePercent: coveragePct,
+          orphanEntities: orphanNodes,
+          unindexedFilesFound: unindexedFiles.length,
+        },
+        entityDistribution: typeCounts,
+        extensionDistribution: extCounts,
+        topFiles,
+        unindexedFiles: unindexedFiles.slice(0, 20),
+        recommendation: orphanNodes > 20
+          ? "High orphan count — entities exist without connections. Consider adding more 'call' or 'import' relationships."
+          : unindexedFiles.length > 20
+            ? "Many unindexed files detected — re-run 'analyze' with higher maxFiles."
+            : "Coverage looks good.",
+      };
+
+      return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
+    }
+  );
+
+  // ── Tool 23: Detect Similar/Duplicate Code ─────────────────────────
+  server.tool(
+    "detect_code_similarities",
+    "Find near-duplicate or semantically similar functions/classes in a project. Uses token-based Jaccard similarity to find code that looks different but does the same thing. Returns groups of similar functions with similarity scores. Use before refactoring to consolidate duplicated logic.",
+    {
+      project: z.string().optional().describe("Project name or path"),
+      threshold: z.number().optional().describe("Similarity threshold 0-1 (default: 0.6 = 60% similar). Lower = more results"),
+      limit: z.number().optional().describe("Max similar pairs to return (default: 20)"),
+    },
+    async ({ project, threshold, limit }) => {
+      const auth = await checkAuth();
+      await logActivity(auth, "detect_code_similarities", { project, threshold, limit });
+      const loaded = await loadAnalysisAsync(project);
+      if (!loaded) return { content: [{ type: "text" as const, text: "No analysis found. Run 'analyze' first." }] };
+
+      const thresh = Math.max(0.2, Math.min(threshold ?? 0.6, 1.0));
+      const maxPairs = limit || 20;
+
+      const functions = loaded.analysis.graph.nodes.filter(
+        n => (n.type === "function" || n.type === "class") && n.filePath && !n.id.startsWith("external:")
+      );
+
+      if (functions.length < 2) return { content: [{ type: "text" as const, text: JSON.stringify({ message: "Need at least 2 functions to compare", count: functions.length }) }] };
+
+      // Read and tokenize each function
+      const tokenized: Array<{ node: typeof functions[0]; tokens: Set<string>; source: string }> = [];
+
+      for (const node of functions.slice(0, 300)) { // Limit to 300 for perf
+        const absPath = path.isAbsolute(node.filePath!) ? node.filePath! : path.resolve(loaded.projectDir, node.filePath!);
+        try {
+          if (!fs.existsSync(absPath)) continue;
+          const content = fs.readFileSync(absPath, "utf-8");
+          const lines = content.split("\n");
+          const start = (node.line || 1) - 1;
+
+          // Extract function body (up to 80 lines)
+          const body = lines.slice(start, start + 80).join("\n");
+
+          // Tokenize: identifiers + keywords (skip whitespace, punctuation)
+          const tokens = new Set<string>();
+          const tokenRegex = /[a-zA-Z_$][a-zA-Z0-9_$]*/g;
+          let m: RegExpExecArray | null;
+          while ((m = tokenRegex.exec(body)) !== null) {
+            tokens.add(m[0].toLowerCase());
+          }
+          tokenized.push({ node, tokens, source: body.substring(0, 300) });
+        } catch { /* skip */ }
+      }
+
+      // Compute Jaccard similarity pairs
+      const pairs: Array<{
+        a: { name: string; file: string; line: number; type: string };
+        b: { name: string; file: string; line: number; type: string };
+        similarity: number;
+        sharedTokens: number;
+        totalTokens: number;
+      }> = [];
+
+      for (let i = 0; i < tokenized.length; i++) {
+        for (let j = i + 1; j < tokenized.length; j++) {
+          const a = tokenized[i], b = tokenized[j];
+
+          // Quick check: skip if files too different in size
+          if (Math.abs(a.tokens.size - b.tokens.size) > Math.max(a.tokens.size, b.tokens.size) * 0.7) continue;
+
+          const intersection = new Set([...a.tokens].filter(t => b.tokens.has(t)));
+          const union = new Set([...a.tokens, ...b.tokens]);
+          if (union.size === 0) continue;
+
+          const sim = intersection.size / union.size;
+          if (sim >= thresh) {
+            const aFile = path.relative(loaded.projectDir, a.node.filePath!);
+            const bFile = path.relative(loaded.projectDir, b.node.filePath!);
+            pairs.push({
+              a: { name: a.node.label, file: aFile, line: a.node.line || 0, type: a.node.type },
+              b: { name: b.node.label, file: bFile, line: b.node.line || 0, type: b.node.type },
+              similarity: Math.round(sim * 100) / 100,
+              sharedTokens: intersection.size,
+              totalTokens: union.size,
+            });
+          }
+
+          if (pairs.length > maxPairs * 3) break; // Early exit
+        }
+        if (pairs.length > maxPairs * 3) break;
+      }
+
+      // Sort by similarity desc, take top
+      pairs.sort((a, b) => b.similarity - a.similarity);
+      const topPairs = pairs.slice(0, maxPairs);
+
+      // Group into clusters
+      const clusters = new Map<string, string[]>();
+      for (const p of topPairs) {
+        const key = [p.a.name, p.b.name].sort().join("|");
+        if (!clusters.has(key)) clusters.set(key, [p.a.name, p.b.name]);
+      }
+
+      const result = {
+        project: loaded.projectName,
+        threshold: thresh,
+        totalFunctionsScanned: tokenized.length,
+        similarPairsFound: pairs.length,
+        showing: topPairs.length,
+        clustersDetected: clusters.size,
+        pairs: topPairs,
+        recommendation: pairs.length > 5
+          ? `${pairs.length} similar pairs found — high duplication. Consider extracting shared logic into utility functions.`
+          : pairs.length > 0
+            ? `${pairs.length} similar pairs — review and consider refactoring.`
+            : "No significant similarities detected above threshold.",
+      };
+
+      return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
+    }
+  );
+
+  // ── Tool 24: Export Team-Shared Artifact ────────────────────────────
+  server.tool(
+    "export_team_artifact",
+    "Export a compressed snapshot of the project's analysis (knowledge graph + dream memories) to .codeatlas/artifact.db — a single file that can be committed to git and shared with teammates. On clone, teammates get instant codebase intelligence without re-analyzing. Similar to codebase-memory-mcp's .codebase-memory/graph.db.zst pattern.",
+    {
+      project: z.string().optional().describe("Project name or path"),
+      format: z.enum(["json", "summary"]).optional().describe("'json' = full export, 'summary' = compressed summary only"),
+    },
+    async ({ project, format }) => {
+      const auth = await checkAuth();
+      await logActivity(auth, "export_team_artifact", { project, format });
+      const loaded = await loadAnalysisAsync(project);
+      if (!loaded) return { content: [{ type: "text" as const, text: "No analysis found. Run 'analyze' first." }] };
+
+      const exportFormat = format || "json";
+      const projectDir = loaded.projectDir;
+      const artifactDir = path.join(projectDir, ".codeatlas");
+      fs.mkdirSync(artifactDir, { recursive: true });
+
+      try {
+        if (exportFormat === "summary") {
+          const nodes = loaded.analysis.graph.nodes.filter(n => !n.id.startsWith("external:"));
+          const links = loaded.analysis.graph.links;
+          const stats = getStats(loaded.analysis);
+
+          const summary = {
+            version: 1,
+            exportedAt: new Date().toISOString(),
+            project: loaded.projectName,
+            stats,
+            modules: nodes.filter(n => n.type === "module").map(n => ({ id: n.id, name: n.label, file: n.filePath })),
+            classes: nodes.filter(n => n.type === "class").map(n => ({ id: n.id, name: n.label, file: n.filePath, line: n.line })),
+            functions: nodes.filter(n => n.type === "function").map(n => ({ id: n.id, name: n.label, file: n.filePath, line: n.line })),
+            callGraph: links.filter(l => l.type === "call").map(l => ({
+              from: nodes.find(n => n.id === l.source)?.label || l.source,
+              to: nodes.find(n => n.id === l.target)?.label || l.target,
+            })).slice(0, 500),
+          };
+
+          const outPath = path.join(artifactDir, "artifact-summary.json");
+          fs.writeFileSync(outPath, JSON.stringify(summary, null, 2));
+          const size = fs.statSync(outPath).size;
+
+          return { content: [{ type: "text" as const, text: JSON.stringify({
+            success: true, path: path.relative(projectDir, outPath),
+            size: `${(size / 1024).toFixed(1)}KB`,
+            summary: { modules: summary.modules.length, classes: summary.classes.length, functions: summary.functions.length, callEdges: summary.callGraph.length },
+            usage: `Teammates: run 'analyze' on this project, then CodeAtlas will auto-load the artifact if present.`,
+          }, null, 2) }] };
+        }
+
+        // Full export
+        const artifact = {
+          version: 1,
+          exportedAt: new Date().toISOString(),
+          project: loaded.projectName,
+          projectDir: loaded.projectDir,
+          analysis: loaded.analysis,
+        };
+
+        const outPath = path.join(artifactDir, "artifact.json");
+        fs.writeFileSync(outPath, JSON.stringify(artifact, null, 2));
+        const size = fs.statSync(outPath).size;
+
+        // Also update .gitignore to track it
+        const gitignorePath = path.join(projectDir, ".gitignore");
+        if (fs.existsSync(gitignorePath)) {
+          const gi = fs.readFileSync(gitignorePath, "utf-8");
+          if (!gi.includes(".codeatlas/")) {
+            fs.appendFileSync(gitignorePath, "\n# CodeAtlas artifact (shared with team)\n!.codeatlas/\n.codeatlas/!artifact*.json\n");
+          }
+        }
+
+        return { content: [{ type: "text" as const, text: JSON.stringify({
+          success: true, path: path.relative(projectDir, outPath),
+          size: `${(size / 1024).toFixed(1)}KB`,
+          stats: getStats(loaded.analysis),
+          gitNote: "Added .codeatlas/ exception to .gitignore — artifact.json is tracked.",
+          usage: `Commit .codeatlas/artifact.json to git. Teammates get instant codebase knowledge on clone.`,
+        }, null, 2) }] };
+      } catch (err: unknown) {
+        return { content: [{ type: "text" as const, text: `Export failed: ${err instanceof Error ? err.message : String(err)}` }], isError: true };
+      }
+    }
+  );
+
+  // ── Tool 25: Sync Skills Inventory to Second Brain ────────────────
+  server.tool(
+    "sync_skills_inventory",
+    "Scan all installed skills (from ~/.agents/skills/ and ~/.claude/skills/) and save a complete inventory to CodeAtlas Second Brain. This lets the AI remember what skills are available, query them, and reference them by name. Run after installing new skills or on first setup.",
+    {
+      action: z.enum(["sync", "query", "list_all"]).optional().default("sync")
+        .describe("'sync' = scan & save inventory to brain, 'query' = search available skills, 'list_all' = full skill list"),
+      query: z.string().optional().describe("Search query (for query action)"),
+      limit: z.number().optional().describe("Max results for query (default: 20)"),
+    },
+    async ({ action, query, limit }) => {
+      const auth = await checkAuth();
+      await logActivity(auth, "sync_skills_inventory", { action, query });
+
+      const AGENTS_SKILLS = path.join(os.homedir(), ".agents", "skills");
+      const CLAUDE_SKILLS = path.join(os.homedir(), ".claude", "skills");
+      const BRAIN_SKILLS_PATH = path.join(os.homedir(), ".codeatlas", "skills_inventory.json");
+
+      // Scan all skill directories
+      const scanSkills = (): Array<{ name: string; description: string; source: string }> => {
+        const skills: Array<{ name: string; description: string; source: string }> = [];
+        const seen = new Set<string>();
+
+        for (const scanDir of [AGENTS_SKILLS, CLAUDE_SKILLS]) {
+          if (!fs.existsSync(scanDir)) continue;
+          try {
+            for (const entry of fs.readdirSync(scanDir)) {
+              const skillMd = path.join(scanDir, entry, "SKILL.md");
+              if (!fs.existsSync(skillMd)) continue;
+              if (seen.has(entry)) continue;
+              seen.add(entry);
+
+              try {
+                const raw = fs.readFileSync(skillMd, "utf-8");
+                // Extract description from frontmatter
+                const fmMatch = raw.match(/^---\s*\n([\s\S]*?)\n---/);
+                let description = "";
+                let source = entry.startsWith("analyzing-") || entry.startsWith("auditing-") || entry.startsWith("configuring-")
+                  || entry.startsWith("building-") || entry.startsWith("detecting-") || entry.startsWith("deploying-")
+                  || entry.startsWith("conducting-") || entry.startsWith("exploiting-") || entry.startsWith("hunting-")
+                  || entry.startsWith("implementing-") || entry.startsWith("performing-") || entry.startsWith("scanning-")
+                  || entry.startsWith("securing-") || entry.startsWith("testing-") || entry.startsWith("triaging-")
+                  || entry.startsWith("operating-") || entry.startsWith("monitoring-") || entry.startsWith("recovering-")
+                  || entry.startsWith("extracting-") || entry.startsWith("evaluating-") || entry.startsWith("collecting-")
+                  || entry.startsWith("generating-") || entry.startsWith("hardening-") || entry.startsWith("prioritizing-")
+                  || entry.startsWith("post-") || entry.startsWith("red-teaming-") || entry.startsWith("orchestrating-")
+                  || entry.startsWith("moving-") || entry.startsWith("emulating-") || entry.startsWith("fuzzing-")
+                  || entry.startsWith("remediating-") || entry.startsWith("triaging-") || entry.startsWith("validating-")
+                  || entry.startsWith("verifying-") || entry.startsWith("containing-") || entry.startsWith("relaying-")
+                  || entry.startsWith("mapping-") || entry.startsWith("profiling-") || entry.startsWith("tracking-")
+                  || entry.startsWith("modeling-")
+                  ? "anthropic-cybersecurity" : "hermes";
+
+                if (fmMatch) {
+                  const fm = fmMatch[1];
+                  const descMatch = fm.match(/description:\s*"?([^"\n]+)/);
+                  if (descMatch) description = descMatch[1].trim().substring(0, 200);
+                }
+                if (!description) {
+                  // Fallback: first non-empty line after frontmatter
+                  const lines = raw.split("\n");
+                  const fmEnd = raw.indexOf("---", 3);
+                  const afterFm = fmEnd !== -1 ? raw.substring(fmEnd + 3) : raw;
+                  for (const line of afterFm.split("\n")) {
+                    const t = line.trim();
+                    if (t && !t.startsWith("#") && !t.startsWith("---")) { description = t.substring(0, 200); break; }
+                  }
+                }
+                skills.push({ name: entry, description, source });
+              } catch { /* skip corrupt */ }
+            }
+          } catch { /* skip */ }
+        }
+        return skills;
+      };
+
+      const skills = scanSkills();
+
+      if (action === "list_all") {
+        const bySource: Record<string, number> = {};
+        for (const s of skills) bySource[s.source] = (bySource[s.source] || 0) + 1;
+        return { content: [{ type: "text" as const, text: JSON.stringify({
+          totalSkills: skills.length, bySource, skills: skills.map(s => ({ name: s.name, desc: s.description.substring(0, 120), src: s.source })),
+        }, null, 2) }] };
+      }
+
+      if (action === "query") {
+        const q = (query || "").toLowerCase();
+        const matches = q ? skills.filter(s => s.name.includes(q) || s.description.toLowerCase().includes(q)) : skills;
+        return { content: [{ type: "text" as const, text: JSON.stringify({
+          query: q || "(all)", count: matches.length, totalSkills: skills.length,
+          results: matches.slice(0, limit || 20).map(s => ({ name: s.name, description: s.description, source: s.source })),
+        }, null, 2) }] };
+      }
+
+      // Default: sync
+      fs.mkdirSync(path.dirname(BRAIN_SKILLS_PATH), { recursive: true });
+      const inventory = {
+        syncedAt: new Date().toISOString(),
+        totalSkills: skills.length,
+        skills,
+        bySource: skills.reduce((acc, s) => { acc[s.source] = (acc[s.source] || 0) + 1; return acc; }, {} as Record<string, number>),
+      };
+      fs.writeFileSync(BRAIN_SKILLS_PATH, JSON.stringify(inventory, null, 2));
+
+      // Save a compact summary as dream memory for cross-session recall
+      try {
+        const compactSummary = skills.map(s => s.name).join(", ");
+        await saveDreamMemory({
+          memory_type: "KNOWLEDGE",
+          content: `[Skills Inventory] ${skills.length} skills installed in Claude Code: ${compactSummary.substring(0, 400)}`,
+          importance: 8,
+          project: process.env.CODEATLAS_PROJECT || "claude-code",
+          session_id: "skills-sync",
+        });
+      } catch (err) {
+        console.error("[sync_skills_inventory] dream save failed:", err);
+      }
+
+      const bySource: Record<string, number> = {};
+      for (const s of skills) bySource[s.source] = (bySource[s.source] || 0) + 1;
+
+      return { content: [{ type: "text" as const, text: JSON.stringify({
+        success: true, totalSkills: skills.length, bySource,
+        savedTo: BRAIN_SKILLS_PATH,
+        summary: `${skills.length} skills synced to Second Brain. ${bySource["anthropic-cybersecurity"] || 0} cyber, ${bySource["hermes"] || 0} hermes/other.`,
+      }, null, 2) }] };
     }
   );
 }
