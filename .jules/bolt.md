@@ -27,7 +27,7 @@
 **Learning:** During import path resolution logic across thousands of files, caching directory contents is crucial. Previously, we only cached a `Set<string>` of filenames via `fs.readdirSync`. This required a subsequent blocking `fs.statSync()` call per matched file to determine if the path was a directory or file. By utilizing `fs.readdirSync(dir, { withFileTypes: true })` and caching the `Map<string, fs.Dirent>`, we can completely bypass the synchronous disk I/O `statSync` (falling back only for broken symlinks), giving massive performance improvements in AST resolution paths.
 **Action:** Always prefer retrieving and caching `fs.Dirent` when performing recursive or iterative file resolution, instead of simply mapping names to perform `fs.statSync` later.
 
-## 2027-05-14 - Precomputed Lowercase for Tight Loops
+## 2026-07-24 - Precomputed Lowercase for Tight Loops
 **Learning:** In tight loops like directory traversal or string matching, repeated calls to `.toLowerCase()` on the same strings create many intermediate string allocations, causing high garbage collection overhead and degraded performance. Using `a.toLowerCase() !== b.toLowerCase()` inside a nested loop multiplies this overhead. Furthermore, be careful using `length` as an early exit for lowercased Unicode strings, as they can change length.
 **Action:** When a string needs case-insensitive comparison repeatedly:
 1. Extract the `.toLowerCase()` call outside the loop for the invariant string (e.g. `const lowerParts = parts.map(p => p.toLowerCase())`).
