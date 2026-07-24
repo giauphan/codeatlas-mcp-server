@@ -24,6 +24,8 @@ import {
   ADR
 } from "../services/adrService.js";
 
+const CONFIG_FILES_ENTRIES = Object.entries({ tsconfig: "tsconfig.json", eslint: ".eslintrc.js", prettier: ".prettierrc", jest: "jest.config.js", vitest: "vitest.config.ts", playwright: "playwright.config.ts", docker: "Dockerfile" });
+
 function escapeRegExp(str: string): string {
   return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
@@ -1888,47 +1890,56 @@ export function registerTools(server: McpServer) {
       const projectDir = loaded.projectDir;
       const ctx: any = { name: loaded.projectName, path: projectDir };
 
-      // package.json
-      const pkgPath = path.join(projectDir, "package.json");
-      if (fs.existsSync(pkgPath)) {
-        try {
-          const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf-8"));
-          ctx.version = pkg.version; ctx.description = pkg.description;
-          ctx.scripts = pkg.scripts || {}; ctx.scriptCount = Object.keys(ctx.scripts).length;
-          ctx.dependencies = pkg.dependencies ? Object.keys(pkg.dependencies) : [];
-          ctx.devDependencies = pkg.devDependencies ? Object.keys(pkg.devDependencies) : [];
-          ctx.main = pkg.main; ctx.bin = pkg.bin;
-        } catch { /* skip */ }
-      }
-
-      // Config files
+      // Run I/O operations concurrently to prevent event loop blocking
       ctx.configFiles = {};
-      await Promise.all(
-        Object.entries({ tsconfig: "tsconfig.json", eslint: ".eslintrc.js", prettier: ".prettierrc", jest: "jest.config.js", vitest: "vitest.config.ts", playwright: "playwright.config.ts", docker: "Dockerfile" }).map(async ([key, f]) => {
+      const pkgPath = path.join(projectDir, "package.json");
+      const gh = path.join(projectDir, ".git", "HEAD");
+
+      await Promise.all([
+        // package.json
+        (async () => {
+          try {
+            const content = await fs.promises.readFile(pkgPath, "utf-8");
+            const pkg = JSON.parse(content);
+            ctx.version = pkg.version; ctx.description = pkg.description;
+            ctx.scripts = pkg.scripts || {}; ctx.scriptCount = Object.keys(ctx.scripts).length;
+            ctx.dependencies = pkg.dependencies ? Object.keys(pkg.dependencies) : [];
+            ctx.devDependencies = pkg.devDependencies ? Object.keys(pkg.devDependencies) : [];
+            ctx.main = pkg.main; ctx.bin = pkg.bin;
+          } catch { /* skip */ }
+        })(),
+
+        // Config files
+        ...CONFIG_FILES_ENTRIES.map(async ([key, f]) => {
           try {
             await fs.promises.access(path.join(projectDir, f));
             ctx.configFiles[key] = true;
           } catch {
             ctx.configFiles[key] = false;
           }
-        })
-      );
+        }),
 
-      // README
-      for (const r of ["README.md", "README"]) {
-        const rp = path.join(projectDir, r);
-        if (fs.existsSync(rp)) { ctx.readme = { file: r, length: fs.statSync(rp).size }; break; }
-      }
+        // README
+        (async () => {
+          for (const r of ["README.md", "README"]) {
+            const rp = path.join(projectDir, r);
+            try {
+              const stat = await fs.promises.stat(rp);
+              ctx.readme = { file: r, length: stat.size };
+              break;
+            } catch { /* skip */ }
+          }
+        })(),
 
-      // Git branch
-      const gh = path.join(projectDir, ".git", "HEAD");
-      if (fs.existsSync(gh)) {
-        try {
-          const h = fs.readFileSync(gh, "utf-8").trim();
-          const m = h.match(/^ref:\s*refs\/heads\/(.+)$/);
-          ctx.gitBranch = m ? m[1] : "(detached)";
-        } catch { /* skip */ }
-      }
+        // Git branch
+        (async () => {
+          try {
+            const h = (await fs.promises.readFile(gh, "utf-8")).trim();
+            const m = h.match(/^ref:\s*refs\/heads\/(.+)$/);
+            ctx.gitBranch = m ? m[1] : "(detached)";
+          } catch { /* skip */ }
+        })()
+      ]);
 
       // Stats
       const st = getStats(loaded.analysis);
