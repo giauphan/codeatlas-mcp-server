@@ -2408,10 +2408,16 @@ def register(ctx):
       const loaded = await loadAnalysisAsync(project);
       if (!loaded) return { content: [{ type: "text" as const, text: "No analysis found. Run 'analyze' first." }] };
 
-      const q = symbol.toLowerCase();
-      const matches = loaded.analysis.graph.nodes.filter(
-        n => n.label.toLowerCase().includes(q) && n.filePath && !n.id.startsWith("external:")
-      ).slice(0, 10);
+      // ⚡ Bolt Optimization: Use precompiled regex and early loop exit instead of chaining .filter().slice()
+      // to avoid O(N) traversals and .toLowerCase() intermediate string allocations across thousands of nodes
+      const searchRegex = new RegExp(escapeRegExp(symbol), 'i');
+      const matches: typeof loaded.analysis.graph.nodes = [];
+      for (const n of loaded.analysis.graph.nodes) {
+        if (searchRegex.test(n.label) && n.filePath && !n.id.startsWith("external:")) {
+          matches.push(n);
+          if (matches.length >= 10) break;
+        }
+      }
 
       if (matches.length === 0)
         return { content: [{ type: "text" as const, text: JSON.stringify({ symbol, matchCount: 0, message: `No symbol '${symbol}' found.` }) }] };
