@@ -2051,7 +2051,7 @@ export function registerTools(server: McpServer) {
 
       // Resolve the project directory immediately to ensure path traversal tokens (like `../`)
       // are fully expanded before validation occurs.
-      let resolvedDir = "";
+      let resolvedDir: string;
       try {
         resolvedDir = fs.realpathSync(loaded.projectDir);
       } catch {
