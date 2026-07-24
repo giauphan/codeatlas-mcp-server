@@ -99,12 +99,10 @@ function findDirMatchingNormalized(normalized: string): string | null {
           if (partA !== partB) {
             isExactCase = false;
 
-            // Lazy-compute lowercased parts for the directory entry to prevent allocations on exact matches
+            // Lazy-compute lowercase arrays to avoid allocations on exact matches
             if (normFilePartsLower === null) {
               normFilePartsLower = normFileParts.map(p => p.toLowerCase());
             }
-
-            // Lazy-compute lowercase parts to avoid string allocations inside the nested loop
             if (lowerParts === null) {
               lowerParts = parts.map(p => p.toLowerCase());
             }
