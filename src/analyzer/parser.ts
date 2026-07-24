@@ -201,7 +201,10 @@ export class CodeAnalyzer {
     const circularDepsCount = this.detectCircularDeps();
 
     // Calculate entity counts in a single pass over nodes instead of mapping/filtering multiple times
-    let modulesCount = 0, functionsCount = 0, classesCount = 0, variablesCount = 0;
+    let modulesCount = 0;
+    let functionsCount = 0;
+    let classesCount = 0;
+    let variablesCount = 0;
     for (const node of this.nodes.values()) {
       if (node.type === 'module') modulesCount++;
       else if (node.type === 'function') functionsCount++;
