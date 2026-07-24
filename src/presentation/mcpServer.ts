@@ -2053,32 +2053,39 @@ export function registerTools(server: McpServer) {
       const loaded = await loadAnalysisAsync(project);
       if (!loaded) return { content: [{ type: "text" as const, text: "No analysis found. Run 'analyze' first." }] };
 
-      const projectDir = loaded.projectDir;
+      // Resolve the project directory immediately to ensure path traversal tokens (like `../`)
+      // are fully expanded before validation occurs.
+      let resolvedDir: string;
+      try {
+        resolvedDir = fs.realpathSync(loaded.projectDir);
+      } catch {
+        return { content: [{ type: "text" as const, text: JSON.stringify({ error: "Invalid project directory" }) }] };
+      }
 
       // 🛡️ Sentinel Security Validation
-      // Ensure the project directory is an authorized workspace to prevent path traversal
+      // Ensure the resolved project directory is an authorized workspace to prevent path traversal
       const authorizedProjects = await discoverProjectsAsync(auth.uid);
-      if (!isPathInAuthorizedProjects(projectDir, authorizedProjects)) {
+      if (!isPathInAuthorizedProjects(resolvedDir, authorizedProjects)) {
         return { content: [{ type: "text" as const, text: JSON.stringify({ error: "Unauthorized project directory" }) }] };
       }
 
-      if (!fs.existsSync(path.join(projectDir, ".git"))) return { content: [{ type: "text" as const, text: JSON.stringify({ error: "Not a git repository" }) }] };
+      if (!fs.existsSync(path.join(resolvedDir, ".git"))) return { content: [{ type: "text" as const, text: JSON.stringify({ error: "Not a git repository" }) }] };
 
       const maxC = Math.min(commits || 5, 20);
       const result: any = { project: loaded.projectName };
       const cp = require("child_process");
 
       try {
-        result.branch = cp.execFileSync("git", ["rev-parse", "--abbrev-ref", "HEAD"], { cwd: projectDir, encoding: "utf-8" }).toString().trim();
-        const st = cp.execFileSync("git", ["status", "--porcelain"], { cwd: projectDir, encoding: "utf-8" }).toString();
+        result.branch = cp.execFileSync("git", ["rev-parse", "--abbrev-ref", "HEAD"], { cwd: resolvedDir, encoding: "utf-8" }).toString().trim();
+        const st = cp.execFileSync("git", ["status", "--porcelain"], { cwd: resolvedDir, encoding: "utf-8" }).toString();
         const mod: string[] = [], add: string[] = [], del: string[] = [];
         for (const line of st.split("\n").map((x: string) => x.trim()).filter(Boolean)) { const s = line.substring(0, 2), f = line.substring(3); if (s.includes("M")) mod.push(f); if (s.includes("A")) add.push(f); if (s.includes("D")) del.push(f); }
         result.uncommitted = { modified: mod.slice(0, 20), added: add.slice(0, 10), deleted: del.slice(0, 10), hasChanges: st.trim().length > 0 };
         try {
-          const [behind, ahead] = cp.execFileSync("git", ["rev-list", "--left-right", "--count", "HEAD...@{upstream}"], { cwd: projectDir, encoding: "utf-8" }).toString().trim().split("\t").map(Number);
+          const [behind, ahead] = cp.execFileSync("git", ["rev-list", "--left-right", "--count", "HEAD...@{upstream}"], { cwd: resolvedDir, encoding: "utf-8" }).toString().trim().split("\t").map(Number);
           result.ahead = ahead || 0; result.behind = behind || 0;
         } catch { result.ahead = null; result.behind = null; }
-        const logRaw = cp.execFileSync("git", ["log", `-${maxC}`, "--format=COMMIT%n%H%n%an%n%ai%n%s%nFILES:", "--name-only"], { cwd: projectDir, encoding: "utf-8", maxBuffer: 1024 * 1024 }).toString();
+        const logRaw = cp.execFileSync("git", ["log", `-${maxC}`, "--format=COMMIT%n%H%n%an%n%ai%n%s%nFILES:", "--name-only"], { cwd: resolvedDir, encoding: "utf-8", maxBuffer: 1024 * 1024 }).toString();
         result.recentCommits = [];
         for (const block of logRaw.split("COMMIT\n").filter(Boolean)) {
           const ls = block.trim().split("\n"); if (ls.length < 4) continue;
