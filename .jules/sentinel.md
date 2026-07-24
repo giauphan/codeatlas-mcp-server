@@ -26,3 +26,7 @@
 **Vulnerability:** MCP tools allowed unbounded string lengths in Zod schemas (`z.string()`).
 **Learning:** Missing input length validation allows attackers to submit extremely large strings causing excessive memory usage and parsing overhead (CWE-400), leading to Denial of Service (DoS).
 **Prevention:** Always explicitly set maximum string lengths (e.g., `.max(255)`) on all `z.string()` schemas.
+## 2026-07-28 - [Path Traversal in Workspace Validation]
+**Vulnerability:** Path traversal in `git_changes` allowed attackers to execute git commands on unauthorized directories by bypassing the `isPathInAuthorizedProjects` check using unresolved paths containing `../`.
+**Learning:** Resolving a user-provided path via `fs.realpathSync()` *after* a security authorization check has already executed is ineffective. The boundary verification (`startsWith`) must evaluate the final, fully-resolved canonical path.
+**Prevention:** Always resolve file system paths fully using `fs.realpathSync()` **before** performing any authorization or boundary validation checks.
