@@ -174,9 +174,16 @@ export class CodeAnalyzer {
   }
 
   private buildAnalysisResult(): AnalysisResult {
+    // Calculate node degrees in O(E) instead of O(N*E) to improve buildAnalysisResult performance for large graphs
+    const nodeDegrees = new Map<string, number>();
+    for (const link of this.links) {
+      nodeDegrees.set(link.source, (nodeDegrees.get(link.source) || 0) + 1);
+      nodeDegrees.set(link.target, (nodeDegrees.get(link.target) || 0) + 1);
+    }
+
     // Add graph layout sizes based on relationships
     this.nodes.forEach(node => {
-      let degree = this.links.filter(l => l.source === node.id || l.target === node.id).length;
+      const degree = nodeDegrees.get(node.id) || 0;
       node.val = (node.type === 'module' ? 8 : (node.type === 'class' ? 6 : 4)) + Math.log1p(degree) * 2;
     });
 
@@ -193,12 +200,29 @@ export class CodeAnalyzer {
     const insights = this.generateAIInsights(graph);
     const circularDepsCount = this.detectCircularDeps();
 
+    // Calculate entity counts in a single pass over nodes instead of mapping/filtering multiple times
+    let modulesCount = 0;
+    let functionsCount = 0;
+    let classesCount = 0;
+    let variablesCount = 0;
+    for (const node of this.nodes.values()) {
+      if (node.type === 'module') modulesCount++;
+      else if (node.type === 'function') functionsCount++;
+      else if (node.type === 'class') classesCount++;
+      else if (node.type === 'variable') variablesCount++;
+    }
+
+    let dependenciesCount = 0;
+    for (const link of this.links) {
+      if (link.type === 'import') dependenciesCount++;
+    }
+
     const counts = {
-      modules: Array.from(this.nodes.values()).filter(n => n.type === 'module').length,
-      functions: Array.from(this.nodes.values()).filter(n => n.type === 'function').length,
-      classes: Array.from(this.nodes.values()).filter(n => n.type === 'class').length,
-      variables: Array.from(this.nodes.values()).filter(n => n.type === 'variable').length,
-      dependencies: this.links.filter(l => l.type === 'import').length,
+      modules: modulesCount,
+      functions: functionsCount,
+      classes: classesCount,
+      variables: variablesCount,
+      dependencies: dependenciesCount,
       circularDeps: circularDepsCount,
       deadCode: 0
     };
