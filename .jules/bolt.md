@@ -42,3 +42,7 @@
 ## 2024-05-19 - CodeAnalyzer AST Parsing Graph Build Bottleneck
 **Learning:** Found an O(N*E) bottleneck in `buildAnalysisResult` where calculating degree involved repeatedly filtering `this.links` array for each node.
 **Action:** Replace `this.links.filter` with a single `nodeDegrees` Map that tallies edges across `this.links` in O(E), improving huge graph generation times significantly. Also optimized `entityCounts` grouping to O(N) by collapsing multiple `Array.from().filter()` calls into a single loop.
+
+## 2024-05-19 - [Performance improvement] Array slice and string regex
+**Learning:** We replaced `filter().slice()` chains with early exit `for` loop `break` checks. We also utilized precomputed lowercase outside loops and precompiled `RegExp` to replace `String.prototype.includes` across the codebase inside iteration filters which speeds up array filtering tremendously without large GC overhead.
+**Action:** When filtering objects via string matching, replace inline string checking and string `.toLowerCase()` allocations with pre-compiled regex objects for fast paths. Avoid `.filter().slice(0, N)` when we can simply run a traditional iteration block to `break` early.

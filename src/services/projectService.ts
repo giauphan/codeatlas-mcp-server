@@ -753,8 +753,9 @@ export function loadAnalysis(projectDir?: string, force = false): { analysis: An
       console.warn(`[Auto-Scan] 🛡️ Ignored IDE system/extensions directory from workspace indexing: ${absPath}`);
       return null;
     }
+    const targetLower = projectDir.trim().toLowerCase();
     let match = projects.find(
-      (p) => p.dir === absPath || p.name.toLowerCase() === projectDir.trim().toLowerCase()
+      (p) => p.dir === absPath || p.name.toLowerCase() === targetLower
     );
     if (match) {
       target = match;
@@ -925,8 +926,9 @@ export async function loadAnalysisAsync(
       console.warn(`[Auto-Scan] 🛡️ Ignored IDE system/extensions directory from workspace indexing: ${absPath}`);
       return null;
     }
+    const targetLower = projectDir.trim().toLowerCase();
     let match = projects.find(
-      (p) => p.dir === absPath || p.name.toLowerCase() === projectDir.trim().toLowerCase()
+      (p) => p.dir === absPath || p.name.toLowerCase() === targetLower
     );
     if (match) {
       target = match;

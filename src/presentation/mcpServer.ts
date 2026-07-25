@@ -1072,13 +1072,21 @@ export function registerTools(server: McpServer) {
           return b.entityCount - a.entityCount;
         });
 
+      const filteredFiles = [];
+      for (const f of filesArray) {
+        if (f.filePath !== "external") {
+          filteredFiles.push(f);
+          if (filteredFiles.length >= 30) break;
+        }
+      }
+
       const result = {
         keyword,
         project: loaded.projectName,
         seedMatches: seedNodes.size,
         totalConnected: visited.size,
         depth: maxDepth,
-        files: filesArray.filter((f) => f.filePath !== "external").slice(0, 30),
+        files: filteredFiles,
         externalDeps: filesArray.find((f) => f.filePath === "external")?.entities.map((e) => e.name) || [],
         relationships: traceLinks.slice(0, 50).map((l) => ({
           from: nodeMap.get(l.source)?.label || l.source,
@@ -2887,8 +2895,12 @@ def register(ctx):
       }
 
       if (action === "query") {
-        const q = (query || "").toLowerCase();
-        const matches = q ? skills.filter(s => s.name.includes(q) || s.description.toLowerCase().includes(q)) : skills;
+        const q = query || "";
+        let matches = skills;
+        if (q) {
+          const regex = new RegExp(escapeRegExp(q), 'i');
+          matches = skills.filter(s => regex.test(s.name) || regex.test(s.description));
+        }
         return { content: [{ type: "text" as const, text: JSON.stringify({
           query: q || "(all)", count: matches.length, totalSkills: skills.length,
           results: matches.slice(0, limit || 20).map(s => ({ name: s.name, description: s.description, source: s.source })),
