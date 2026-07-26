@@ -42,3 +42,6 @@
 ## 2024-05-19 - CodeAnalyzer AST Parsing Graph Build Bottleneck
 **Learning:** Found an O(N*E) bottleneck in `buildAnalysisResult` where calculating degree involved repeatedly filtering `this.links` array for each node.
 **Action:** Replace `this.links.filter` with a single `nodeDegrees` Map that tallies edges across `this.links` in O(E), improving huge graph generation times significantly. Also optimized `entityCounts` grouping to O(N) by collapsing multiple `Array.from().filter()` calls into a single loop.
+## 2026-07-26 - [Performance improvement] Array.find inside Array.map
+**Learning:** Found an O(L*N) bottleneck in `mcpServer.ts` (exporting artifact summary) and `e2e.test.ts` where `Array.prototype.find()` was called inside `Array.prototype.map()` for every graph link to find its source and target nodes. This is extremely slow for large AST graphs.
+**Action:** Always precompute a lookup Map (e.g., `Map<string, string>`) in O(N) time before the loop, and use `.get()` to look up elements in O(1) time. Also avoid chained `.filter().map().slice()` by combining them into a single early-exit `for` loop.

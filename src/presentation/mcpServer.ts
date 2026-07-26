@@ -2739,6 +2739,23 @@ def register(ctx):
           const links = loaded.analysis.graph.links;
           const stats = getStats(loaded.analysis);
 
+          // ⚡ Bolt Optimization: Replace O(N*L) array finds inside map with O(1) Map lookups and early exit loop
+          const nodeLabelMap = new Map<string, string>();
+          for (const n of nodes) {
+            nodeLabelMap.set(n.id, n.label);
+          }
+
+          const callGraph: Array<{ from: string; to: string }> = [];
+          for (const l of links) {
+            if (l.type === "call") {
+              callGraph.push({
+                from: nodeLabelMap.get(l.source) || l.source,
+                to: nodeLabelMap.get(l.target) || l.target,
+              });
+              if (callGraph.length >= 500) break;
+            }
+          }
+
           const summary = {
             version: 1,
             exportedAt: new Date().toISOString(),
@@ -2747,10 +2764,7 @@ def register(ctx):
             modules: nodes.filter(n => n.type === "module").map(n => ({ id: n.id, name: n.label, file: n.filePath })),
             classes: nodes.filter(n => n.type === "class").map(n => ({ id: n.id, name: n.label, file: n.filePath, line: n.line })),
             functions: nodes.filter(n => n.type === "function").map(n => ({ id: n.id, name: n.label, file: n.filePath, line: n.line })),
-            callGraph: links.filter(l => l.type === "call").map(l => ({
-              from: nodes.find(n => n.id === l.source)?.label || l.source,
-              to: nodes.find(n => n.id === l.target)?.label || l.target,
-            })).slice(0, 500),
+            callGraph,
           };
 
           const outPath = path.join(artifactDir, "artifact-summary.json");

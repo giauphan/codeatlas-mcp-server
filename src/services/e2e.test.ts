@@ -245,6 +245,23 @@ export class HelperService {
       assert.ok(cache, "Analysis must be in cache for export");
 
       // Simulate export
+      // ⚡ Bolt Optimization: Replace O(N*L) array finds inside map with O(1) Map lookups and early exit loop
+      const nodeLabelMap = new Map<string, string>();
+      for (const n of cache!.graph.nodes) {
+        nodeLabelMap.set(n.id, n.label);
+      }
+
+      const callGraph: Array<{ from: string; to: string }> = [];
+      for (const l of cache!.graph.links) {
+        if (l.type === "call") {
+          callGraph.push({
+            from: nodeLabelMap.get(l.source) || l.source,
+            to: nodeLabelMap.get(l.target) || l.target,
+          });
+          if (callGraph.length >= 500) break;
+        }
+      }
+
       const summary = {
         version: 1,
         exportedAt: new Date().toISOString(),
@@ -253,10 +270,7 @@ export class HelperService {
         modules: cache!.graph.nodes.filter((n: { type: string }) => n.type === "module" || n.type === "class").map((n: { id: string; label: string; filePath?: string }) => ({ id: n.id, name: n.label, file: n.filePath })),
         classes: cache!.graph.nodes.filter((n: { type: string }) => n.type === "class").map((n: { id: string; label: string; filePath?: string; line?: number }) => ({ id: n.id, name: n.label, file: n.filePath, line: n.line })),
         functions: cache!.graph.nodes.filter((n: { type: string }) => n.type === "function").map((n: { id: string; label: string; filePath?: string; line?: number }) => ({ id: n.id, name: n.label, file: n.filePath, line: n.line })),
-        callGraph: cache!.graph.links.filter((l: { type: string }) => l.type === "call").map((l: { source: string; target: string }) => ({
-          from: cache!.graph.nodes.find((n: { id: string }) => n.id === l.source)?.label || l.source,
-          to: cache!.graph.nodes.find((n: { id: string }) => n.id === l.target)?.label || l.target,
-        })),
+        callGraph,
       };
 
       const outPath = path.join(artifactDir, "artifact-summary.json");
