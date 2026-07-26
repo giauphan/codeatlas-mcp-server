@@ -2328,14 +2328,14 @@ def register(ctx):
     "Manage Architecture Decision Records (ADRs) — persistent decisions that survive context resets. Use when documenting architecture choices, listing past decisions, updating status, or checking what was decided and why. ADRs persist at ~/.codeatlas/adr/<project>/.",
     {
       action: z.enum(["list", "get", "create", "update_status", "delete"]).describe("CRUD operation"),
-      project: z.string().optional().describe("Project name (required for create)"),
-      id: z.string().optional().describe("ADR ID (e.g. 'adr-001') — required for get/update_status/delete"),
-      title: z.string().optional().describe("Decision title (required for create)"),
+      project: z.string().max(255).optional().describe("Project name (required for create)"),
+      id: z.string().max(255).optional().describe("ADR ID (e.g. 'adr-001') — required for get/update_status/delete"),
+      title: z.string().max(255).optional().describe("Decision title (required for create)"),
       status: z.enum(["proposed", "accepted", "deprecated", "superseded"]).optional().describe("New status for update_status"),
-      context: z.string().optional().describe("Why this decision was needed (create)"),
-      decision: z.string().optional().describe("What was decided (create)"),
-      consequences: z.string().optional().describe("Expected outcomes — positive, negative, risks (create)"),
-      supersededBy: z.string().optional().describe("ADR ID that supersedes this one (required when status is superseded)"),
+      context: z.string().max(50000).optional().describe("Why this decision was needed (create)"),
+      decision: z.string().max(50000).optional().describe("What was decided (create)"),
+      consequences: z.string().max(50000).optional().describe("Expected outcomes — positive, negative, risks (create)"),
+      supersededBy: z.string().max(255).optional().describe("ADR ID that supersedes this one (required when status is superseded)"),
     },
     async ({ action, project, id, title, status, context: ctxText, decision, consequences, supersededBy }) => {
       const auth = await checkAuth();
@@ -2406,8 +2406,8 @@ def register(ctx):
     "get_code_snippet",
     "Read source code of a specific function/class/module by its qualified name. Returns the exact file path, line range, and raw source. Use when you need to see the actual implementation — not just that it exists.",
     {
-      project: z.string().optional().describe("Project name or path"),
-      symbol: z.string().describe("Qualified name or partial match (e.g. 'UserService', 'parseRequest', 'Auth.login')"),
+      project: z.string().max(255).optional().describe("Project name or path"),
+      symbol: z.string().max(255).describe("Qualified name or partial match (e.g. 'UserService', 'parseRequest', 'Auth.login')"),
       contextLines: z.number().optional().describe("Extra context lines around the symbol (default: 5, max: 30)"),
     },
     async ({ project, symbol, contextLines }) => {
@@ -2505,7 +2505,7 @@ def register(ctx):
     "index_coverage",
     "Check what files and entity types are indexed for a project. Returns: file count, entity distribution, files with most entities, and files that might be missing (not indexed). Use after 'analyze' to verify coverage.",
     {
-      project: z.string().optional().describe("Project name or path"),
+      project: z.string().max(255).optional().describe("Project name or path"),
     },
     async ({ project }) => {
       const auth = await checkAuth();
@@ -2602,7 +2602,7 @@ def register(ctx):
     "detect_code_similarities",
     "Find near-duplicate or semantically similar functions/classes in a project. Uses token-based Jaccard similarity to find code that looks different but does the same thing. Returns groups of similar functions with similarity scores. Use before refactoring to consolidate duplicated logic.",
     {
-      project: z.string().optional().describe("Project name or path"),
+      project: z.string().max(255).optional().describe("Project name or path"),
       threshold: z.number().optional().describe("Similarity threshold 0-1 (default: 0.6 = 60% similar). Lower = more results"),
       limit: z.number().optional().describe("Max similar pairs to return (default: 20)"),
     },
@@ -2719,7 +2719,7 @@ def register(ctx):
     "export_team_artifact",
     "Export a compressed snapshot of the project's analysis (knowledge graph + dream memories) to .codeatlas/artifact.db — a single file that can be committed to git and shared with teammates. On clone, teammates get instant codebase intelligence without re-analyzing. Similar to codebase-memory-mcp's .codebase-memory/graph.db.zst pattern.",
     {
-      project: z.string().optional().describe("Project name or path"),
+      project: z.string().max(255).optional().describe("Project name or path"),
       format: z.enum(["json", "summary"]).optional().describe("'json' = full export, 'summary' = compressed summary only"),
     },
     async ({ project, format }) => {
@@ -2821,7 +2821,7 @@ def register(ctx):
     {
       action: z.enum(["sync", "query", "list_all"]).optional().default("sync")
         .describe("'sync' = scan & save inventory to brain, 'query' = search available skills, 'list_all' = full skill list"),
-      query: z.string().optional().describe("Search query (for query action)"),
+      query: z.string().max(255).optional().describe("Search query (for query action)"),
       limit: z.number().optional().describe("Max results for query (default: 20)"),
     },
     async ({ action, query, limit }) => {
