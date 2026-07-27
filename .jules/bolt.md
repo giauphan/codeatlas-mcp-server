@@ -45,3 +45,6 @@
 ## 2026-07-26 - [Performance improvement] Array.find inside Array.map
 **Learning:** Found an O(L*N) bottleneck in `mcpServer.ts` (exporting artifact summary) and `e2e.test.ts` where `Array.prototype.find()` was called inside `Array.prototype.map()` for every graph link to find its source and target nodes. This is extremely slow for large AST graphs.
 **Action:** Always precompute a lookup Map (e.g., `Map<string, string>`) in O(N) time before the loop, and use `.get()` to look up elements in O(1) time. Also avoid chained `.filter().map().slice()` by combining them into a single early-exit `for` loop.
+## 2026-07-26 - [Performance improvement] Optimized O(N*E) generateAIInsights
+**Learning:** Filtering a links array for every node using `graph.links.filter` creates an O(N*E) bottleneck when checking relationships (like finding modules with many functions).
+**Action:** When filtering or counting relationships between nodes, avoid nesting a links filter inside a nodes loop. Instead, do a single O(E) pass over the links array to precompute the required counts in a Map, enabling O(1) lookups during the subsequent O(N) nodes loop.

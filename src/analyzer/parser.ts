@@ -1217,10 +1217,17 @@ export class CodeAnalyzer {
     // Mock AI Insights generation based on simple heuristics
     
     // 1. Large files / God objects
+    // ⚡ Bolt Optimization: Replace O(N*E) nested array filter with O(E) precomputed Map and O(1) lookups
+    const moduleFunctionCounts = new Map<string, number>();
+    for (const l of graph.links) {
+      if (l.type === 'contains' && l.target.startsWith('function')) {
+        moduleFunctionCounts.set(l.source, (moduleFunctionCounts.get(l.source) || 0) + 1);
+      }
+    }
+
     const modulesWithManyFunctions = Array.from(this.nodes.values()).filter(n => {
       if (n.type !== 'module') return false;
-      const functionCount = graph.links.filter(l => l.source === n.id && l.type === 'contains' && l.target.startsWith('function')).length;
-      return functionCount > 10; // threshold
+      return (moduleFunctionCounts.get(n.id) || 0) > 10; // threshold
     });
 
     if (modulesWithManyFunctions.length > 0) {
