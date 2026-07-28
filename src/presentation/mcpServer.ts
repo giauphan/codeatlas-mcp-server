@@ -1073,11 +1073,16 @@ export function registerTools(server: McpServer) {
         });
 
       const filteredFiles = [];
+      let externalDeps: string[] = [];
       for (const f of filesArray) {
         if (f.filePath !== "external") {
-          filteredFiles.push(f);
-          if (filteredFiles.length >= 30) break;
+          if (filteredFiles.length < 30) {
+            filteredFiles.push(f);
+          }
+        } else {
+          externalDeps = f.entities.map((e) => e.name);
         }
+        if (filteredFiles.length >= 30 && externalDeps.length > 0) break;
       }
 
       const result = {
@@ -1087,7 +1092,7 @@ export function registerTools(server: McpServer) {
         totalConnected: visited.size,
         depth: maxDepth,
         files: filteredFiles,
-        externalDeps: filesArray.find((f) => f.filePath === "external")?.entities.map((e) => e.name) || [],
+        externalDeps,
         relationships: (traceLinks.length > 50 ? traceLinks.slice(0, 50) : traceLinks).map((l) => ({
           from: nodeMap.get(l.source)?.label || l.source,
           to: nodeMap.get(l.target)?.label || l.target,
