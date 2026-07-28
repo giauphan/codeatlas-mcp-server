@@ -1088,7 +1088,7 @@ export function registerTools(server: McpServer) {
         depth: maxDepth,
         files: filteredFiles,
         externalDeps: filesArray.find((f) => f.filePath === "external")?.entities.map((e) => e.name) || [],
-        relationships: traceLinks.slice(0, 50).map((l) => ({
+        relationships: (traceLinks.length > 50 ? traceLinks.slice(0, 50) : traceLinks).map((l) => ({
           from: nodeMap.get(l.source)?.label || l.source,
           to: nodeMap.get(l.target)?.label || l.target,
           type: l.type,
