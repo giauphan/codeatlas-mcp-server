@@ -748,12 +748,13 @@ export function loadAnalysis(projectDir?: string, force = false): { analysis: An
   let target: { name: string; dir: string; analysisPath: string; modifiedAt: Date } | undefined = projects[0];
 
   if (projectDir) {
-    const absPath = path.resolve(projectDir.trim());
+    const trimmedDir = projectDir.trim();
+    const absPath = path.resolve(trimmedDir);
     if (isSystemIdeDirectory(absPath)) {
       console.warn(`[Auto-Scan] 🛡️ Ignored IDE system/extensions directory from workspace indexing: ${absPath}`);
       return null;
     }
-    const targetLower = projectDir.trim().toLowerCase();
+    const targetLower = trimmedDir.toLowerCase();
     let match = projects.find(
       (p) => p.dir === absPath || p.name.toLowerCase() === targetLower
     );
@@ -921,12 +922,13 @@ export async function loadAnalysisAsync(
   let target: { name: string; dir: string; analysisPath: string; modifiedAt: Date } | undefined = projects[0];
 
   if (projectDir) {
-    const absPath = path.resolve(projectDir.trim());
+    const trimmedDir = projectDir.trim();
+    const absPath = path.resolve(trimmedDir);
     if (isSystemIdeDirectory(absPath)) {
       console.warn(`[Auto-Scan] 🛡️ Ignored IDE system/extensions directory from workspace indexing: ${absPath}`);
       return null;
     }
-    const targetLower = projectDir.trim().toLowerCase();
+    const targetLower = trimmedDir.toLowerCase();
     let match = projects.find(
       (p) => p.dir === absPath || p.name.toLowerCase() === targetLower
     );
