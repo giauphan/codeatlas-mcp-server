@@ -2904,7 +2904,7 @@ def register(ctx):
         let matches = skills;
         if (q) {
           const regex = new RegExp(escapeRegExp(q), 'i');
-          matches = skills.filter(s => regex.test(s.name) || regex.test(s.description));
+          matches = skills.filter(s => regex.test(s.name) || regex.test(s.description ?? ''));
         }
         return { content: [{ type: "text" as const, text: JSON.stringify({
           query: q || "(all)", count: matches.length, totalSkills: skills.length,
