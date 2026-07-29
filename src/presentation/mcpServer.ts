@@ -2632,8 +2632,8 @@ def register(ctx):
           const lines = content.split("\n");
           const start = (node.line || 1) - 1;
 
-          // Extract function body (up to 80 lines)
-          const body = lines.slice(start, start + 80).join("\n");
+          // Extract function body (up to 80 lines, max 1000 chars per line to prevent ReDoS)
+          const body = lines.slice(start, start + 80).map(l => l.substring(0, 1000)).join("\n");
 
           // Tokenize: identifiers + keywords (skip whitespace, punctuation)
           const tokens = new Set<string>();

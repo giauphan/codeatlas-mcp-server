@@ -35,3 +35,7 @@
 **Vulnerability:** The `project_context` tool in `src/presentation/mcpServer.ts` was missing an authorization validation check (`isPathInAuthorizedProjects`) before reading configuration files, reading the README, and fetching git status from the provided project directory.
 **Learning:** Even tools that only read data (like `project_context`) and seem harmless can still be exploited if they take a `project` path as an argument and construct arbitrary paths without validating against authorized workspace boundaries. An attacker might provide an absolute path like `/etc` as the project directory to read the file structure or specific configuration files.
 **Prevention:** Always use the `isPathInAuthorizedProjects` check in any tool that accepts a user-provided project directory or path before proceeding with any file system operations.
+## 2024-05-20 - Denial of Service via Unbounded Regex in code tokenization
+**Vulnerability:** Denial of Service (DoS) vulnerability due to unbounded regex evaluation on user-provided code strings during tokenization in `CodeAnalyzer`.
+**Learning:** Regular Expression Denial of Service (ReDoS) can occur even with seemingly safe regex patterns if the input string fed to the regex engine is arbitrarily long or malformed.
+**Prevention:** Always strictly bound the input size (e.g., truncate individual lines to a reasonable maximum length like 1000 characters) before applying regular expressions to user-provided text or code.
