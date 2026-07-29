@@ -40,32 +40,51 @@ function ensureDir(project: string): string {
   return dir;
 }
 
-export function listADRs(project?: string): ADR[] {
+export async function listADRs(project?: string): Promise<ADR[]> {
   const safeProject = project ? sanitizeProject(project) : undefined;
   const base = safeProject ? path.join(ADR_DIR, safeProject) : ADR_DIR;
   if (!fs.existsSync(base)) return [];
-  const all: ADR[] = [];
+
+  let all: ADR[] = [];
+
   if (safeProject) {
-    for (const f of fs.readdirSync(base)) {
-      if (f.endsWith(".json")) {
+    const files = await fs.promises.readdir(base);
+    const jsonFiles = files.filter(f => f.endsWith(".json"));
+
+    const parsed = await Promise.all(
+      jsonFiles.map(async f => {
         try {
-          all.push(JSON.parse(fs.readFileSync(path.join(base, f), "utf-8")));
-        } catch { /* skip corrupt */ }
-      }
-    }
+          return JSON.parse(await fs.promises.readFile(path.join(base, f), "utf-8"));
+        } catch { return null; }
+      })
+    );
+    all = parsed.filter(Boolean) as ADR[];
   } else {
-    for (const pdir of fs.readdirSync(base)) {
-      const pPath = path.join(base, pdir);
-      if (!fs.statSync(pPath).isDirectory()) continue;
-      for (const f of fs.readdirSync(pPath)) {
-        if (f.endsWith(".json")) {
-          try {
-            all.push(JSON.parse(fs.readFileSync(path.join(pPath, f), "utf-8")));
-          } catch { /* skip */ }
-        }
+    const pdirs = await fs.promises.readdir(base, { withFileTypes: true });
+
+    const projectPromises = pdirs.filter(dirent => dirent.isDirectory()).map(async pdir => {
+      const pPath = path.join(base, pdir.name);
+      try {
+        const files = await fs.promises.readdir(pPath);
+        const jsonFiles = files.filter(f => f.endsWith(".json"));
+
+        const parsed = await Promise.all(
+          jsonFiles.map(async f => {
+            try {
+              return JSON.parse(await fs.promises.readFile(path.join(pPath, f), "utf-8"));
+            } catch { return null; }
+          })
+        );
+        return parsed.filter(Boolean) as ADR[];
+      } catch {
+        return [];
       }
-    }
+    });
+
+    const results = await Promise.all(projectPromises);
+    all = results.flat();
   }
+
   return all.sort((a, b) => ((b.date || "").localeCompare(a.date || "")));
 }
 
