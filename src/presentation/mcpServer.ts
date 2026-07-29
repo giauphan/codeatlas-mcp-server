@@ -2344,7 +2344,7 @@ def register(ctx):
       try {
         switch (action) {
           case "list": {
-            const adrs = listADRs(project);
+            const adrs = await listADRs(project);
             return { content: [{ type: "text" as const, text: JSON.stringify({
               count: adrs.length,
               adrs: adrs.map(a => ({ id: a.id, title: a.title, status: a.status, date: a.date, project: a.project })),
@@ -2358,7 +2358,7 @@ def register(ctx):
           }
           case "create": {
             if (!project || !title || !decision) return { content: [{ type: "text" as const, text: JSON.stringify({ error: "project, title, and decision are required" }) }] };
-            const existing = listADRs(project);
+            const existing = await listADRs(project);
             let num = existing.length + 1;
             let id = `adr-${String(num).padStart(3, "0")}`;
             while (existing.some(adr => adr.id === id)) {
