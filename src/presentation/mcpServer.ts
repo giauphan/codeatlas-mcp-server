@@ -2558,10 +2558,19 @@ def register(ctx):
       // Coverage quality score
       const withFilePath = nodes.filter(n => n.filePath).length;
       const coveragePct = nodes.length > 0 ? Math.round((withFilePath / nodes.length) * 100) : 0;
-      const orphanNodes = nodes.filter(n => {
-        if (n.type === "variable") return false;
-        return !links.some(l => l.source === n.id || l.target === n.id);
-      }).length;
+
+      // ⚡ Bolt Optimization: Use a precomputed Set for O(1) link lookups instead of O(N*L) Array.some()
+      const linkedNodeIds = new Set<string>();
+      for (const l of links) {
+        linkedNodeIds.add(l.source);
+        linkedNodeIds.add(l.target);
+      }
+      let orphanNodes = 0;
+      for (const n of nodes) {
+        if (n.type !== "variable" && !linkedNodeIds.has(n.id)) {
+          orphanNodes++;
+        }
+      }
 
       // Discover actual project files not indexed
       const indexedFiles = new Set(fileEntityCount.keys());

@@ -48,3 +48,6 @@
 ## 2026-07-26 - [Performance improvement] Optimized O(N*E) generateAIInsights
 **Learning:** Filtering a links array for every node using `graph.links.filter` creates an O(N*E) bottleneck when checking relationships (like finding modules with many functions).
 **Action:** When filtering or counting relationships between nodes, avoid nesting a links filter inside a nodes loop. Instead, do a single O(E) pass over the links array to precompute the required counts in a Map, enabling O(1) lookups during the subsequent O(N) nodes loop.
+## 2025-07-29 - [Performance improvement] Optimized O(N*L) array some during node filtering
+**Learning:** Checking for node connections by using `nodes.filter` and inside it `links.some` is an O(N*L) operation which leads to a severe performance bottleneck for large graphs. Precomputing a Set with all `source` and `target` links takes O(L) space and time and makes the lookup O(1), bringing the total time complexity to O(N+L).
+**Action:** When filtering or counting relationships between nodes, avoid nesting a links `some` or `filter` or `find` inside a nodes loop. Instead, do a single O(L) pass over the links array to precompute a `Set` or `Map`, enabling O(1) lookups during the subsequent O(N) nodes loop.
