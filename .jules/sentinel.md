@@ -35,3 +35,7 @@
 **Vulnerability:** The `project_context` tool in `src/presentation/mcpServer.ts` was missing an authorization validation check (`isPathInAuthorizedProjects`) before reading configuration files, reading the README, and fetching git status from the provided project directory.
 **Learning:** Even tools that only read data (like `project_context`) and seem harmless can still be exploited if they take a `project` path as an argument and construct arbitrary paths without validating against authorized workspace boundaries. An attacker might provide an absolute path like `/etc` as the project directory to read the file structure or specific configuration files.
 **Prevention:** Always use the `isPathInAuthorizedProjects` check in any tool that accepts a user-provided project directory or path before proceeding with any file system operations.
+## 2026-07-29 - Unvalidated Command Execution via git_changes
+**Vulnerability:** Command injection vulnerability in `git_changes` tool via `child_process.execFileSync` and unvalidated directory path.
+**Learning:** Using `execFileSync` can still be risky if the command context or arguments are influenced by user input. Directory paths passed as `cwd` can also contain shell metacharacters that might be indirectly interpreted.
+**Prevention:** Always use `child_process.spawnSync` with `shell: false` for external binary execution. Ensure directory paths are sanitized using the `SHELL_METACHAR_RE` regex before being passed as `cwd` to prevent indirect command injection.
