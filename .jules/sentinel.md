@@ -39,3 +39,7 @@
 **Vulnerability:** Command injection vulnerability in `git_changes` tool via `child_process.execFileSync` and unvalidated directory path.
 **Learning:** Using `execFileSync` can still be risky if the command context or arguments are influenced by user input. Directory paths passed as `cwd` can also contain shell metacharacters that might be indirectly interpreted.
 **Prevention:** Always use `child_process.spawnSync` with `shell: false` for external binary execution. Ensure directory paths are sanitized using the `SHELL_METACHAR_RE` regex before being passed as `cwd` to prevent indirect command injection.
+## 2024-07-29 - [Authentication Bypass via Mock Fallback]
+**Vulnerability:** The `checkAuth` function used for authorization fell back to granting full privileges via a mock local user if no authentication context was found and `CODEATLAS_MULTI_TENANT` was not explicitly enabled.
+**Learning:** Returning mock authentication credentials as a default fallback allows attackers to easily bypass authentication simply by not providing any credentials.
+**Prevention:** Never use mock objects or fallback roles when authentication fails or is missing. Always throw an explicit unauthorized error.

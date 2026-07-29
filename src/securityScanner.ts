@@ -96,7 +96,6 @@ export class SecurityScanner {
     try {
       const criticalFindings = findings.filter(f => f.severity === "CRITICAL" || f.severity === "HIGH").slice(0, 5);
       const codeContext = criticalFindings.map(f => {
-        const node = analysis.graph.nodes.find(n => n.filePath === f.filePath);
         return "[" + f.severity + "] " + f.type + ": " + f.message + " (" + f.filePath + ":" + f.line + ")";
       }).join("\n");
 
