@@ -51,3 +51,10 @@
 ## 2025-07-29 - [Performance improvement] Optimized O(N*L) array some during node filtering
 **Learning:** Checking for node connections by using `nodes.filter` and inside it `links.some` is an O(N*L) operation which leads to a severe performance bottleneck for large graphs. Precomputing a Set with all `source` and `target` links takes O(L) space and time and makes the lookup O(1), bringing the total time complexity to O(N+L).
 **Action:** When filtering or counting relationships between nodes, avoid nesting a links `some` or `filter` or `find` inside a nodes loop. Instead, do a single O(L) pass over the links array to precompute a `Set` or `Map`, enabling O(1) lookups during the subsequent O(N) nodes loop.
+## 2025-07-29 - [Performance improvement] Optimized O(N) array filtering and mapping
+**Learning:** Chained array methods like `.filter().map()` or `.filter().slice().map()` on large sets of graph nodes are inefficient. They enforce multiple O(N) traversals of all nodes and create intermediate array allocations.
+**Action:** When filtering and mapping a large collection, use a single `for...of` loop. Apply filter conditions inside the loop and `push` to the result array. Implement early exit conditions (e.g. `count < limit`) to avoid iterating the entire collection unnecessarily when a limited slice is desired.
+
+## 2025-07-29 - [Performance improvement] Optimized O(E) double link traversal
+**Learning:** Traversing the same `links` array multiple times (e.g. using `links.forEach()` to count outgoing connections, then `links.forEach()` again to count incoming connections) wastes execution time.
+**Action:** When calculating multiple distinct graph metrics from links, combine them into a single O(E) loop that populates multiple Maps simultaneously.
