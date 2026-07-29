@@ -40,7 +40,7 @@ describe("ADR Service — CRUD operations", () => {
     saveADR({ id: "adr-002", title: "Older", status: "accepted" as const, context: "", decision: "A", consequences: "", project: "__test__", date: "2023-01-01" });
     saveADR({ id: "adr-003", title: "Newer", status: "accepted" as const, context: "", decision: "B", consequences: "", project: "__test__", date: "2024-06-01" });
 
-    const all = listADRs("__test__");
+    const all = await listADRs("__test__");
     assert.ok(all.length >= 3);
     // Newest first
     assert.strictEqual(all[0].date, "2024-06-01");

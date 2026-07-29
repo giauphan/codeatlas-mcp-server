@@ -105,7 +105,7 @@ export class HelperService {
       const { saveADR, listADRs } = await import("./adrService.js");
       saveADR({ id: "e2e-adr-2", title: "Old", status: "proposed", context: "", decision: "A", consequences: "", project: "e2e-test", date: "2023-01-01" });
       saveADR({ id: "e2e-adr-3", title: "New", status: "accepted", context: "", decision: "B", consequences: "", project: "e2e-test", date: "2024-07-15" });
-      const all = listADRs("e2e-test");
+      const all = await listADRs("e2e-test");
       assert.ok(all.length >= 3);
       assert.strictEqual(all[0].date, "2024-07-15");
     });

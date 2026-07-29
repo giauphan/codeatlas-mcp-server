@@ -1079,7 +1079,7 @@ export function registerTools(server: McpServer) {
         totalConnected: visited.size,
         depth: maxDepth,
         files: filesArray.filter((f) => f.filePath !== "external").slice(0, 30),
-        externalDeps: filesArray.find((f) => f.filePath === "external")?.entities.map((e) => e.name) || [],
+        externalDeps: byFile.get("external")?.map((e) => e.name) || [],
         relationships: traceLinks.slice(0, 50).map((l) => ({
           from: nodeMap.get(l.source)?.label || l.source,
           to: nodeMap.get(l.target)?.label || l.target,
@@ -2088,23 +2088,35 @@ export function registerTools(server: McpServer) {
         return { content: [{ type: "text" as const, text: JSON.stringify({ error: "Unauthorized project directory" }) }] };
       }
 
+      // Security: Block shell metacharacters in directory path to prevent indirect command injection
+      if (SHELL_METACHAR_RE.test(resolvedDir)) {
+        return { content: [{ type: "text" as const, text: JSON.stringify({ error: "Security Error: Directory path contains forbidden shell metacharacters" }) }] };
+      }
+
       if (!fs.existsSync(path.join(resolvedDir, ".git"))) return { content: [{ type: "text" as const, text: JSON.stringify({ error: "Not a git repository" }) }] };
 
       const maxC = Math.min(commits || 5, 20);
       const result: any = { project: loaded.projectName };
       const cp = require("child_process");
 
+      const execGit = (args: string[], maxBuffer?: number) => {
+        const res = cp.spawnSync("git", args, { cwd: resolvedDir, encoding: "utf-8", shell: false, maxBuffer });
+        if (res.error) throw res.error;
+        if (res.status !== 0) throw new Error(res.stderr?.toString() || "Git command failed");
+        return res.stdout.toString();
+      };
+
       try {
-        result.branch = cp.execFileSync("git", ["rev-parse", "--abbrev-ref", "HEAD"], { cwd: resolvedDir, encoding: "utf-8" }).toString().trim();
-        const st = cp.execFileSync("git", ["status", "--porcelain"], { cwd: resolvedDir, encoding: "utf-8" }).toString();
+        result.branch = execGit(["rev-parse", "--abbrev-ref", "HEAD"]).trim();
+        const st = execGit(["status", "--porcelain"]);
         const mod: string[] = [], add: string[] = [], del: string[] = [];
         for (const line of st.split("\n").map((x: string) => x.trim()).filter(Boolean)) { const s = line.substring(0, 2), f = line.substring(3); if (s.includes("M")) mod.push(f); if (s.includes("A")) add.push(f); if (s.includes("D")) del.push(f); }
         result.uncommitted = { modified: mod.slice(0, 20), added: add.slice(0, 10), deleted: del.slice(0, 10), hasChanges: st.trim().length > 0 };
         try {
-          const [behind, ahead] = cp.execFileSync("git", ["rev-list", "--left-right", "--count", "HEAD...@{upstream}"], { cwd: resolvedDir, encoding: "utf-8" }).toString().trim().split("\t").map(Number);
+          const [behind, ahead] = execGit(["rev-list", "--left-right", "--count", "HEAD...@{upstream}"]).trim().split("\t").map(Number);
           result.ahead = ahead || 0; result.behind = behind || 0;
         } catch { result.ahead = null; result.behind = null; }
-        const logRaw = cp.execFileSync("git", ["log", `-${maxC}`, "--format=COMMIT%n%H%n%an%n%ai%n%s%nFILES:", "--name-only"], { cwd: resolvedDir, encoding: "utf-8", maxBuffer: 1024 * 1024 }).toString();
+        const logRaw = execGit(["log", `-${maxC}`, "--format=COMMIT%n%H%n%an%n%ai%n%s%nFILES:", "--name-only"], 1024 * 1024);
         result.recentCommits = [];
         for (const block of logRaw.split("COMMIT\n").filter(Boolean)) {
           const ls = block.trim().split("\n"); if (ls.length < 4) continue;
@@ -2344,7 +2356,7 @@ def register(ctx):
       try {
         switch (action) {
           case "list": {
-            const adrs = listADRs(project);
+            const adrs = await listADRs(project);
             return { content: [{ type: "text" as const, text: JSON.stringify({
               count: adrs.length,
               adrs: adrs.map(a => ({ id: a.id, title: a.title, status: a.status, date: a.date, project: a.project })),
@@ -2358,7 +2370,7 @@ def register(ctx):
           }
           case "create": {
             if (!project || !title || !decision) return { content: [{ type: "text" as const, text: JSON.stringify({ error: "project, title, and decision are required" }) }] };
-            const existing = listADRs(project);
+            const existing = await listADRs(project);
             let num = existing.length + 1;
             let id = `adr-${String(num).padStart(3, "0")}`;
             while (existing.some(adr => adr.id === id)) {
