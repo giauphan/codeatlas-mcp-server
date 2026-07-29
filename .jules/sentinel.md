@@ -35,3 +35,7 @@
 **Vulnerability:** The `project_context` tool in `src/presentation/mcpServer.ts` was missing an authorization validation check (`isPathInAuthorizedProjects`) before reading configuration files, reading the README, and fetching git status from the provided project directory.
 **Learning:** Even tools that only read data (like `project_context`) and seem harmless can still be exploited if they take a `project` path as an argument and construct arbitrary paths without validating against authorized workspace boundaries. An attacker might provide an absolute path like `/etc` as the project directory to read the file structure or specific configuration files.
 **Prevention:** Always use the `isPathInAuthorizedProjects` check in any tool that accepts a user-provided project directory or path before proceeding with any file system operations.
+## 2024-07-29 - [Authentication Bypass via Mock Fallback]
+**Vulnerability:** The `checkAuth` function used for authorization fell back to granting full privileges via a mock local user if no authentication context was found and `CODEATLAS_MULTI_TENANT` was not explicitly enabled.
+**Learning:** Returning mock authentication credentials as a default fallback allows attackers to easily bypass authentication simply by not providing any credentials.
+**Prevention:** Never use mock objects or fallback roles when authentication fails or is missing. Always throw an explicit unauthorized error.
