@@ -1144,7 +1144,6 @@ export function registerTools(server: McpServer) {
       }
 
       if (seedNodes.size === 0) {
-        // ⚡ Bolt Optimization: Replace O(N^2) arr.indexOf and chained arrays with O(1) early-exit loop
         const suggestions: string[] = [];
         const seenSuggestions = new Set<string>();
         for (const n of nodes) {
