@@ -51,3 +51,7 @@
 ## 2025-07-29 - [Performance improvement] Optimized O(N*L) array some during node filtering
 **Learning:** Checking for node connections by using `nodes.filter` and inside it `links.some` is an O(N*L) operation which leads to a severe performance bottleneck for large graphs. Precomputing a Set with all `source` and `target` links takes O(L) space and time and makes the lookup O(1), bringing the total time complexity to O(N+L).
 **Action:** When filtering or counting relationships between nodes, avoid nesting a links `some` or `filter` or `find` inside a nodes loop. Instead, do a single O(L) pass over the links array to precompute a `Set` or `Map`, enabling O(1) lookups during the subsequent O(N) nodes loop.
+
+## 2026-07-26 - [Performance improvement] Avoid O(N^2) event loop freeze with arr.indexOf
+**Learning:** Chaining `.filter((val, i, arr) => arr.indexOf(val) === i)` to deduplicate an array creates an O(N²) bottleneck. When applied to large collections like AST nodes, this can block the Node.js event loop for tens of seconds, causing unresponsiveness. Furthermore, chaining `.filter().map().filter().slice()` forces full traversals and multiple array allocations.
+**Action:** When filtering, mapping, deduplicating, and taking a slice of a large collection, use a standard `for...of` loop with a `Set` for O(1) deduplication and `break` to early-exit once the desired slice size is reached. This turns the operation into O(1) best-case and eliminates intermediate allocations.
