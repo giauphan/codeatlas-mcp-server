@@ -47,3 +47,8 @@
 **Vulnerability:** The `checkAuth` function used for authorization fell back to granting full privileges via a mock local user if no authentication context was found and `CODEATLAS_MULTI_TENANT` was not explicitly enabled.
 **Learning:** Returning mock authentication credentials as a default fallback allows attackers to easily bypass authentication simply by not providing any credentials.
 **Prevention:** Never use mock objects or fallback roles when authentication fails or is missing. Always throw an explicit unauthorized error.
+
+## 2025-02-14 - Indirect Command Injection via CWD
+**Vulnerability:** The `run_script` tool passed user-influenced directory paths directly as the `cwd` argument in `child_process.spawnSync()`. While `shell: false` was used for the execution, the target binary (e.g. `npm run`) internally spawns a shell to execute the script in the `package.json`. A malicious directory path containing shell metacharacters (e.g., `&`, `;`) could escape the directory path context and lead to command injection if the target tool constructs shell commands with the `cwd` unsafely.
+**Learning:** Even when using `shell: false`, child processes that subsequently invoke their own shells (like `npm` or `sh`) may be vulnerable to command injection if the current working directory (`cwd`) is attacker-controlled and unsanitized.
+**Prevention:** Always sanitize user-influenced directory paths using strict pattern matching (like `SHELL_METACHAR_RE`) before passing them as the `cwd` in child process executions.

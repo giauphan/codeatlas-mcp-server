@@ -1990,6 +1990,11 @@ export function registerTools(server: McpServer) {
         return { content: [{ type: "text" as const, text: JSON.stringify({ error: "Unauthorized project directory" }) }] };
       }
 
+      // Security: Block shell metacharacters in directory path to prevent indirect command injection
+      if (SHELL_METACHAR_RE.test(projectDir)) {
+        return { content: [{ type: "text" as const, text: JSON.stringify({ error: "Security Error: Directory path contains forbidden shell metacharacters" }) }] };
+      }
+
       const pkgPath = path.join(projectDir, "package.json");
       if (fs.existsSync(pkgPath)) {
         try {
