@@ -208,10 +208,15 @@ export class HelperService {
       const tokensA = tokenize(contentA);
       const tokensB = tokenize(contentB);
 
-      const intersection = new Set([...tokensA].filter(t => tokensB.has(t)));
-      const union = new Set([...tokensA, ...tokensB]);
+      let intersectionSize = 0;
+      for (const t of tokensA) {
+        if (tokensB.has(t)) {
+          intersectionSize++;
+        }
+      }
+      const unionSize = tokensA.size + tokensB.size - intersectionSize;
 
-      const similarity = intersection.size / union.size;
+      const similarity = intersectionSize / unionSize;
       // These two files are very similar (same structure, different names)
       assert.ok(similarity >= 0.5, `Similarity should be >= 0.5, got ${similarity}`);
     });
@@ -227,10 +232,15 @@ export class HelperService {
 
       const tokensA = tokenize("abc def ghi xyz");
       const tokensB = tokenize("xxx yyy zzz");
-      const intersection = new Set([...tokensA].filter(t => tokensB.has(t)));
-      const union = new Set([...tokensA, ...tokensB]);
-      assert.strictEqual(intersection.size, 0);
-      assert.strictEqual(union.size, 7);
+      let intersectionSize = 0;
+      for (const t of tokensA) {
+        if (tokensB.has(t)) {
+          intersectionSize++;
+        }
+      }
+      const unionSize = tokensA.size + tokensB.size - intersectionSize;
+      assert.strictEqual(intersectionSize, 0);
+      assert.strictEqual(unionSize, 7);
     });
   });
 
