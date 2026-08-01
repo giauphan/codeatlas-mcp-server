@@ -47,3 +47,7 @@
 **Vulnerability:** The `checkAuth` function used for authorization fell back to granting full privileges via a mock local user if no authentication context was found and `CODEATLAS_MULTI_TENANT` was not explicitly enabled.
 **Learning:** Returning mock authentication credentials as a default fallback allows attackers to easily bypass authentication simply by not providing any credentials.
 **Prevention:** Never use mock objects or fallback roles when authentication fails or is missing. Always throw an explicit unauthorized error.
+## 2024-08-01 - [String Replacement Injection]
+**Vulnerability:** String Replacement Injection in `setup_mcp_config` tool via `String.prototype.replace()`.
+**Learning:** If user-controlled input (like an API key) is concatenated into the replacement string of `String.prototype.replace()`, special replacement patterns (like `$&`, `$1`, `$'`) can be interpreted by the engine, corrupting the resulting string or injecting unintended content.
+**Prevention:** Always use a replacer function (e.g., `() => replacement`) instead of passing a concatenated string when the replacement value contains or may contain user/external input.
