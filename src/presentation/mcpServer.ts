@@ -2683,11 +2683,19 @@ def register(ctx):
           // Quick check: skip if files too different in size
           if (Math.abs(a.tokens.size - b.tokens.size) > Math.max(a.tokens.size, b.tokens.size) * 0.7) continue;
 
-          const intersection = new Set([...a.tokens].filter(t => b.tokens.has(t)));
-          const union = new Set([...a.tokens, ...b.tokens]);
-          if (union.size === 0) continue;
+          // ⚡ Bolt Optimization: Calculate intersection/union sizes manually to prevent intermediate array/Set allocations and GC pressure in tight loop
+          let intersectionSize = 0;
+          // Iterate over the smaller set for faster intersection check
+          const [smaller, larger] = a.tokens.size < b.tokens.size ? [a.tokens, b.tokens] : [b.tokens, a.tokens];
+          for (const token of smaller) {
+            if (larger.has(token)) {
+              intersectionSize++;
+            }
+          }
+          const unionSize = a.tokens.size + b.tokens.size - intersectionSize;
+          if (unionSize === 0) continue;
 
-          const sim = intersection.size / union.size;
+          const sim = intersectionSize / unionSize;
           if (sim >= thresh) {
             const aFile = path.relative(loaded.projectDir, a.node.filePath!);
             const bFile = path.relative(loaded.projectDir, b.node.filePath!);
@@ -2695,8 +2703,8 @@ def register(ctx):
               a: { name: a.node.label, file: aFile, line: a.node.line || 0, type: a.node.type },
               b: { name: b.node.label, file: bFile, line: b.node.line || 0, type: b.node.type },
               similarity: Math.round(sim * 100) / 100,
-              sharedTokens: intersection.size,
-              totalTokens: union.size,
+              sharedTokens: intersectionSize,
+              totalTokens: unionSize,
             });
           }
 
