@@ -2749,8 +2749,22 @@ def register(ctx):
       const loaded = await loadAnalysisAsync(project);
       if (!loaded) return { content: [{ type: "text" as const, text: "No analysis found. Run 'analyze' first." }] };
 
+      let resolvedDir: string;
+      try {
+        resolvedDir = fs.realpathSync(loaded.projectDir);
+      } catch {
+        return { content: [{ type: "text" as const, text: JSON.stringify({ error: "Invalid project directory" }) }] };
+      }
+
+      // 🛡️ Sentinel Security Validation
+      // Ensure the resolved project directory is an authorized workspace to prevent path traversal
+      const authorizedProjects = await discoverProjectsAsync(auth.uid);
+      if (!isPathInAuthorizedProjects(resolvedDir, authorizedProjects)) {
+        return { content: [{ type: "text" as const, text: JSON.stringify({ error: "Unauthorized project directory" }) }] };
+      }
+
       const exportFormat = format || "json";
-      const projectDir = loaded.projectDir;
+      const projectDir = resolvedDir;
       const artifactDir = path.join(projectDir, ".codeatlas");
       fs.mkdirSync(artifactDir, { recursive: true });
 
