@@ -2767,13 +2767,14 @@ def register(ctx):
         }
 
         let resolvedArtifactDir = path.join(resolvedProjectDir, ".codeatlas");
-        if (fs.existsSync(resolvedArtifactDir)) {
-          resolvedArtifactDir = fs.realpathSync(resolvedArtifactDir);
-          if (!isPathInAuthorizedProjects(resolvedArtifactDir, authorizedProjects)) {
-            return { content: [{ type: "text" as const, text: "Unauthorized artifact directory" }] };
-          }
-        }
         fs.mkdirSync(resolvedArtifactDir, { recursive: true });
+
+        // Re-resolve and re-validate after mkdirSync to close the TOCTOU gap completely
+        // in case a symlink was swapped in immediately before creation.
+        resolvedArtifactDir = fs.realpathSync(resolvedArtifactDir);
+        if (!isPathInAuthorizedProjects(resolvedArtifactDir, authorizedProjects)) {
+          return { content: [{ type: "text" as const, text: "Unauthorized artifact directory" }] };
+        }
         const projectDir = resolvedProjectDir; // Used for relative paths in success responses
         if (exportFormat === "summary") {
           const nodes = loaded.analysis.graph.nodes.filter(n => !n.id.startsWith("external:"));
