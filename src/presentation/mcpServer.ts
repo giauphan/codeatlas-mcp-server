@@ -2760,16 +2760,21 @@ def register(ctx):
           return { content: [{ type: "text" as const, text: "Invalid project directory" }] };
         }
 
-        // 🛡️ Sentinel Security Validation
         // Ensure the resolved project directory is an authorized workspace to prevent path traversal
         const authorizedProjects = await discoverProjectsAsync(auth.uid);
         if (!isPathInAuthorizedProjects(resolvedProjectDir, authorizedProjects)) {
           return { content: [{ type: "text" as const, text: "Unauthorized project directory" }] };
         }
 
-        const resolvedArtifactDir = path.join(resolvedProjectDir, ".codeatlas");
+        let resolvedArtifactDir = path.join(resolvedProjectDir, ".codeatlas");
+        if (fs.existsSync(resolvedArtifactDir)) {
+          resolvedArtifactDir = fs.realpathSync(resolvedArtifactDir);
+          if (!isPathInAuthorizedProjects(resolvedArtifactDir, authorizedProjects)) {
+            return { content: [{ type: "text" as const, text: "Unauthorized artifact directory" }] };
+          }
+        }
         fs.mkdirSync(resolvedArtifactDir, { recursive: true });
-        const projectDir = resolvedProjectDir;
+        const projectDir = resolvedProjectDir; // Used for relative paths in success responses
         if (exportFormat === "summary") {
           const nodes = loaded.analysis.graph.nodes.filter(n => !n.id.startsWith("external:"));
           const links = loaded.analysis.graph.links;
