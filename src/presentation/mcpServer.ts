@@ -2686,8 +2686,9 @@ def register(ctx):
           // ⚡ Bolt Optimization: Replace O(N) array spreads and intermediate Set allocations with an explicit counter
           // inside this O(N²) loop to prevent massive GC pressure and speed up Jaccard similarity calculation.
           let intersectionSize = 0;
-          for (const t of a.tokens) {
-            if (b.tokens.has(t)) intersectionSize++;
+          const [smaller, larger] = a.tokens.size < b.tokens.size ? [a.tokens, b.tokens] : [b.tokens, a.tokens];
+          for (const t of smaller) {
+            if (larger.has(t)) intersectionSize++;
           }
           const unionSize = a.tokens.size + b.tokens.size - intersectionSize;
           if (unionSize === 0) continue;

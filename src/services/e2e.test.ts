@@ -209,8 +209,9 @@ export class HelperService {
       const tokensB = tokenize(contentB);
 
       let intersectionSize = 0;
-      for (const t of tokensA) {
-        if (tokensB.has(t)) intersectionSize++;
+      const [smaller, larger] = tokensA.size < tokensB.size ? [tokensA, tokensB] : [tokensB, tokensA];
+      for (const t of smaller) {
+        if (larger.has(t)) intersectionSize++;
       }
       const unionSize = tokensA.size + tokensB.size - intersectionSize;
 
@@ -231,8 +232,9 @@ export class HelperService {
       const tokensA = tokenize("abc def ghi xyz");
       const tokensB = tokenize("xxx yyy zzz");
       let intersectionSize = 0;
-      for (const t of tokensA) {
-        if (tokensB.has(t)) intersectionSize++;
+      const [smaller, larger] = tokensA.size < tokensB.size ? [tokensA, tokensB] : [tokensB, tokensA];
+      for (const t of smaller) {
+        if (larger.has(t)) intersectionSize++;
       }
       const unionSize = tokensA.size + tokensB.size - intersectionSize;
       assert.strictEqual(intersectionSize, 0);
