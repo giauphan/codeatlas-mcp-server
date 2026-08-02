@@ -328,24 +328,37 @@ export function registerTools(server: McpServer) {
       const links = loaded.analysis.graph.links;
       const nodeMap = createNodeLabelMap(loaded.analysis.graph.nodes);
 
+      // ⚡ Bolt Optimization: Precompute links for matched nodes to avoid O(N*L) filtering inside map
+      const topMatches = matches.slice(0, 50);
+      const matchIds = new Set(topMatches.map((n) => n.id));
+
+      const incomingLinksMap = new Map<string, Array<{ from: string, type: string }>>();
+      const outgoingLinksMap = new Map<string, Array<{ to: string, type: string }>>();
+
+      for (const l of links) {
+        if (matchIds.has(l.target)) {
+          let arr = incomingLinksMap.get(l.target);
+          if (!arr) { arr = []; incomingLinksMap.set(l.target, arr); }
+          arr.push({ from: nodeMap.get(l.source) || l.source, type: l.type });
+        }
+        if (matchIds.has(l.source)) {
+          let arr = outgoingLinksMap.get(l.source);
+          if (!arr) { arr = []; outgoingLinksMap.set(l.source, arr); }
+          arr.push({ to: nodeMap.get(l.target) || l.target, type: l.type });
+        }
+      }
+
       const result = {
         query,
         matchCount: matches.length,
-        results: matches.slice(0, 50).map((n) => {
-          const incomingLinks = links
-            .filter((l) => l.target === n.id)
-            .map((l) => ({ from: nodeMap.get(l.source) || l.source, type: l.type }));
-          const outgoingLinks = links
-            .filter((l) => l.source === n.id)
-            .map((l) => ({ to: nodeMap.get(l.target) || l.target, type: l.type }));
-
+        results: topMatches.map((n) => {
           return {
             name: n.label,
             type: n.type,
             filePath: n.filePath ? (path.isAbsolute(n.filePath) ? n.filePath : path.resolve(loaded.projectDir, n.filePath)) : null,
             line: n.line || null,
-            incomingRelationships: incomingLinks,
-            outgoingRelationships: outgoingLinks,
+            incomingRelationships: incomingLinksMap.get(n.id) || [],
+            outgoingRelationships: outgoingLinksMap.get(n.id) || [],
           };
         }),
       };
@@ -389,6 +402,18 @@ export function registerTools(server: McpServer) {
 
       let filesEntries = Array.from(byFile.entries());
 
+      // ⚡ Bolt Optimization: Precompute dependencies for matched nodes to avoid O(N*L) filtering inside map
+      const matchIds = new Set(matches.map((n) => n.id));
+      const dependenciesMap = new Map<string, Array<{ to: string, type: string }>>();
+
+      for (const l of links) {
+        if (matchIds.has(l.source)) {
+          let arr = dependenciesMap.get(l.source);
+          if (!arr) { arr = []; dependenciesMap.set(l.source, arr); }
+          arr.push({ to: nodeMap.get(l.target) || l.target, type: l.type });
+        }
+      }
+
       const result = {
         query: filePath,
         filesFound: byFile.size,
@@ -400,9 +425,7 @@ export function registerTools(server: McpServer) {
             name: e.label,
             type: e.type,
             line: e.line || null,
-            dependencies: links
-              .filter((l) => l.source === e.id)
-              .map((l) => ({ to: nodeMap.get(l.target) || l.target, type: l.type })),
+            dependencies: dependenciesMap.get(e.id) || [],
           })),
         })),
       };
