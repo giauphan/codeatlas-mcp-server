@@ -1425,27 +1425,36 @@ export function registerTools(server: McpServer) {
         // Find circular dependencies locally (from analyzer insights or simple check)
         const circularDependencies = (loaded.analysis.insights as any)?.circularDependencies || [];
 
-        // God objects: classes with more than 15 outgoing/incoming connections
+        // ⚡ Bolt Optimization: Combine link loops to O(E) and node iterations to O(N) without intermediate arrays
         const nodeConnections = new Map<string, number>();
-        links.forEach((l: any) => {
+        const incomingCount = new Map<string, number>();
+
+        for (const l of links) {
           nodeConnections.set(l.source, (nodeConnections.get(l.source) || 0) + 1);
           nodeConnections.set(l.target, (nodeConnections.get(l.target) || 0) + 1);
-        });
-
-        const godObjects = nodes
-          .filter((n: any) => n.type === 'class' && (nodeConnections.get(n.id) || 0) > 15)
-          .map((n: any) => ({ name: n.label, filePath: n.filePath, connections: nodeConnections.get(n.id) }));
-
-        // Dead code: non-external entities with 0 incoming connections
-        const incomingCount = new Map<string, number>();
-        links.forEach((l: any) => {
           incomingCount.set(l.target, (incomingCount.get(l.target) || 0) + 1);
-        });
+        }
 
-        const deadCode = nodes
-          .filter((n: any) => n.type === 'function' && !n.id.startsWith('external:') && (incomingCount.get(n.id) || 0) === 0 && !n.label.includes('main') && !n.label.includes('index'))
-          .slice(0, 10)
-          .map((n: any) => ({ name: n.label, filePath: n.filePath, line: n.line }));
+        const godObjects = [];
+        const deadCode = [];
+        let deadCodeFound = 0;
+
+        for (const n of nodes) {
+          if (n.type === 'class') {
+            const count = nodeConnections.get(n.id) || 0;
+            if (count > 15) {
+              godObjects.push({ name: n.label, filePath: n.filePath, connections: count });
+            }
+          } else if (n.type === 'function' && deadCodeFound < 10) {
+            if (!n.id.startsWith('external:') && !n.label.includes('main') && !n.label.includes('index')) {
+              const count = incomingCount.get(n.id) || 0;
+              if (count === 0) {
+                deadCode.push({ name: n.label, filePath: n.filePath, line: n.line });
+                deadCodeFound++;
+              }
+            }
+          }
+        }
 
         const result = {
           project: loaded.projectName,
