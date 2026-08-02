@@ -2756,7 +2756,8 @@ def register(ctx):
         try {
           // Resolve the project directory path to fully expand any potential traversal tokens
           resolvedProjectDir = fs.realpathSync(loaded.projectDir);
-        } catch {
+        } catch (err: unknown) {
+          console.error(`[Export Artifact] realpathSync failed for projectDir: ${err instanceof Error ? err.message : String(err)}`);
           return { content: [{ type: "text" as const, text: "Invalid project directory" }] };
         }
 
