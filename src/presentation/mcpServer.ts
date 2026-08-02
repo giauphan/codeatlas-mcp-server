@@ -1991,15 +1991,28 @@ export function registerTools(server: McpServer) {
 
       // 🛡️ Sentinel Security Validation
       // Use spawnSync without a shell to prevent command injection entirely
-      const projectDir = loaded.projectDir;
 
-      // Ensure the project directory is an authorized workspace to prevent path traversal
+      // Resolve the project directory immediately to ensure path traversal tokens (like `../`)
+      // are fully expanded before validation occurs.
+      let resolvedDir: string;
+      try {
+        resolvedDir = fs.realpathSync(loaded.projectDir);
+      } catch {
+        return { content: [{ type: "text" as const, text: JSON.stringify({ error: "Invalid project directory" }) }] };
+      }
+
+      // Ensure the resolved project directory is an authorized workspace to prevent path traversal
       const authorizedProjects = await discoverProjectsAsync(auth.uid);
-      if (!isPathInAuthorizedProjects(projectDir, authorizedProjects)) {
+      if (!isPathInAuthorizedProjects(resolvedDir, authorizedProjects)) {
         return { content: [{ type: "text" as const, text: JSON.stringify({ error: "Unauthorized project directory" }) }] };
       }
 
-      const pkgPath = path.join(projectDir, "package.json");
+      // Security: Block shell metacharacters in directory path to prevent indirect command injection via cwd
+      if (SHELL_METACHAR_RE.test(resolvedDir)) {
+        return { content: [{ type: "text" as const, text: JSON.stringify({ error: "Security Error: Directory path contains forbidden shell metacharacters" }) }] };
+      }
+
+      const pkgPath = path.join(resolvedDir, "package.json");
       if (fs.existsSync(pkgPath)) {
         try {
           const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf-8"));
@@ -2043,7 +2056,7 @@ export function registerTools(server: McpServer) {
           timeout: maxTime * 1000,
           shell: false, // Security: explicit shell false
           maxBuffer: 1024 * 1024,
-          cwd: projectDir
+          cwd: resolvedDir
         });
 
         const dur = ((Date.now() - startTime) / 1000).toFixed(1);
