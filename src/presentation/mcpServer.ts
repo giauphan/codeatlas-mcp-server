@@ -2768,11 +2768,20 @@ def register(ctx):
         }
 
         let resolvedArtifactDir = path.join(resolvedProjectDir, ".codeatlas");
+
+        // Re-resolve and re-validate the target artifact directory BEFORE mkdirSync
+        // to prevent `mkdirSync({ recursive: true })` from following a pre-existing symlink
+        // out of the authorized workspace and creating arbitrary directories.
+        if (fs.existsSync(resolvedArtifactDir)) {
+          resolvedArtifactDir = fs.realpathSync(resolvedArtifactDir);
+          if (!isPathInAuthorizedProjects(resolvedArtifactDir, authorizedProjects)) {
+            return { content: [{ type: "text" as const, text: "Unauthorized artifact directory" }] };
+          }
+        }
         fs.mkdirSync(resolvedArtifactDir, { recursive: true });
 
-        // Re-resolve and re-validate after mkdirSync to mitigate the TOCTOU gap.
-        // While a residual race exists before writeFileSync, this prevents the primary
-        // symlink swap vector prior to directory creation.
+        // Re-resolve and re-validate after mkdirSync to mitigate the TOCTOU gap
+        // in case a symlink was swapped in immediately before creation.
         resolvedArtifactDir = fs.realpathSync(resolvedArtifactDir);
         if (!isPathInAuthorizedProjects(resolvedArtifactDir, authorizedProjects)) {
           return { content: [{ type: "text" as const, text: "Unauthorized artifact directory" }] };
