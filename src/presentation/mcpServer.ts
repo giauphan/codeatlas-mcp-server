@@ -2753,27 +2753,24 @@ def register(ctx):
       const artifactDir = path.join(loaded.projectDir, ".codeatlas");
 
       try {
-        let resolvedArtifactDir: string;
+        let resolvedProjectDir: string;
         try {
-          // Resolve the artifact directory path to fully expand any potential traversal tokens
-          // Note: we can't fully resolve a directory that might not exist yet if the parent doesn't exist,
-          // but we resolve the projectDir as the root boundary.
-          const resolvedProjectDir = fs.realpathSync(loaded.projectDir);
-
-          // 🛡️ Sentinel Security Validation
-          // Ensure the resolved project directory is an authorized workspace to prevent path traversal
-          const authorizedProjects = await discoverProjectsAsync(auth.uid);
-          if (!isPathInAuthorizedProjects(resolvedProjectDir, authorizedProjects)) {
-            return { content: [{ type: "text" as const, text: JSON.stringify({ error: "Unauthorized project directory" }) }] };
-          }
-
-          resolvedArtifactDir = path.join(resolvedProjectDir, ".codeatlas");
+          // Resolve the project directory path to fully expand any potential traversal tokens
+          resolvedProjectDir = fs.realpathSync(loaded.projectDir);
         } catch {
-          return { content: [{ type: "text" as const, text: JSON.stringify({ error: "Invalid project directory" }) }] };
+          return { content: [{ type: "text" as const, text: "Invalid project directory" }] };
         }
 
+        // 🛡️ Sentinel Security Validation
+        // Ensure the resolved project directory is an authorized workspace to prevent path traversal
+        const authorizedProjects = await discoverProjectsAsync(auth.uid);
+        if (!isPathInAuthorizedProjects(resolvedProjectDir, authorizedProjects)) {
+          return { content: [{ type: "text" as const, text: "Unauthorized project directory" }] };
+        }
+
+        const resolvedArtifactDir = path.join(resolvedProjectDir, ".codeatlas");
         fs.mkdirSync(resolvedArtifactDir, { recursive: true });
-        const projectDir = loaded.projectDir; // Keep projectDir reference for other uses in block
+        const projectDir = resolvedProjectDir;
         if (exportFormat === "summary") {
           const nodes = loaded.analysis.graph.nodes.filter(n => !n.id.startsWith("external:"));
           const links = loaded.analysis.graph.links;
