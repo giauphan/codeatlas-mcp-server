@@ -203,7 +203,14 @@ export class HelperService {
 
     const jaccardSimilarity = (setA: Set<string>, setB: Set<string>) => {
       let intersectionSize = 0;
-      const [smaller, larger] = setA.size < setB.size ? [setA, setB] : [setB, setA];
+      let smaller, larger;
+      if (setA.size < setB.size) {
+        smaller = setA;
+        larger = setB;
+      } else {
+        smaller = setB;
+        larger = setA;
+      }
       for (const t of smaller) {
         if (larger.has(t)) intersectionSize++;
       }

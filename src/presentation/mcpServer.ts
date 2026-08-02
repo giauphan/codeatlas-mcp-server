@@ -2686,7 +2686,14 @@ def register(ctx):
           // Iterate over the smaller set to find the intersection size
           // to prevent massive GC pressure and speed up Jaccard similarity calculation.
           let intersectionSize = 0;
-          const [smaller, larger] = a.tokens.size < b.tokens.size ? [a.tokens, b.tokens] : [b.tokens, a.tokens];
+          let smaller, larger;
+          if (a.tokens.size < b.tokens.size) {
+            smaller = a.tokens;
+            larger = b.tokens;
+          } else {
+            smaller = b.tokens;
+            larger = a.tokens;
+          }
           for (const t of smaller) {
             if (larger.has(t)) intersectionSize++;
           }
