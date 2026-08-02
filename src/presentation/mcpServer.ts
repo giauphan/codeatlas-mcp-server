@@ -2164,7 +2164,7 @@ export function registerTools(server: McpServer) {
             if (cfg.includes("codeatlas:")) {
               results.push({ client: "hermes", action: "mcp_config", status: "already_configured" });
             } else if (cfg.includes("mcp_servers:")) {
-              cfg = cfg.replace("mcp_servers:", () => "mcp_servers:\n" + mcpEntry);
+              cfg = cfg.replace("mcp_servers:", (_match) => "mcp_servers:\n" + mcpEntry);
               fs.writeFileSync(hermesCfg, cfg);
               results.push({ client: "hermes", action: "mcp_config", status: "updated" });
             } else {
