@@ -2749,26 +2749,31 @@ def register(ctx):
       const loaded = await loadAnalysisAsync(project);
       if (!loaded) return { content: [{ type: "text" as const, text: "No analysis found. Run 'analyze' first." }] };
 
-      let resolvedDir: string;
-      try {
-        resolvedDir = fs.realpathSync(loaded.projectDir);
-      } catch {
-        return { content: [{ type: "text" as const, text: JSON.stringify({ error: "Invalid project directory" }) }] };
-      }
-
-      // 🛡️ Sentinel Security Validation
-      // Ensure the resolved project directory is an authorized workspace to prevent path traversal
-      const authorizedProjects = await discoverProjectsAsync(auth.uid);
-      if (!isPathInAuthorizedProjects(resolvedDir, authorizedProjects)) {
-        return { content: [{ type: "text" as const, text: JSON.stringify({ error: "Unauthorized project directory" }) }] };
-      }
-
       const exportFormat = format || "json";
-      const projectDir = resolvedDir;
-      const artifactDir = path.join(projectDir, ".codeatlas");
-      fs.mkdirSync(artifactDir, { recursive: true });
+      const artifactDir = path.join(loaded.projectDir, ".codeatlas");
 
       try {
+        let resolvedArtifactDir: string;
+        try {
+          // Resolve the artifact directory path to fully expand any potential traversal tokens
+          // Note: we can't fully resolve a directory that might not exist yet if the parent doesn't exist,
+          // but we resolve the projectDir as the root boundary.
+          const resolvedProjectDir = fs.realpathSync(loaded.projectDir);
+
+          // 🛡️ Sentinel Security Validation
+          // Ensure the resolved project directory is an authorized workspace to prevent path traversal
+          const authorizedProjects = await discoverProjectsAsync(auth.uid);
+          if (!isPathInAuthorizedProjects(resolvedProjectDir, authorizedProjects)) {
+            return { content: [{ type: "text" as const, text: JSON.stringify({ error: "Unauthorized project directory" }) }] };
+          }
+
+          resolvedArtifactDir = path.join(resolvedProjectDir, ".codeatlas");
+        } catch {
+          return { content: [{ type: "text" as const, text: JSON.stringify({ error: "Invalid project directory" }) }] };
+        }
+
+        fs.mkdirSync(resolvedArtifactDir, { recursive: true });
+        const projectDir = loaded.projectDir; // Keep projectDir reference for other uses in block
         if (exportFormat === "summary") {
           const nodes = loaded.analysis.graph.nodes.filter(n => !n.id.startsWith("external:"));
           const links = loaded.analysis.graph.links;
@@ -2802,7 +2807,7 @@ def register(ctx):
             callGraph,
           };
 
-          const outPath = path.join(artifactDir, "artifact-summary.json");
+        const outPath = path.join(resolvedArtifactDir, "artifact_summary.json");
           fs.writeFileSync(outPath, JSON.stringify(summary, null, 2));
           const size = fs.statSync(outPath).size;
 
@@ -2823,7 +2828,7 @@ def register(ctx):
           analysis: loaded.analysis,
         };
 
-        const outPath = path.join(artifactDir, "artifact.json");
+        const outPath = path.join(resolvedArtifactDir, "artifact.json");
         fs.writeFileSync(outPath, JSON.stringify(artifact, null, 2));
         const size = fs.statSync(outPath).size;
 
