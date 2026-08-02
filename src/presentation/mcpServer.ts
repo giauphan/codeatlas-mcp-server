@@ -2683,8 +2683,8 @@ def register(ctx):
           // Quick check: skip if files too different in size
           if (Math.abs(a.tokens.size - b.tokens.size) > Math.max(a.tokens.size, b.tokens.size) * 0.7) continue;
 
-          // ⚡ Bolt Optimization: Replace O(N) array spreads and intermediate Set allocations with an explicit counter
-          // inside this O(N²) loop to prevent massive GC pressure and speed up Jaccard similarity calculation.
+          // Iterate over the smaller set to find the intersection size
+          // to prevent massive GC pressure and speed up Jaccard similarity calculation.
           let intersectionSize = 0;
           const [smaller, larger] = a.tokens.size < b.tokens.size ? [a.tokens, b.tokens] : [b.tokens, a.tokens];
           for (const t of smaller) {
