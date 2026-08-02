@@ -193,50 +193,41 @@ export class HelperService {
 
   // ═══════════ Code Similarity ═══════════
   describe("4. detect_code_similarities — Jaccard similarity", () => {
+    const tokenize = (s: string) => {
+      const tokens = new Set<string>();
+      const re = /[a-zA-Z_$][a-zA-Z0-9_$]*/g;
+      let m;
+      while ((m = re.exec(s)) !== null) tokens.add(m[0].toLowerCase());
+      return tokens;
+    };
+
+    const jaccardSimilarity = (setA: Set<string>, setB: Set<string>) => {
+      let intersectionSize = 0;
+      const [smaller, larger] = setA.size < setB.size ? [setA, setB] : [setB, setA];
+      for (const t of smaller) {
+        if (larger.has(t)) intersectionSize++;
+      }
+      const unionSize = setA.size + setB.size - intersectionSize;
+      return { intersectionSize, unionSize, similarity: unionSize === 0 ? 0 : intersectionSize / unionSize };
+    };
+
     it("computes Jaccard token similarity between two files", async () => {
       const contentA = fs.readFileSync(path.join(PROJECT_DIR, "src", "userService.ts"), "utf-8");
       const contentB = fs.readFileSync(path.join(PROJECT_DIR, "utils", "helper.ts"), "utf-8");
 
-      const tokenize = (s: string) => {
-        const tokens = new Set<string>();
-        const re = /[a-zA-Z_$][a-zA-Z0-9_$]*/g;
-        let m;
-        while ((m = re.exec(s)) !== null) tokens.add(m[0].toLowerCase());
-        return tokens;
-      };
-
       const tokensA = tokenize(contentA);
       const tokensB = tokenize(contentB);
 
-      let intersectionSize = 0;
-      const [smaller, larger] = tokensA.size < tokensB.size ? [tokensA, tokensB] : [tokensB, tokensA];
-      for (const t of smaller) {
-        if (larger.has(t)) intersectionSize++;
-      }
-      const unionSize = tokensA.size + tokensB.size - intersectionSize;
-
-      const similarity = intersectionSize / unionSize;
+      const { similarity } = jaccardSimilarity(tokensA, tokensB);
       // These two files are very similar (same structure, different names)
       assert.ok(similarity >= 0.5, `Similarity should be >= 0.5, got ${similarity}`);
     });
 
     it("returns 0 for completely different tokens", async () => {
-      const tokenize = (s: string) => {
-        const tokens = new Set<string>();
-        const re = /[a-zA-Z_$][a-zA-Z0-9_$]*/g;
-        let m;
-        while ((m = re.exec(s)) !== null) tokens.add(m[0].toLowerCase());
-        return tokens;
-      };
-
       const tokensA = tokenize("abc def ghi xyz");
       const tokensB = tokenize("xxx yyy zzz");
-      let intersectionSize = 0;
-      const [smaller, larger] = tokensA.size < tokensB.size ? [tokensA, tokensB] : [tokensB, tokensA];
-      for (const t of smaller) {
-        if (larger.has(t)) intersectionSize++;
-      }
-      const unionSize = tokensA.size + tokensB.size - intersectionSize;
+
+      const { intersectionSize, unionSize } = jaccardSimilarity(tokensA, tokensB);
       assert.strictEqual(intersectionSize, 0);
       assert.strictEqual(unionSize, 7);
     });
