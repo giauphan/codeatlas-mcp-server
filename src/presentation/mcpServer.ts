@@ -2750,7 +2750,6 @@ def register(ctx):
       if (!loaded) return { content: [{ type: "text" as const, text: "No analysis found. Run 'analyze' first." }] };
 
       const exportFormat = format || "json";
-      const artifactDir = path.join(loaded.projectDir, ".codeatlas");
 
       try {
         let resolvedProjectDir: string;
@@ -2804,7 +2803,7 @@ def register(ctx):
             callGraph,
           };
 
-        const outPath = path.join(resolvedArtifactDir, "artifact_summary.json");
+          const outPath = path.join(resolvedArtifactDir, "artifact-summary.json");
           fs.writeFileSync(outPath, JSON.stringify(summary, null, 2));
           const size = fs.statSync(outPath).size;
 
