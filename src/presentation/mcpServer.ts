@@ -4,6 +4,7 @@ import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
 import { getHomePath, getHermesConfigPath, getHermesPluginDir, getClaudeConfigPath } from "../utils/pathUtils.js";
+import { jaccardSimilarity } from "../utils/mathUtils.js";
 import { checkAuth, logActivity } from "../services/authService.js";
 import {
   discoverProjectsAsync,
@@ -2683,23 +2684,16 @@ def register(ctx):
           // Quick check: skip if files too different in size
           if (Math.abs(a.tokens.size - b.tokens.size) > Math.max(a.tokens.size, b.tokens.size) * 0.7) continue;
 
-          let intersectionSize = 0;
-          for (const t of a.tokens) {
-            if (b.tokens.has(t)) {
-              intersectionSize++;
-            }
-          }
-          const unionSize = a.tokens.size + b.tokens.size - intersectionSize;
+          const { similarity, intersectionSize, unionSize } = jaccardSimilarity(a.tokens, b.tokens);
           if (unionSize === 0) continue;
 
-          const sim = intersectionSize / unionSize;
-          if (sim >= thresh) {
+          if (similarity >= thresh) {
             const aFile = path.relative(loaded.projectDir, a.node.filePath!);
             const bFile = path.relative(loaded.projectDir, b.node.filePath!);
             pairs.push({
               a: { name: a.node.label, file: aFile, line: a.node.line || 0, type: a.node.type },
               b: { name: b.node.label, file: bFile, line: b.node.line || 0, type: b.node.type },
-              similarity: Math.round(sim * 100) / 100,
+              similarity: Math.round(similarity * 100) / 100,
               sharedTokens: intersectionSize,
               totalTokens: unionSize,
             });

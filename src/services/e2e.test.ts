@@ -3,6 +3,7 @@ import * as assert from "node:assert";
 import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
+import { jaccardSimilarity } from "../utils/mathUtils.js";
 
 const TMP_DIR = path.join(os.tmpdir(), "codeatlas-e2e-" + Date.now());
 const PROJECT_DIR = path.join(TMP_DIR, "test-project");
@@ -208,15 +209,7 @@ export class HelperService {
       const tokensA = tokenize(contentA);
       const tokensB = tokenize(contentB);
 
-      let intersectionSize = 0;
-      for (const t of tokensA) {
-        if (tokensB.has(t)) {
-          intersectionSize++;
-        }
-      }
-      const unionSize = tokensA.size + tokensB.size - intersectionSize;
-
-      const similarity = intersectionSize / unionSize;
+      const { similarity } = jaccardSimilarity(tokensA, tokensB);
       // These two files are very similar (same structure, different names)
       assert.ok(similarity >= 0.5, `Similarity should be >= 0.5, got ${similarity}`);
     });
@@ -232,13 +225,7 @@ export class HelperService {
 
       const tokensA = tokenize("abc def ghi xyz");
       const tokensB = tokenize("xxx yyy zzz");
-      let intersectionSize = 0;
-      for (const t of tokensA) {
-        if (tokensB.has(t)) {
-          intersectionSize++;
-        }
-      }
-      const unionSize = tokensA.size + tokensB.size - intersectionSize;
+      const { intersectionSize, unionSize } = jaccardSimilarity(tokensA, tokensB);
       assert.strictEqual(intersectionSize, 0);
       assert.strictEqual(unionSize, 7);
     });
