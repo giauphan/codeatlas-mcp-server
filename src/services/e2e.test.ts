@@ -3,6 +3,7 @@ import * as assert from "node:assert";
 import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
+import { jaccardSimilarity } from "../utils/mathUtils.js";
 
 const TMP_DIR = path.join(os.tmpdir(), "codeatlas-e2e-" + Date.now());
 const PROJECT_DIR = path.join(TMP_DIR, "test-project");
@@ -226,7 +227,6 @@ export class HelperService {
     it("returns 0 for completely different tokens", async () => {
       const tokensA = tokenize("abc def ghi xyz");
       const tokensB = tokenize("xxx yyy zzz");
-
       const { intersectionSize, unionSize } = jaccardSimilarity(tokensA, tokensB);
       assert.strictEqual(intersectionSize, 0);
       assert.strictEqual(unionSize, 7);
