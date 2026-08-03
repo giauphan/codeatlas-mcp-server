@@ -54,3 +54,23 @@
 ## 2026-07-29 - [Performance improvement] Optimized Set Intersection in Tight Loops
 **Learning:** When calculating Set intersections or Jaccard similarity inside a nested O(N^2) loop, doing `new Set([...a].filter(x => b.has(x)))` creates arrays, spreads them, filters them, and builds a new Set on every iteration. This causes immense Garbage Collection pressure and performance degradation.
 **Action:** When only sizes are needed (e.g. for Jaccard similarity `intersection / union`), avoid creating Sets entirely. Instead, iterate over the smaller set with a simple `for...of` loop, count the matches to get `intersectionSize`, and mathematically calculate `unionSize = a.size + b.size - intersectionSize`.
+
+## 2025-07-30 - [Performance improvement] Optimized O(N*E) array filtering in loops and O(N^2) indexOf deduplication
+**Learning:** During analysis of the `call_graph` component inside `mcpServer.ts`, an O(N*E) logic pattern was found within the diagram's order resolving logic where `dedupLinks` (Array of size E) was getting filtered repeatedly per node (N instances). In addition, O(N²) issues were discovered with `.filter((val, i, arr) => arr.indexOf(val) === i)` logic when generating execution/reading orders.
+**Action:** When filtering relationships based on node IDs in a loop, precompute a `Map<string, string[]>` of targets / sources to avoid `O(N*E)` operation. When deduplicating arrays, avoid `.indexOf(val) === i` on `.filter()` over large lists. Instead, utilize `Set` instances with loops to achieve `O(N)` scaling with `O(1)` time checks.
+
+## 2025-07-29 - [Performance improvement] Optimized O(N) array filtering and mapping
+**Learning:** Chained array methods like `.filter().map()` or `.filter().slice().map()` on large sets of graph nodes are inefficient. They enforce multiple O(N) traversals of all nodes and create intermediate array allocations.
+**Action:** When filtering and mapping a large collection, use a single `for...of` loop. Apply filter conditions inside the loop and `push` to the result array. Implement early exit conditions (e.g. `count < limit`) to avoid iterating the entire collection unnecessarily when a limited slice is desired.
+
+## 2025-07-29 - [Performance improvement] Optimized O(E) double link traversal
+**Learning:** Traversing the same `links` array multiple times (e.g. using `links.forEach()` to count outgoing connections, then `links.forEach()` again to count incoming connections) wastes execution time.
+**Action:** When calculating multiple distinct graph metrics from links, combine them into a single O(E) loop that populates multiple Maps simultaneously.
+
+## 2026-07-26 - [Performance improvement] Optimized O(N*L) link filtering inside node mapping
+**Learning:** Checking for node connections by using `nodes.map` and inside it `links.filter` is an O(N*L) operation which leads to a severe performance bottleneck for large graphs. Precomputing Maps for incoming/outgoing links by iterating over the `links` array once takes O(L) time and makes the lookup O(1), bringing the total time complexity to O(N+L).
+**Action:** When mapping relationships for a subset of nodes, avoid nesting a links `filter` inside a nodes `map`. Instead, do a single O(L) pass over the links array to precompute a `Map`, enabling O(1) lookups during the subsequent O(N) nodes mapping.
+
+## 2026-07-30 - [Performance improvement] Optimized O(N^2) Set intersections
+**Learning:** Checking Set intersection and Jaccard similarity inside an O(N^2) loop using `new Set([...a].filter(x => b.has(x)))` creates massive garbage collection pressure by constantly allocating new temporary Arrays and Sets. You can calculate the intersection size and union size for Jaccard similarity without allocating anything by iterating through one set and counting the matches (`if (b.has(x)) intersectionSize++`), then computing `unionSize = a.size + b.size - intersectionSize`. If the similarity threshold is very low and the loop body executes for many pairs, this change yields proportionally more benefit since the inner loop executes more often.
+**Action:** When computing Set sizes for similarity algorithms inside tight loops, avoid creating new Sets or using spread syntax (`...`). Instead, manually iterate and maintain counter variables to prevent memory spikes.
