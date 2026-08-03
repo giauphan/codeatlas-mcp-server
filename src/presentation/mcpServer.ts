@@ -2880,14 +2880,25 @@ def register(ctx):
             }
           }
 
+          // ⚡ Bolt Optimization: Replace 3 chained .filter().map() passes with a single O(N) pass
+          const modules: Array<{ id: string; name: string; file?: string }> = [];
+          const classes: Array<{ id: string; name: string; file?: string; line?: number }> = [];
+          const functions: Array<{ id: string; name: string; file?: string; line?: number }> = [];
+
+          for (const n of nodes) {
+            if (n.type === "module") modules.push({ id: n.id, name: n.label, file: n.filePath });
+            else if (n.type === "class") classes.push({ id: n.id, name: n.label, file: n.filePath, line: n.line });
+            else if (n.type === "function") functions.push({ id: n.id, name: n.label, file: n.filePath, line: n.line });
+          }
+
           const summary = {
             version: 1,
             exportedAt: new Date().toISOString(),
             project: loaded.projectName,
             stats,
-            modules: nodes.filter(n => n.type === "module").map(n => ({ id: n.id, name: n.label, file: n.filePath })),
-            classes: nodes.filter(n => n.type === "class").map(n => ({ id: n.id, name: n.label, file: n.filePath, line: n.line })),
-            functions: nodes.filter(n => n.type === "function").map(n => ({ id: n.id, name: n.label, file: n.filePath, line: n.line })),
+            modules,
+            classes,
+            functions,
             callGraph,
           };
 
