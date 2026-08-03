@@ -285,32 +285,29 @@ export class CodeAnalyzer {
     const nodeToFolder = new Map<string, string>();
     const crossLinks: GraphLink[] = [];
 
-    // Map each node to its folder
+    // ⚡ Bolt Optimization: Initialize chunks early and map nodes to folders
     for (const [folder, nodes] of folderNodeMap) {
       for (const node of nodes) {
         nodeToFolder.set(node.id, folder);
       }
-    }
-
-    // Within-chunk links keep the layout cohesive; cross-chunk edges become thin connectors.
-    for (const [folder, nodes] of folderNodeMap) {
-      const nodeIds = new Set(nodes.map(n => n.id));
-      const internalLinks = result.graph.links.filter(
-        link => nodeIds.has(link.source) && nodeIds.has(link.target)
-      );
       chunks.set(folder, {
         folderPath: folder,
         nodes,
-        links: internalLinks
+        links: []
       });
     }
 
-    // Collect cross-chunk links
+    // ⚡ Bolt Optimization: Single O(L) pass to distribute links instead of O(F*L) nested filtering
+    // Within-chunk links keep the layout cohesive; cross-chunk edges become thin connectors.
     for (const link of result.graph.links) {
       const srcFolder = nodeToFolder.get(link.source);
       const tgtFolder = nodeToFolder.get(link.target);
-      if (srcFolder && tgtFolder && srcFolder !== tgtFolder) {
-        crossLinks.push(link);
+      if (srcFolder && tgtFolder) {
+        if (srcFolder === tgtFolder) {
+          chunks.get(srcFolder)!.links.push(link);
+        } else {
+          crossLinks.push(link);
+        }
       }
     }
 
