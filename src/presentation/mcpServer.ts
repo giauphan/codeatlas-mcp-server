@@ -1168,6 +1168,18 @@ export function registerTools(server: McpServer) {
       }
 
       if (seedNodes.size === 0) {
+        const suggestions: string[] = [];
+        const seenSuggestions = new Set<string>();
+        for (const n of nodes) {
+          if (suggestions.length >= 15) break;
+          if (n.type === "function" || n.type === "class") {
+            if (!seenSuggestions.has(n.label)) {
+              seenSuggestions.add(n.label);
+              suggestions.push(n.label);
+            }
+          }
+        }
+
         return {
           content: [{
             type: "text" as const,
@@ -1175,11 +1187,7 @@ export function registerTools(server: McpServer) {
               keyword,
               matchCount: 0,
               message: `No entities found matching '${keyword}'. Try a broader keyword.`,
-              suggestions: nodes
-                .filter((n) => n.type === "function" || n.type === "class")
-                .map((n) => n.label)
-                .filter((l, i, arr) => arr.indexOf(l) === i)
-                .slice(0, 15),
+              suggestions,
             }, null, 2),
           }],
         };
