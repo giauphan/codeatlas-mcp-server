@@ -51,6 +51,9 @@
 ## 2025-07-29 - [Performance improvement] Optimized O(N*L) array some during node filtering
 **Learning:** Checking for node connections by using `nodes.filter` and inside it `links.some` is an O(N*L) operation which leads to a severe performance bottleneck for large graphs. Precomputing a Set with all `source` and `target` links takes O(L) space and time and makes the lookup O(1), bringing the total time complexity to O(N+L).
 **Action:** When filtering or counting relationships between nodes, avoid nesting a links `some` or `filter` or `find` inside a nodes loop. Instead, do a single O(L) pass over the links array to precompute a `Set` or `Map`, enabling O(1) lookups during the subsequent O(N) nodes loop.
+## 2026-07-29 - [Performance improvement] Optimized Set Intersection in Tight Loops
+**Learning:** When calculating Set intersections or Jaccard similarity inside a nested O(N^2) loop, doing `new Set([...a].filter(x => b.has(x)))` creates arrays, spreads them, filters them, and builds a new Set on every iteration. This causes immense Garbage Collection pressure and performance degradation.
+**Action:** When only sizes are needed (e.g. for Jaccard similarity `intersection / union`), avoid creating Sets entirely. Instead, iterate over the smaller set with a simple `for...of` loop, count the matches to get `intersectionSize`, and mathematically calculate `unionSize = a.size + b.size - intersectionSize`.
 
 ## 2025-07-30 - [Performance improvement] Optimized O(N*E) array filtering in loops and O(N^2) indexOf deduplication
 **Learning:** During analysis of the `call_graph` component inside `mcpServer.ts`, an O(N*E) logic pattern was found within the diagram's order resolving logic where `dedupLinks` (Array of size E) was getting filtered repeatedly per node (N instances). In addition, O(N²) issues were discovered with `.filter((val, i, arr) => arr.indexOf(val) === i)` logic when generating execution/reading orders.
