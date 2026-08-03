@@ -51,6 +51,10 @@
 ## 2025-07-29 - [Performance improvement] Optimized O(N*L) array some during node filtering
 **Learning:** Checking for node connections by using `nodes.filter` and inside it `links.some` is an O(N*L) operation which leads to a severe performance bottleneck for large graphs. Precomputing a Set with all `source` and `target` links takes O(L) space and time and makes the lookup O(1), bringing the total time complexity to O(N+L).
 **Action:** When filtering or counting relationships between nodes, avoid nesting a links `some` or `filter` or `find` inside a nodes loop. Instead, do a single O(L) pass over the links array to precompute a `Set` or `Map`, enabling O(1) lookups during the subsequent O(N) nodes loop.
+## 2026-08-01 - [O(F*L) Array Filtering Bottleneck in Graph Construction]
+**Learning:** In the `buildChunkedResult` method, filtering the links array for each folder created an O(F*L) bottleneck, causing significant performance degradation for large graphs. The issue arose because `array.filter` iterated over all links for every mapped folder just to find the links internal to that folder.
+**Action:** When categorizing or partitioning a large array of relationships (like edges in a graph) into multiple buckets, prefer initializing the buckets and executing a single O(N) loop over the items to distribute them, rather than running `filter` for each bucket. This single-pass distribution avoids massive loop amplification.
+
 ## 2026-07-29 - [Performance improvement] Optimized Set Intersection in Tight Loops
 **Learning:** When calculating Set intersections or Jaccard similarity inside a nested O(N^2) loop, doing `new Set([...a].filter(x => b.has(x)))` creates arrays, spreads them, filters them, and builds a new Set on every iteration. This causes immense Garbage Collection pressure and performance degradation.
 **Action:** When only sizes are needed (e.g. for Jaccard similarity `intersection / union`), avoid creating Sets entirely. Instead, iterate over the smaller set with a simple `for...of` loop, count the matches to get `intersectionSize`, and mathematically calculate `unionSize = a.size + b.size - intersectionSize`.
