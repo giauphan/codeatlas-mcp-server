@@ -51,3 +51,22 @@
 ## 2025-07-29 - [Performance improvement] Optimized O(N*L) array some during node filtering
 **Learning:** Checking for node connections by using `nodes.filter` and inside it `links.some` is an O(N*L) operation which leads to a severe performance bottleneck for large graphs. Precomputing a Set with all `source` and `target` links takes O(L) space and time and makes the lookup O(1), bringing the total time complexity to O(N+L).
 **Action:** When filtering or counting relationships between nodes, avoid nesting a links `some` or `filter` or `find` inside a nodes loop. Instead, do a single O(L) pass over the links array to precompute a `Set` or `Map`, enabling O(1) lookups during the subsequent O(N) nodes loop.
+
+## 2026-07-26 - [Performance improvement] Avoid O(N^2) event loop freeze with arr.indexOf
+**Learning:** Chaining `.filter((val, i, arr) => arr.indexOf(val) === i)` to deduplicate an array creates an O(N²) bottleneck. When applied to large collections like AST nodes, this can block the Node.js event loop for tens of seconds, causing unresponsiveness. Furthermore, chaining `.filter().map().filter().slice()` forces full traversals and multiple array allocations.
+**Action:** When filtering, mapping, deduplicating, and taking a slice of a large collection, use a standard `for...of` loop with a `Set` for O(1) deduplication and `break` to early-exit once the desired slice size is reached. This turns the operation into O(1) best-case and eliminates intermediate allocations.
+## 2025-07-29 - [Performance improvement] Optimized O(N) array filtering and mapping
+**Learning:** Chained array methods like `.filter().map()` or `.filter().slice().map()` on large sets of graph nodes are inefficient. They enforce multiple O(N) traversals of all nodes and create intermediate array allocations.
+**Action:** When filtering and mapping a large collection, use a single `for...of` loop. Apply filter conditions inside the loop and `push` to the result array. Implement early exit conditions (e.g. `count < limit`) to avoid iterating the entire collection unnecessarily when a limited slice is desired.
+
+## 2025-07-29 - [Performance improvement] Optimized O(E) double link traversal
+**Learning:** Traversing the same `links` array multiple times (e.g. using `links.forEach()` to count outgoing connections, then `links.forEach()` again to count incoming connections) wastes execution time.
+**Action:** When calculating multiple distinct graph metrics from links, combine them into a single O(E) loop that populates multiple Maps simultaneously.
+
+## 2026-07-26 - [Performance improvement] Optimized O(N*L) link filtering inside node mapping
+**Learning:** Checking for node connections by using `nodes.map` and inside it `links.filter` is an O(N*L) operation which leads to a severe performance bottleneck for large graphs. Precomputing Maps for incoming/outgoing links by iterating over the `links` array once takes O(L) time and makes the lookup O(1), bringing the total time complexity to O(N+L).
+**Action:** When mapping relationships for a subset of nodes, avoid nesting a links `filter` inside a nodes `map`. Instead, do a single O(L) pass over the links array to precompute a `Map`, enabling O(1) lookups during the subsequent O(N) nodes mapping.
+
+## 2026-07-30 - [Performance improvement] Optimized O(N^2) Set intersections
+**Learning:** Checking Set intersection and Jaccard similarity inside an O(N^2) loop using `new Set([...a].filter(x => b.has(x)))` creates massive garbage collection pressure by constantly allocating new temporary Arrays and Sets. You can calculate the intersection size and union size for Jaccard similarity without allocating anything by iterating through one set and counting the matches (`if (b.has(x)) intersectionSize++`), then computing `unionSize = a.size + b.size - intersectionSize`. If the similarity threshold is very low and the loop body executes for many pairs, this change yields proportionally more benefit since the inner loop executes more often.
+**Action:** When computing Set sizes for similarity algorithms inside tight loops, avoid creating new Sets or using spread syntax (`...`). Instead, manually iterate and maintain counter variables to prevent memory spikes.
