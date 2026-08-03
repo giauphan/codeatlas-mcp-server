@@ -47,3 +47,11 @@
 **Vulnerability:** The `checkAuth` function used for authorization fell back to granting full privileges via a mock local user if no authentication context was found and `CODEATLAS_MULTI_TENANT` was not explicitly enabled.
 **Learning:** Returning mock authentication credentials as a default fallback allows attackers to easily bypass authentication simply by not providing any credentials.
 **Prevention:** Never use mock objects or fallback roles when authentication fails or is missing. Always throw an explicit unauthorized error.
+## 2025-02-23 - Prevent String Replacement Injection in String.prototype.replace()
+**Vulnerability:** The configuration string replacement in `mcpServer.ts` passed dynamic content (`mcpEntry`, which contains an environment variable) as a string to `String.prototype.replace()`.
+**Learning:** If the dynamic content includes special replacement patterns (like `$&`, `$1`, or `$'`), the `replace` function interpolates the matches instead of treating it as literal text, which can cause data corruption or structural injection in generated configuration files.
+**Prevention:** Always use a replacer function (e.g., `() => replacement`) instead of a string argument when using `String.prototype.replace()` with dynamic or external input.
+## 2024-08-02 - Indirect Command Injection via Unsanitized `cwd` in `spawnSync`
+**Vulnerability:** Indirect command injection vulnerability in `run_script` tool where an unvalidated `projectDir` was passed as `cwd` to `child_process.spawnSync` despite `shell: false` being used.
+**Learning:** Target binaries like `npm` or `sh` may internally spawn their own shells. If the `cwd` parameter is attacker-controlled and contains shell metacharacters, it can become an indirect command injection vector even when `spawnSync` is explicitly configured with `shell: false`.
+**Prevention:** Always sanitize user-influenced directory paths (e.g., using `SHELL_METACHAR_RE` regex) before passing them as the `cwd` option in child process executions.
