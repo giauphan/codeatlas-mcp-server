@@ -2,6 +2,10 @@
 **Vulnerability:** The `checkAuth` function used for authorization fell back to granting full privileges via a mock local user if no authentication context was found and `CODEATLAS_MULTI_TENANT` was not explicitly enabled.
 **Learning:** Returning mock authentication credentials as a default fallback allows attackers to easily bypass authentication simply by not providing any credentials.
 **Prevention:** Never use mock objects or fallback roles when authentication fails or is missing. Always throw an explicit unauthorized error.
+## 2026-08-02 - [Authorization Bypass in Export Tool]
+**Vulnerability:** The `export_team_artifact` tool lacked authorization checks, potentially allowing arbitrary file creation inside unauthorized directories due to unvalidated `projectDir`.
+**Learning:** Any tool that performs file system operations (like writing export files) must validate the target directory against authorized workspace bounds, even if the directory appears to be loaded from internal state (`loadAnalysisAsync`), to prevent authorization bypasses.
+**Prevention:** Consistently apply `fs.realpathSync` followed by `isPathInAuthorizedProjects` to all tools before performing any file I/O operations, regardless of whether the path is directly user-provided or retrieved from internal state.
 
 ## 2025-02-14 - Indirect Command Injection via CWD
 **Vulnerability:** The `run_script` tool passed user-influenced directory paths directly as the `cwd` argument in `child_process.spawnSync()`. While `shell: false` was used for the execution, the target binary (e.g. `npm run`) internally spawns a shell to execute the script in the `package.json`. A malicious directory path containing shell metacharacters (e.g., `&`, `;`) could escape the directory path context and lead to command injection if the spawned binary itself (or a downstream child process) constructs shell commands using the `cwd` unsafely. The vulnerability depends on the specific binary internals, not Node.js `spawnSync` itself.

@@ -2821,11 +2821,43 @@ def register(ctx):
       if (!loaded) return { content: [{ type: "text" as const, text: "No analysis found. Run 'analyze' first." }] };
 
       const exportFormat = format || "json";
-      const projectDir = loaded.projectDir;
-      const artifactDir = path.join(projectDir, ".codeatlas");
-      fs.mkdirSync(artifactDir, { recursive: true });
 
       try {
+        let resolvedProjectDir: string;
+        try {
+          // Resolve the project directory path to fully expand any potential traversal tokens
+          resolvedProjectDir = fs.realpathSync(loaded.projectDir);
+        } catch (err: unknown) {
+          console.error(`[Export Artifact] realpathSync failed for projectDir: ${err instanceof Error ? err.message : String(err)}`);
+          return { content: [{ type: "text" as const, text: "Invalid project directory" }] };
+        }
+
+        // Ensure the resolved project directory is an authorized workspace to prevent path traversal
+        const authorizedProjects = await discoverProjectsAsync(auth.uid);
+        if (!isPathInAuthorizedProjects(resolvedProjectDir, authorizedProjects)) {
+          return { content: [{ type: "text" as const, text: "Unauthorized project directory" }] };
+        }
+
+        let resolvedArtifactDir = path.join(resolvedProjectDir, ".codeatlas");
+
+        // Re-resolve and re-validate the target artifact directory BEFORE mkdirSync
+        // to prevent `mkdirSync({ recursive: true })` from following a pre-existing symlink
+        // out of the authorized workspace and creating arbitrary directories.
+        if (fs.existsSync(resolvedArtifactDir)) {
+          resolvedArtifactDir = fs.realpathSync(resolvedArtifactDir);
+          if (!isPathInAuthorizedProjects(resolvedArtifactDir, authorizedProjects)) {
+            return { content: [{ type: "text" as const, text: "Unauthorized artifact directory" }] };
+          }
+        }
+        fs.mkdirSync(resolvedArtifactDir, { recursive: true });
+
+        // Re-resolve and re-validate after mkdirSync to mitigate the TOCTOU gap
+        // in case a symlink was swapped in immediately before creation.
+        resolvedArtifactDir = fs.realpathSync(resolvedArtifactDir);
+        if (!isPathInAuthorizedProjects(resolvedArtifactDir, authorizedProjects)) {
+          return { content: [{ type: "text" as const, text: "Unauthorized artifact directory" }] };
+        }
+        const projectDir = resolvedProjectDir; // Used for relative paths in success responses
         if (exportFormat === "summary") {
           const nodes = loaded.analysis.graph.nodes.filter(n => !n.id.startsWith("external:"));
           const links = loaded.analysis.graph.links;
@@ -2859,8 +2891,9 @@ def register(ctx):
             callGraph,
           };
 
-          const outPath = path.join(artifactDir, "artifact-summary.json");
-          fs.writeFileSync(outPath, JSON.stringify(summary, null, 2));
+          const outPath = path.join(resolvedArtifactDir, "artifact-summary.json");
+          // Prevent symlink following on the output file itself
+          fs.writeFileSync(outPath, JSON.stringify(summary, null, 2), { flag: "w" });
           const size = fs.statSync(outPath).size;
 
           return { content: [{ type: "text" as const, text: JSON.stringify({
@@ -2880,8 +2913,9 @@ def register(ctx):
           analysis: loaded.analysis,
         };
 
-        const outPath = path.join(artifactDir, "artifact.json");
-        fs.writeFileSync(outPath, JSON.stringify(artifact, null, 2));
+        const outPath = path.join(resolvedArtifactDir, "artifact.json");
+        // Prevent symlink following on the output file itself
+        fs.writeFileSync(outPath, JSON.stringify(artifact, null, 2), { flag: "w" });
         const size = fs.statSync(outPath).size;
 
         // Also update .gitignore to track it
