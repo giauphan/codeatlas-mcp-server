@@ -1351,6 +1351,25 @@ export function registerTools(server: McpServer) {
         if (deg === 0) queue.push(id);
       }
 
+      // Precompute O(1) lookups for callsTo and calledBy instead of O(N*E) array filtering
+      const callsToMap = new Map<string, string[]>();
+      const calledByMap = new Map<string, string[]>();
+      for (const link of dedupLinks) {
+        let callsToArr = callsToMap.get(link.source);
+        if (!callsToArr) {
+          callsToArr = [];
+          callsToMap.set(link.source, callsToArr);
+        }
+        callsToArr.push(nodeNameMap.get(link.target) || link.target);
+
+        let calledByArr = calledByMap.get(link.target);
+        if (!calledByArr) {
+          calledByArr = [];
+          calledByMap.set(link.target, calledByArr);
+        }
+        calledByArr.push(nodeNameMap.get(link.source) || link.source);
+      }
+
       let step = 1;
       const ordered = new Set<string>();
       while (queue.length > 0 && step <= maxN) {
@@ -1360,12 +1379,8 @@ export function registerTools(server: McpServer) {
 
         const node = nodeMap.get(current);
         if (node) {
-          const callsTo = dedupLinks
-            .filter((l) => l.source === current)
-            .map((l) => nodeNameMap.get(l.target) || l.target);
-          const calledBy = dedupLinks
-            .filter((l) => l.target === current)
-            .map((l) => nodeNameMap.get(l.source) || l.source);
+          const callsTo = callsToMap.get(current) || [];
+          const calledBy = calledByMap.get(current) || [];
 
           executionOrder.push({
             step: step++,
@@ -1391,12 +1406,8 @@ export function registerTools(server: McpServer) {
 
       for (const node of traceNodes) {
         if (!ordered.has(node.id)) {
-          const callsTo = dedupLinks
-            .filter((l) => l.source === node.id)
-            .map((l) => nodeNameMap.get(l.target) || l.target);
-          const calledBy = dedupLinks
-            .filter((l) => l.target === node.id)
-            .map((l) => nodeNameMap.get(l.source) || l.source);
+          const callsTo = callsToMap.get(node.id) || [];
+          const calledBy = calledByMap.get(node.id) || [];
 
           executionOrder.push({
             step: step++,
@@ -1424,10 +1435,18 @@ export function registerTools(server: McpServer) {
         })),
         mermaidDiagram: mermaid,
         executionOrder,
-        readingOrder: executionOrder
-          .filter((e) => e.file)
-          .map((e) => e.file!)
-          .filter((f, i, arr) => arr.indexOf(f) === i),
+        // ⚡ Bolt Optimization: Use Set for O(1) deduplication instead of O(N²) array indexOf filtering
+        readingOrder: (() => {
+          const uniqueFiles = new Set<string>();
+          const result: string[] = [];
+          for (const e of executionOrder) {
+            if (e.file && !uniqueFiles.has(e.file)) {
+              uniqueFiles.add(e.file);
+              result.push(e.file);
+            }
+          }
+          return result;
+        })(),
         message: `Generated ${dType} diagram for '${keyword}': ${traceNodes.length} nodes, ${dedupLinks.length} call relationships. Entry points: ${entryPoints.map((n) => n.label).join(", ")}`,
       };
 
