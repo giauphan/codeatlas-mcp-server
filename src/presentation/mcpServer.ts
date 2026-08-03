@@ -4,6 +4,7 @@ import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
 import { getHomePath, getHermesConfigPath, getHermesPluginDir, getClaudeConfigPath } from "../utils/pathUtils.js";
+import { jaccardSimilarity } from "../utils/mathUtils.js";
 import { checkAuth, logActivity } from "../services/authService.js";
 import {
   discoverProjectsAsync,
@@ -328,24 +329,37 @@ export function registerTools(server: McpServer) {
       const links = loaded.analysis.graph.links;
       const nodeMap = createNodeLabelMap(loaded.analysis.graph.nodes);
 
+      // ⚡ Bolt Optimization: Precompute links for matched nodes to avoid O(N*L) filtering inside map
+      const topMatches = matches.slice(0, 50);
+      const matchIds = new Set(topMatches.map((n) => n.id));
+
+      const incomingLinksMap = new Map<string, Array<{ from: string, type: string }>>();
+      const outgoingLinksMap = new Map<string, Array<{ to: string, type: string }>>();
+
+      for (const l of links) {
+        if (matchIds.has(l.target)) {
+          let arr = incomingLinksMap.get(l.target);
+          if (!arr) { arr = []; incomingLinksMap.set(l.target, arr); }
+          arr.push({ from: nodeMap.get(l.source) || l.source, type: l.type });
+        }
+        if (matchIds.has(l.source)) {
+          let arr = outgoingLinksMap.get(l.source);
+          if (!arr) { arr = []; outgoingLinksMap.set(l.source, arr); }
+          arr.push({ to: nodeMap.get(l.target) || l.target, type: l.type });
+        }
+      }
+
       const result = {
         query,
         matchCount: matches.length,
-        results: matches.slice(0, 50).map((n) => {
-          const incomingLinks = links
-            .filter((l) => l.target === n.id)
-            .map((l) => ({ from: nodeMap.get(l.source) || l.source, type: l.type }));
-          const outgoingLinks = links
-            .filter((l) => l.source === n.id)
-            .map((l) => ({ to: nodeMap.get(l.target) || l.target, type: l.type }));
-
+        results: topMatches.map((n) => {
           return {
             name: n.label,
             type: n.type,
             filePath: n.filePath ? (path.isAbsolute(n.filePath) ? n.filePath : path.resolve(loaded.projectDir, n.filePath)) : null,
             line: n.line || null,
-            incomingRelationships: incomingLinks,
-            outgoingRelationships: outgoingLinks,
+            incomingRelationships: incomingLinksMap.get(n.id) || [],
+            outgoingRelationships: outgoingLinksMap.get(n.id) || [],
           };
         }),
       };
@@ -389,6 +403,18 @@ export function registerTools(server: McpServer) {
 
       let filesEntries = Array.from(byFile.entries());
 
+      // ⚡ Bolt Optimization: Precompute dependencies for matched nodes to avoid O(N*L) filtering inside map
+      const matchIds = new Set(matches.map((n) => n.id));
+      const dependenciesMap = new Map<string, Array<{ to: string, type: string }>>();
+
+      for (const l of links) {
+        if (matchIds.has(l.source)) {
+          let arr = dependenciesMap.get(l.source);
+          if (!arr) { arr = []; dependenciesMap.set(l.source, arr); }
+          arr.push({ to: nodeMap.get(l.target) || l.target, type: l.type });
+        }
+      }
+
       const result = {
         query: filePath,
         filesFound: byFile.size,
@@ -400,9 +426,7 @@ export function registerTools(server: McpServer) {
             name: e.label,
             type: e.type,
             line: e.line || null,
-            dependencies: links
-              .filter((l) => l.source === e.id)
-              .map((l) => ({ to: nodeMap.get(l.target) || l.target, type: l.type })),
+            dependencies: dependenciesMap.get(e.id) || [],
           })),
         })),
       };
@@ -1144,6 +1168,18 @@ export function registerTools(server: McpServer) {
       }
 
       if (seedNodes.size === 0) {
+        const suggestions: string[] = [];
+        const seenSuggestions = new Set<string>();
+        for (const n of nodes) {
+          if (suggestions.length >= 15) break;
+          if (n.type === "function" || n.type === "class") {
+            if (!seenSuggestions.has(n.label)) {
+              seenSuggestions.add(n.label);
+              suggestions.push(n.label);
+            }
+          }
+        }
+
         return {
           content: [{
             type: "text" as const,
@@ -1151,11 +1187,7 @@ export function registerTools(server: McpServer) {
               keyword,
               matchCount: 0,
               message: `No entities found matching '${keyword}'. Try a broader keyword.`,
-              suggestions: nodes
-                .filter((n) => n.type === "function" || n.type === "class")
-                .map((n) => n.label)
-                .filter((l, i, arr) => arr.indexOf(l) === i)
-                .slice(0, 15),
+              suggestions,
             }, null, 2),
           }],
         };
@@ -1319,6 +1351,25 @@ export function registerTools(server: McpServer) {
         if (deg === 0) queue.push(id);
       }
 
+      // Precompute O(1) lookups for callsTo and calledBy instead of O(N*E) array filtering
+      const callsToMap = new Map<string, string[]>();
+      const calledByMap = new Map<string, string[]>();
+      for (const link of dedupLinks) {
+        let callsToArr = callsToMap.get(link.source);
+        if (!callsToArr) {
+          callsToArr = [];
+          callsToMap.set(link.source, callsToArr);
+        }
+        callsToArr.push(nodeNameMap.get(link.target) || link.target);
+
+        let calledByArr = calledByMap.get(link.target);
+        if (!calledByArr) {
+          calledByArr = [];
+          calledByMap.set(link.target, calledByArr);
+        }
+        calledByArr.push(nodeNameMap.get(link.source) || link.source);
+      }
+
       let step = 1;
       const ordered = new Set<string>();
       while (queue.length > 0 && step <= maxN) {
@@ -1328,12 +1379,8 @@ export function registerTools(server: McpServer) {
 
         const node = nodeMap.get(current);
         if (node) {
-          const callsTo = dedupLinks
-            .filter((l) => l.source === current)
-            .map((l) => nodeNameMap.get(l.target) || l.target);
-          const calledBy = dedupLinks
-            .filter((l) => l.target === current)
-            .map((l) => nodeNameMap.get(l.source) || l.source);
+          const callsTo = callsToMap.get(current) || [];
+          const calledBy = calledByMap.get(current) || [];
 
           executionOrder.push({
             step: step++,
@@ -1359,12 +1406,8 @@ export function registerTools(server: McpServer) {
 
       for (const node of traceNodes) {
         if (!ordered.has(node.id)) {
-          const callsTo = dedupLinks
-            .filter((l) => l.source === node.id)
-            .map((l) => nodeNameMap.get(l.target) || l.target);
-          const calledBy = dedupLinks
-            .filter((l) => l.target === node.id)
-            .map((l) => nodeNameMap.get(l.source) || l.source);
+          const callsTo = callsToMap.get(node.id) || [];
+          const calledBy = calledByMap.get(node.id) || [];
 
           executionOrder.push({
             step: step++,
@@ -1392,10 +1435,18 @@ export function registerTools(server: McpServer) {
         })),
         mermaidDiagram: mermaid,
         executionOrder,
-        readingOrder: executionOrder
-          .filter((e) => e.file)
-          .map((e) => e.file!)
-          .filter((f, i, arr) => arr.indexOf(f) === i),
+        // ⚡ Bolt Optimization: Use Set for O(1) deduplication instead of O(N²) array indexOf filtering
+        readingOrder: (() => {
+          const uniqueFiles = new Set<string>();
+          const result: string[] = [];
+          for (const e of executionOrder) {
+            if (e.file && !uniqueFiles.has(e.file)) {
+              uniqueFiles.add(e.file);
+              result.push(e.file);
+            }
+          }
+          return result;
+        })(),
         message: `Generated ${dType} diagram for '${keyword}': ${traceNodes.length} nodes, ${dedupLinks.length} call relationships. Entry points: ${entryPoints.map((n) => n.label).join(", ")}`,
       };
 
@@ -1425,27 +1476,36 @@ export function registerTools(server: McpServer) {
         // Find circular dependencies locally (from analyzer insights or simple check)
         const circularDependencies = (loaded.analysis.insights as any)?.circularDependencies || [];
 
-        // God objects: classes with more than 15 outgoing/incoming connections
+        // ⚡ Bolt Optimization: Combine link loops to O(E) and node iterations to O(N) without intermediate arrays
         const nodeConnections = new Map<string, number>();
-        links.forEach((l: any) => {
+        const incomingCount = new Map<string, number>();
+
+        for (const l of links) {
           nodeConnections.set(l.source, (nodeConnections.get(l.source) || 0) + 1);
           nodeConnections.set(l.target, (nodeConnections.get(l.target) || 0) + 1);
-        });
-
-        const godObjects = nodes
-          .filter((n: any) => n.type === 'class' && (nodeConnections.get(n.id) || 0) > 15)
-          .map((n: any) => ({ name: n.label, filePath: n.filePath, connections: nodeConnections.get(n.id) }));
-
-        // Dead code: non-external entities with 0 incoming connections
-        const incomingCount = new Map<string, number>();
-        links.forEach((l: any) => {
           incomingCount.set(l.target, (incomingCount.get(l.target) || 0) + 1);
-        });
+        }
 
-        const deadCode = nodes
-          .filter((n: any) => n.type === 'function' && !n.id.startsWith('external:') && (incomingCount.get(n.id) || 0) === 0 && !n.label.includes('main') && !n.label.includes('index'))
-          .slice(0, 10)
-          .map((n: any) => ({ name: n.label, filePath: n.filePath, line: n.line }));
+        const godObjects = [];
+        const deadCode = [];
+        let deadCodeFound = 0;
+
+        for (const n of nodes) {
+          if (n.type === 'class') {
+            const count = nodeConnections.get(n.id) || 0;
+            if (count > 15) {
+              godObjects.push({ name: n.label, filePath: n.filePath, connections: count });
+            }
+          } else if (n.type === 'function' && deadCodeFound < 10) {
+            if (!n.id.startsWith('external:') && !n.label.includes('main') && !n.label.includes('index')) {
+              const count = incomingCount.get(n.id) || 0;
+              if (count === 0) {
+                deadCode.push({ name: n.label, filePath: n.filePath, line: n.line });
+                deadCodeFound++;
+              }
+            }
+          }
+        }
 
         const result = {
           project: loaded.projectName,
@@ -1982,15 +2042,28 @@ export function registerTools(server: McpServer) {
 
       // 🛡️ Sentinel Security Validation
       // Use spawnSync without a shell to prevent command injection entirely
-      const projectDir = loaded.projectDir;
 
-      // Ensure the project directory is an authorized workspace to prevent path traversal
+      // Resolve the project directory immediately to ensure path traversal tokens (like `../`)
+      // are fully expanded before validation occurs.
+      let resolvedDir: string;
+      try {
+        resolvedDir = fs.realpathSync(loaded.projectDir);
+      } catch {
+        return { content: [{ type: "text" as const, text: JSON.stringify({ error: "Invalid project directory" }) }] };
+      }
+
+      // Ensure the resolved project directory is an authorized workspace to prevent path traversal
       const authorizedProjects = await discoverProjectsAsync(auth.uid);
-      if (!isPathInAuthorizedProjects(projectDir, authorizedProjects)) {
+      if (!isPathInAuthorizedProjects(resolvedDir, authorizedProjects)) {
         return { content: [{ type: "text" as const, text: JSON.stringify({ error: "Unauthorized project directory" }) }] };
       }
 
-      const pkgPath = path.join(projectDir, "package.json");
+      // Security: Block shell metacharacters in directory path to prevent indirect command injection via cwd
+      if (SHELL_METACHAR_RE.test(resolvedDir)) {
+        return { content: [{ type: "text" as const, text: JSON.stringify({ error: "Security Error: Directory path contains forbidden shell metacharacters" }) }] };
+      }
+
+      const pkgPath = path.join(resolvedDir, "package.json");
       if (fs.existsSync(pkgPath)) {
         try {
           const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf-8"));
@@ -2034,7 +2107,7 @@ export function registerTools(server: McpServer) {
           timeout: maxTime * 1000,
           shell: false, // Security: explicit shell false
           maxBuffer: 1024 * 1024,
-          cwd: projectDir
+          cwd: resolvedDir
         });
 
         const dur = ((Date.now() - startTime) / 1000).toFixed(1);
@@ -2164,7 +2237,7 @@ export function registerTools(server: McpServer) {
             if (cfg.includes("codeatlas:")) {
               results.push({ client: "hermes", action: "mcp_config", status: "already_configured" });
             } else if (cfg.includes("mcp_servers:")) {
-              cfg = cfg.replace("mcp_servers:", "mcp_servers:\n" + mcpEntry);
+              cfg = cfg.replace("mcp_servers:", () => "mcp_servers:\n" + mcpEntry);
               fs.writeFileSync(hermesCfg, cfg);
               results.push({ client: "hermes", action: "mcp_config", status: "updated" });
             } else {
@@ -2683,20 +2756,18 @@ def register(ctx):
           // Quick check: skip if files too different in size
           if (Math.abs(a.tokens.size - b.tokens.size) > Math.max(a.tokens.size, b.tokens.size) * 0.7) continue;
 
-          const intersection = new Set([...a.tokens].filter(t => b.tokens.has(t)));
-          const union = new Set([...a.tokens, ...b.tokens]);
-          if (union.size === 0) continue;
+          const { similarity, intersectionSize, unionSize } = jaccardSimilarity(a.tokens, b.tokens);
+          if (unionSize === 0) continue;
 
-          const sim = intersection.size / union.size;
-          if (sim >= thresh) {
+          if (similarity >= thresh) {
             const aFile = path.relative(loaded.projectDir, a.node.filePath!);
             const bFile = path.relative(loaded.projectDir, b.node.filePath!);
             pairs.push({
               a: { name: a.node.label, file: aFile, line: a.node.line || 0, type: a.node.type },
               b: { name: b.node.label, file: bFile, line: b.node.line || 0, type: b.node.type },
-              similarity: Math.round(sim * 100) / 100,
-              sharedTokens: intersection.size,
-              totalTokens: union.size,
+              similarity: Math.round(similarity * 100) / 100,
+              sharedTokens: intersectionSize,
+              totalTokens: unionSize,
             });
           }
 
