@@ -82,3 +82,7 @@
 ## 2026-07-30 - [Performance improvement] Optimized O(N^2) Set intersections
 **Learning:** Checking Set intersection and Jaccard similarity inside an O(N^2) loop using `new Set([...a].filter(x => b.has(x)))` creates massive garbage collection pressure by constantly allocating new temporary Arrays and Sets. You can calculate the intersection size and union size for Jaccard similarity without allocating anything by iterating through one set and counting the matches (`if (b.has(x)) intersectionSize++`), then computing `unionSize = a.size + b.size - intersectionSize`. If the similarity threshold is very low and the loop body executes for many pairs, this change yields proportionally more benefit since the inner loop executes more often.
 **Action:** When computing Set sizes for similarity algorithms inside tight loops, avoid creating new Sets or using spread syntax (`...`). Instead, manually iterate and maintain counter variables to prevent memory spikes.
+
+## 2024-08-04 - [Single-Pass Partitioning Replaces Multi-Pass Filter Chains]
+**Learning:** Chaining `.filter().map()` multiple times over the same array to partition items into distinct buckets creates unnecessary N * (number of buckets) overhead and excessive intermediate array allocations.
+**Action:** Replace multiple filter chains with a single `for...of` loop when bucketing data, performing O(1) condition checks inside to distribute elements in a single O(N) pass.

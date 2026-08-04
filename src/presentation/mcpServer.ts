@@ -2880,14 +2880,29 @@ def register(ctx):
             }
           }
 
+          // Use a single O(N) pass to categorize nodes instead of chained O(N) .filter().map()
+          const modulesList: Array<{ id: string, name: string, file: string | undefined }> = [];
+          const classesList: Array<{ id: string, name: string, file: string | undefined, line: number | undefined }> = [];
+          const functionsList: Array<{ id: string, name: string, file: string | undefined, line: number | undefined }> = [];
+
+          for (const n of nodes) {
+            if (n.type === "module") {
+              modulesList.push({ id: n.id, name: n.label, file: n.filePath });
+            } else if (n.type === "class") {
+              classesList.push({ id: n.id, name: n.label, file: n.filePath, line: n.line });
+            } else if (n.type === "function") {
+              functionsList.push({ id: n.id, name: n.label, file: n.filePath, line: n.line });
+            }
+          }
+
           const summary = {
             version: 1,
             exportedAt: new Date().toISOString(),
             project: loaded.projectName,
             stats,
-            modules: nodes.filter(n => n.type === "module").map(n => ({ id: n.id, name: n.label, file: n.filePath })),
-            classes: nodes.filter(n => n.type === "class").map(n => ({ id: n.id, name: n.label, file: n.filePath, line: n.line })),
-            functions: nodes.filter(n => n.type === "function").map(n => ({ id: n.id, name: n.label, file: n.filePath, line: n.line })),
+            modules: modulesList,
+            classes: classesList,
+            functions: functionsList,
             callGraph,
           };
 
