@@ -547,6 +547,13 @@ export function registerTools(server: McpServer) {
 
       const mermaid = lines.join("\n");
 
+      let modCount = 0, classCount = 0, funcCount = 0;
+      for (const n of nodes) {
+        if (n.type === "module") modCount++;
+        else if (n.type === "class") classCount++;
+        else if (n.type === "function") funcCount++;
+      }
+
       const result = {
         project: loaded.projectName,
         scope: diagramScope,
@@ -555,7 +562,7 @@ export function registerTools(server: McpServer) {
         linkCount: links.length,
         truncated: loaded.analysis.graph.nodes.length > max,
         mermaidDiagram: mermaid,
-        summary: `System flow for ${loaded.projectName}: ${nodes.filter((n) => n.type === "module").length} modules, ${nodes.filter((n) => n.type === "class").length} classes, ${nodes.filter((n) => n.type === "function").length} functions connected by ${links.length} relationships.`,
+        summary: `System flow for ${loaded.projectName}: ${modCount} modules, ${classCount} classes, ${funcCount} functions connected by ${links.length} relationships.`,
       };
 
       return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
@@ -604,11 +611,16 @@ export function registerTools(server: McpServer) {
         }
       }
 
+      let modCountSync = 0;
+      for (const n of nodes) {
+        if (n.type === "module") modCountSync++;
+      }
+
       const result = {
         success: syncSuccess,
         project: loaded.projectName,
         stats: {
-          modules: nodes.filter((n) => n.type === "module").length,
+          modules: modCountSync,
           totalEntities: nodes.length,
           totalLinks: links.length,
           businessRuleSaved: syncSuccess && !!businessRule,
@@ -2880,14 +2892,24 @@ def register(ctx):
             }
           }
 
+          const modules: Array<{ id: string, name: string, file?: string }> = [];
+          const classes: Array<{ id: string, name: string, file?: string, line?: number }> = [];
+          const functions: Array<{ id: string, name: string, file?: string, line?: number }> = [];
+
+          for (const n of nodes) {
+            if (n.type === "module") modules.push({ id: n.id, name: n.label, file: n.filePath });
+            else if (n.type === "class") classes.push({ id: n.id, name: n.label, file: n.filePath, line: n.line });
+            else if (n.type === "function") functions.push({ id: n.id, name: n.label, file: n.filePath, line: n.line });
+          }
+
           const summary = {
             version: 1,
             exportedAt: new Date().toISOString(),
             project: loaded.projectName,
             stats,
-            modules: nodes.filter(n => n.type === "module").map(n => ({ id: n.id, name: n.label, file: n.filePath })),
-            classes: nodes.filter(n => n.type === "class").map(n => ({ id: n.id, name: n.label, file: n.filePath, line: n.line })),
-            functions: nodes.filter(n => n.type === "function").map(n => ({ id: n.id, name: n.label, file: n.filePath, line: n.line })),
+            modules,
+            classes,
+            functions,
             callGraph,
           };
 
