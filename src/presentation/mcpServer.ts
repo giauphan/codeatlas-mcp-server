@@ -2880,14 +2880,30 @@ def register(ctx):
             }
           }
 
+          // ⚡ Bolt Optimization: Use a single O(N) loop to categorize nodes instead of chained .filter().map()
+          // This avoids multiple full passes and intermediate array allocations, reducing execution time and GC pressure.
+          const modulesSummary: any[] = [];
+          const classesSummary: any[] = [];
+          const functionsSummary: any[] = [];
+
+          for (const n of nodes) {
+            if (n.type === "module") {
+              modulesSummary.push({ id: n.id, name: n.label, file: n.filePath });
+            } else if (n.type === "class") {
+              classesSummary.push({ id: n.id, name: n.label, file: n.filePath, line: n.line });
+            } else if (n.type === "function") {
+              functionsSummary.push({ id: n.id, name: n.label, file: n.filePath, line: n.line });
+            }
+          }
+
           const summary = {
             version: 1,
             exportedAt: new Date().toISOString(),
             project: loaded.projectName,
             stats,
-            modules: nodes.filter(n => n.type === "module").map(n => ({ id: n.id, name: n.label, file: n.filePath })),
-            classes: nodes.filter(n => n.type === "class").map(n => ({ id: n.id, name: n.label, file: n.filePath, line: n.line })),
-            functions: nodes.filter(n => n.type === "function").map(n => ({ id: n.id, name: n.label, file: n.filePath, line: n.line })),
+            modules: modulesSummary,
+            classes: classesSummary,
+            functions: functionsSummary,
             callGraph,
           };
 
