@@ -547,6 +547,14 @@ export function registerTools(server: McpServer) {
 
       const mermaid = lines.join("\n");
 
+      // ⚡ Bolt Optimization: Use a single O(N) pass to count entity types instead of multiple `.filter().length` calls
+      let moduleCount = 0, classCount = 0, functionCount = 0;
+      for (const n of nodes) {
+        if (n.type === "module") moduleCount++;
+        else if (n.type === "class") classCount++;
+        else if (n.type === "function") functionCount++;
+      }
+
       const result = {
         project: loaded.projectName,
         scope: diagramScope,
@@ -555,7 +563,7 @@ export function registerTools(server: McpServer) {
         linkCount: links.length,
         truncated: loaded.analysis.graph.nodes.length > max,
         mermaidDiagram: mermaid,
-        summary: `System flow for ${loaded.projectName}: ${nodes.filter((n) => n.type === "module").length} modules, ${nodes.filter((n) => n.type === "class").length} classes, ${nodes.filter((n) => n.type === "function").length} functions connected by ${links.length} relationships.`,
+        summary: `System flow for ${loaded.projectName}: ${moduleCount} modules, ${classCount} classes, ${functionCount} functions connected by ${links.length} relationships.`,
       };
 
       return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
@@ -604,11 +612,17 @@ export function registerTools(server: McpServer) {
         }
       }
 
+      // ⚡ Bolt Optimization: Use single O(N) loop to count modules instead of `.filter().length`
+      let moduleCount = 0;
+      for (const n of nodes) {
+        if (n.type === "module") moduleCount++;
+      }
+
       const result = {
         success: syncSuccess,
         project: loaded.projectName,
         stats: {
-          modules: nodes.filter((n) => n.type === "module").length,
+          modules: moduleCount,
           totalEntities: nodes.length,
           totalLinks: links.length,
           businessRuleSaved: syncSuccess && !!businessRule,
@@ -2880,14 +2894,29 @@ def register(ctx):
             }
           }
 
+          // ⚡ Bolt Optimization: Use a single O(N) pass to categorize nodes instead of chained `.filter().map()`
+          const modulesList: Array<{ id: string; name: string; file?: string }> = [];
+          const classesList: Array<{ id: string; name: string; file?: string; line?: number }> = [];
+          const functionsList: Array<{ id: string; name: string; file?: string; line?: number }> = [];
+
+          for (const n of nodes) {
+            if (n.type === "module") {
+              modulesList.push({ id: n.id, name: n.label, file: n.filePath });
+            } else if (n.type === "class") {
+              classesList.push({ id: n.id, name: n.label, file: n.filePath, line: n.line });
+            } else if (n.type === "function") {
+              functionsList.push({ id: n.id, name: n.label, file: n.filePath, line: n.line });
+            }
+          }
+
           const summary = {
             version: 1,
             exportedAt: new Date().toISOString(),
             project: loaded.projectName,
             stats,
-            modules: nodes.filter(n => n.type === "module").map(n => ({ id: n.id, name: n.label, file: n.filePath })),
-            classes: nodes.filter(n => n.type === "class").map(n => ({ id: n.id, name: n.label, file: n.filePath, line: n.line })),
-            functions: nodes.filter(n => n.type === "function").map(n => ({ id: n.id, name: n.label, file: n.filePath, line: n.line })),
+            modules: modulesList,
+            classes: classesList,
+            functions: functionsList,
             callGraph,
           };
 

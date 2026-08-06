@@ -261,14 +261,30 @@ export class HelperService {
         }
       }
 
+      // ⚡ Bolt Optimization: Use a single O(N) pass to categorize nodes instead of chained `.filter().map()`
+      const modulesList: Array<{ id: string; name: string; file?: string }> = [];
+      const classesList: Array<{ id: string; name: string; file?: string; line?: number }> = [];
+      const functionsList: Array<{ id: string; name: string; file?: string; line?: number }> = [];
+
+      for (const n of cache!.graph.nodes) {
+        if (n.type === "module" || n.type === "class") {
+          modulesList.push({ id: n.id, name: n.label, file: n.filePath });
+        }
+        if (n.type === "class") {
+          classesList.push({ id: n.id, name: n.label, file: n.filePath, line: n.line });
+        } else if (n.type === "function") {
+          functionsList.push({ id: n.id, name: n.label, file: n.filePath, line: n.line });
+        }
+      }
+
       const summary = {
         version: 1,
         exportedAt: new Date().toISOString(),
         project: "test-project",
         stats: { modules: 2, functions: 4, classes: 2, dependencies: 2, circularDeps: 0, deadCode: 0 },
-        modules: cache!.graph.nodes.filter((n: { type: string }) => n.type === "module" || n.type === "class").map((n: { id: string; label: string; filePath?: string }) => ({ id: n.id, name: n.label, file: n.filePath })),
-        classes: cache!.graph.nodes.filter((n: { type: string }) => n.type === "class").map((n: { id: string; label: string; filePath?: string; line?: number }) => ({ id: n.id, name: n.label, file: n.filePath, line: n.line })),
-        functions: cache!.graph.nodes.filter((n: { type: string }) => n.type === "function").map((n: { id: string; label: string; filePath?: string; line?: number }) => ({ id: n.id, name: n.label, file: n.filePath, line: n.line })),
+        modules: modulesList,
+        classes: classesList,
+        functions: functionsList,
         callGraph,
       };
 
