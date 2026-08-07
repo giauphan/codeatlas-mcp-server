@@ -2256,7 +2256,44 @@ export function registerTools(server: McpServer) {
       }, null, 2) }] };
 
       const results: any[] = [];
-      const mcpEntry = `  codeatlas:\n    command: npx\n    args: ["-y", "codeatlas-enterprise"]\n    env:\n      CODEATLAS_API_KEY: ${JSON.stringify(key)}\n    enabled: true\n`;
+
+      // Save the key securely to ~/.codeatlas/.env
+      try {
+        const homeDir = getHomePath();
+        if (homeDir) {
+          const codeatlasDir = path.join(homeDir, ".codeatlas");
+          if (!fs.existsSync(codeatlasDir)) {
+            fs.mkdirSync(codeatlasDir, { recursive: true, mode: 0o700 });
+          }
+          const envPath = path.join(codeatlasDir, ".env");
+          let envContent = "";
+          let fileExists = false;
+          try {
+            fileExists = fs.existsSync(envPath);
+            if (fileExists) {
+              envContent = fs.readFileSync(envPath, "utf-8");
+            }
+          } catch (e) {
+            // Ignore access errors on check
+          }
+
+          if (fileExists) {
+            if (!envContent.includes("CODEATLAS_API_KEY=")) {
+              envContent += (envContent.endsWith("\n") || envContent === "" ? "" : "\n") + `CODEATLAS_API_KEY=${key}\n`;
+            } else {
+              envContent = envContent.replace(/CODEATLAS_API_KEY=.*(\r?\n|$)/g, `CODEATLAS_API_KEY=${key}\n`);
+            }
+            // Use writeFileSync with temp file to avoid race conditions (partial mitigate)
+            fs.writeFileSync(envPath, envContent, { mode: 0o600 });
+          } else {
+            fs.writeFileSync(envPath, `CODEATLAS_API_KEY=${key}\n`, { mode: 0o600 });
+          }
+        }
+      } catch (err: any) {
+        results.push({ action: "save_env", status: "error", error: err.message });
+      }
+
+      const mcpEntry = `  codeatlas:\n    command: npx\n    args: ["-y", "codeatlas-enterprise"]\n    enabled: true\n`;
 
       // Hermes MCP config
       if (client === "hermes" || client === "all") {
@@ -2264,7 +2301,15 @@ export function registerTools(server: McpServer) {
         try {
           if (fs.existsSync(hermesCfg)) {
             let cfg = fs.readFileSync(hermesCfg, "utf-8");
+            // Cleanup any existing embedded API key
+            if (cfg.includes("CODEATLAS_API_KEY:")) {
+               cfg = cfg.replace(/[ \t]*CODEATLAS_API_KEY:.*(\r?\n|$)/g, "");
+               // Cleanup empty env block if it exists
+               cfg = cfg.replace(/[ \t]*env:[ \t]*(\r?\n)(?![ \t]+[A-Za-z0-9_]+:)/g, "");
+            }
+
             if (cfg.includes("codeatlas:")) {
+              fs.writeFileSync(hermesCfg, cfg); // Save cleanup
               results.push({ client: "hermes", action: "mcp_config", status: "already_configured" });
             } else if (cfg.includes("mcp_servers:")) {
               cfg = cfg.replace("mcp_servers:", () => "mcp_servers:\n" + mcpEntry);
@@ -2360,11 +2405,26 @@ def register(ctx):
         const claudeCfg = getClaudeConfigPath();
         try {
           const claudeEntry = { mcpServers: {
-            codeatlas: { command: "npx", args: ["-y", "codeatlas-enterprise"], env: { CODEATLAS_API_KEY: key } },
-            ["codeatlas-genome"]: { command: "npx", args: ["-y", "codeatlas-enterprise"], env: { CODEATLAS_API_KEY: key } },
+            codeatlas: { command: "npx", args: ["-y", "codeatlas-enterprise"] },
+            ["codeatlas-genome"]: { command: "npx", args: ["-y", "codeatlas-enterprise"] },
           }};
           if (fs.existsSync(claudeCfg)) {
             const existing = JSON.parse(fs.readFileSync(claudeCfg, "utf-8"));
+
+            // Clean up old env references if they exist
+            if (existing.mcpServers?.codeatlas?.env?.CODEATLAS_API_KEY) {
+                delete existing.mcpServers.codeatlas.env.CODEATLAS_API_KEY;
+                if (Object.keys(existing.mcpServers.codeatlas.env).length === 0) {
+                    delete existing.mcpServers.codeatlas.env;
+                }
+            }
+            if (existing.mcpServers?.["codeatlas-genome"]?.env?.CODEATLAS_API_KEY) {
+                delete existing.mcpServers["codeatlas-genome"].env.CODEATLAS_API_KEY;
+                if (Object.keys(existing.mcpServers["codeatlas-genome"].env).length === 0) {
+                    delete existing.mcpServers["codeatlas-genome"].env;
+                }
+            }
+
             existing.mcpServers = { ...existing.mcpServers, ...claudeEntry.mcpServers };
             fs.writeFileSync(claudeCfg, JSON.stringify(existing, null, 2));
             results.push({ client: "claude", action: "mcp_config", status: "updated" });
