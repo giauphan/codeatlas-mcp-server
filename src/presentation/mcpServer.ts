@@ -2226,7 +2226,32 @@ export function registerTools(server: McpServer) {
       }, null, 2) }] };
 
       const results: any[] = [];
-      const mcpEntry = `  codeatlas:\n    command: npx\n    args: ["-y", "codeatlas-enterprise"]\n    env:\n      CODEATLAS_API_KEY: ${JSON.stringify(key)}\n    enabled: true\n`;
+
+      // Save the key securely to ~/.codeatlas/.env
+      try {
+        const codeatlasDir = path.join(os.homedir(), ".codeatlas");
+        if (!fs.existsSync(codeatlasDir)) {
+          fs.mkdirSync(codeatlasDir, { recursive: true, mode: 0o700 });
+        }
+        const envPath = path.join(codeatlasDir, ".env");
+        let envContent = "";
+        if (fs.existsSync(envPath)) {
+          envContent = fs.readFileSync(envPath, "utf-8");
+          if (!envContent.includes("CODEATLAS_API_KEY=")) {
+            envContent += `\nCODEATLAS_API_KEY=${key}\n`;
+            fs.writeFileSync(envPath, envContent, { mode: 0o600 });
+          } else {
+            envContent = envContent.replace(/CODEATLAS_API_KEY=.*(\r?\n|$)/g, `CODEATLAS_API_KEY=${key}$1`);
+            fs.writeFileSync(envPath, envContent, { mode: 0o600 });
+          }
+        } else {
+          fs.writeFileSync(envPath, `CODEATLAS_API_KEY=${key}\n`, { mode: 0o600 });
+        }
+      } catch (err: any) {
+        results.push({ action: "save_env", status: "error", error: err.message });
+      }
+
+      const mcpEntry = `  codeatlas:\n    command: npx\n    args: ["-y", "codeatlas-enterprise"]\n    enabled: true\n`;
 
       // Hermes MCP config
       if (client === "hermes" || client === "all") {
@@ -2330,8 +2355,8 @@ def register(ctx):
         const claudeCfg = getClaudeConfigPath();
         try {
           const claudeEntry = { mcpServers: {
-            codeatlas: { command: "npx", args: ["-y", "codeatlas-enterprise"], env: { CODEATLAS_API_KEY: key } },
-            ["codeatlas-genome"]: { command: "npx", args: ["-y", "codeatlas-enterprise"], env: { CODEATLAS_API_KEY: key } },
+            codeatlas: { command: "npx", args: ["-y", "codeatlas-enterprise"] },
+            ["codeatlas-genome"]: { command: "npx", args: ["-y", "codeatlas-enterprise"] },
           }};
           if (fs.existsSync(claudeCfg)) {
             const existing = JSON.parse(fs.readFileSync(claudeCfg, "utf-8"));
