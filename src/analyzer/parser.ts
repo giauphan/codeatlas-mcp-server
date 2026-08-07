@@ -1245,6 +1245,7 @@ export class CodeAnalyzer {
       if (l.type === 'import' && l.source.startsWith('module:') && l.target.startsWith('module:')) {
         moduleDependencies.set(l.source, (moduleDependencies.get(l.source) || 0) + 1);
       }
+      }
     }
 
     const highlyCoupled: string[] = [];
