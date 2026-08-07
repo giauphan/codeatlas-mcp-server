@@ -170,6 +170,15 @@ import { startWatcher, stopWatcher, isIndexingEnabledForProject, watcher } from 
 
 // Load environment variables
 dotenv.config();
+// Also load from global config if it exists
+try {
+  const globalEnvPath = path.join(os.homedir(), ".codeatlas", ".env");
+  if (fs.existsSync(globalEnvPath)) {
+    dotenv.config({ path: globalEnvPath, override: false }); // Do not override if already set
+  }
+} catch (e) {
+  // Ignore errors reading global config
+}
 
 // Start server
 async function main() {
