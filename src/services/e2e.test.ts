@@ -261,14 +261,25 @@ export class HelperService {
         }
       }
 
+      // ⚡ Bolt Optimization: Replace 3 chained .filter().map() passes with a single O(N) pass
+      const modules: Array<{ id: string; name: string; file?: string }> = [];
+      const classes: Array<{ id: string; name: string; file?: string; line?: number }> = [];
+      const functions: Array<{ id: string; name: string; file?: string; line?: number }> = [];
+
+      for (const n of cache!.graph.nodes) {
+        if (n.type === "module" || n.type === "class") modules.push({ id: n.id, name: n.label, file: n.filePath });
+        if (n.type === "class") classes.push({ id: n.id, name: n.label, file: n.filePath, line: n.line });
+        if (n.type === "function") functions.push({ id: n.id, name: n.label, file: n.filePath, line: n.line });
+      }
+
       const summary = {
         version: 1,
         exportedAt: new Date().toISOString(),
         project: "test-project",
         stats: { modules: 2, functions: 4, classes: 2, dependencies: 2, circularDeps: 0, deadCode: 0 },
-        modules: cache!.graph.nodes.filter((n: { type: string }) => n.type === "module" || n.type === "class").map((n: { id: string; label: string; filePath?: string }) => ({ id: n.id, name: n.label, file: n.filePath })),
-        classes: cache!.graph.nodes.filter((n: { type: string }) => n.type === "class").map((n: { id: string; label: string; filePath?: string; line?: number }) => ({ id: n.id, name: n.label, file: n.filePath, line: n.line })),
-        functions: cache!.graph.nodes.filter((n: { type: string }) => n.type === "function").map((n: { id: string; label: string; filePath?: string; line?: number }) => ({ id: n.id, name: n.label, file: n.filePath, line: n.line })),
+        modules,
+        classes,
+        functions,
         callGraph,
       };
 
