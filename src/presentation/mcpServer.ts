@@ -2865,14 +2865,28 @@ def register(ctx):
         }
         const projectDir = resolvedProjectDir; // Used for relative paths in success responses
         if (exportFormat === "summary") {
-          const nodes = loaded.analysis.graph.nodes.filter(n => !n.id.startsWith("external:"));
           const links = loaded.analysis.graph.links;
           const stats = getStats(loaded.analysis);
 
-          // ⚡ Bolt Optimization: Replace O(N*L) array finds inside map with O(1) Map lookups and early exit loop
+          // ⚡ Bolt Optimization: Single O(N) pass over nodes to populate label map and extract typed nodes,
+          // replacing chained .filter().map() that caused multiple traversals and allocations.
           const nodeLabelMap = new Map<string, string>();
-          for (const n of nodes) {
+          const modules: Array<{ id: string; name: string; file?: string }> = [];
+          const classes: Array<{ id: string; name: string; file?: string; line?: number }> = [];
+          const functions: Array<{ id: string; name: string; file?: string; line?: number }> = [];
+
+          for (const n of loaded.analysis.graph.nodes) {
+            if (n.id.startsWith("external:")) continue;
+
             nodeLabelMap.set(n.id, n.label);
+
+            if (n.type === "module") {
+              modules.push({ id: n.id, name: n.label, file: n.filePath });
+            } else if (n.type === "class") {
+              classes.push({ id: n.id, name: n.label, file: n.filePath, line: n.line });
+            } else if (n.type === "function") {
+              functions.push({ id: n.id, name: n.label, file: n.filePath, line: n.line });
+            }
           }
 
           const callGraph: Array<{ from: string; to: string }> = [];
@@ -2884,17 +2898,6 @@ def register(ctx):
               });
               if (callGraph.length >= 500) break;
             }
-          }
-
-          // ⚡ Bolt Optimization: Replace 3 chained .filter().map() passes with a single O(N) pass
-          const modules: Array<{ id: string; name: string; file?: string }> = [];
-          const classes: Array<{ id: string; name: string; file?: string; line?: number }> = [];
-          const functions: Array<{ id: string; name: string; file?: string; line?: number }> = [];
-
-          for (const n of nodes) {
-            if (n.type === "module") modules.push({ id: n.id, name: n.label, file: n.filePath });
-            else if (n.type === "class") classes.push({ id: n.id, name: n.label, file: n.filePath, line: n.line });
-            else if (n.type === "function") functions.push({ id: n.id, name: n.label, file: n.filePath, line: n.line });
           }
 
           const summary = {
