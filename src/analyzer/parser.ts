@@ -1222,7 +1222,6 @@ export class CodeAnalyzer {
       }
     }
 
-    // ⚡ Bolt Optimization: Replaced Array.from().filter().map() with a single loop to avoid multiple traversals and intermediate allocations.
     const modulesWithManyFunctions: string[] = [];
     for (const n of this.nodes.values()) {
       if (n.type === 'module' && (moduleFunctionCounts.get(n.id) || 0) > 10) {
@@ -1249,7 +1248,6 @@ export class CodeAnalyzer {
       }
     });
     
-    // ⚡ Bolt Optimization: Single loop iteration over Map entries instead of Array.from().filter().map()
     const highlyCoupled: string[] = [];
     for (const [id, count] of moduleDependencies) {
       if (count > 15) {
