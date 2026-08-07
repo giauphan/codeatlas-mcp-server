@@ -1222,10 +1222,13 @@ export class CodeAnalyzer {
       }
     }
 
-    const modulesWithManyFunctions = Array.from(this.nodes.values()).filter(n => {
-      if (n.type !== 'module') return false;
-      return (moduleFunctionCounts.get(n.id) || 0) > 10; // threshold
-    });
+    // ⚡ Bolt Optimization: Replaced Array.from().filter().map() with a single loop to avoid multiple traversals and intermediate allocations.
+    const modulesWithManyFunctions: string[] = [];
+    for (const n of this.nodes.values()) {
+      if (n.type === 'module' && (moduleFunctionCounts.get(n.id) || 0) > 10) {
+        modulesWithManyFunctions.push(n.id);
+      }
+    }
 
     if (modulesWithManyFunctions.length > 0) {
       insights.push({
@@ -1234,7 +1237,7 @@ export class CodeAnalyzer {
         title: 'God Object Detected',
         description: `Found ${modulesWithManyFunctions.length} modules containing a large number of functions. Consider splitting them.`,
         severity: 'high',
-        affectedNodes: modulesWithManyFunctions.map(n => n.id)
+        affectedNodes: modulesWithManyFunctions
       });
     }
 
@@ -1246,7 +1249,14 @@ export class CodeAnalyzer {
       }
     });
     
-    const highlyCoupled = Array.from(moduleDependencies.entries()).filter(([_, count]) => count > 15).map(([id]) => id);
+    // ⚡ Bolt Optimization: Single loop iteration over Map entries instead of Array.from().filter().map()
+    const highlyCoupled: string[] = [];
+    for (const [id, count] of moduleDependencies) {
+      if (count > 15) {
+        highlyCoupled.push(id);
+      }
+    }
+
     if (highlyCoupled.length > 0) {
       insights.push({
         id: 'i-2',
