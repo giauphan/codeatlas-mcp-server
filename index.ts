@@ -11,7 +11,12 @@ import * as os from "os";
 
 // Configure centralized log file in ~/.codeatlas/mcp.log
 const homeDir = os.homedir();
-const logDir = path.join(homeDir, ".codeatlas");
+let logDir = "";
+if (homeDir) {
+  logDir = path.join(homeDir, ".codeatlas");
+} else {
+  logDir = path.join(process.cwd(), ".codeatlas");
+}
 const logFilePath = path.join(logDir, "mcp.log");
 const pidFilePath = path.join(logDir, "mcp.pid");
 
@@ -170,6 +175,18 @@ import { startWatcher, stopWatcher, isIndexingEnabledForProject, watcher } from 
 
 // Load environment variables
 dotenv.config();
+// Also load from global config if it exists
+try {
+  const homeDirEnv = os.homedir();
+  if (homeDirEnv) {
+    const globalEnvPath = path.join(homeDirEnv, ".codeatlas", ".env");
+    if (fs.existsSync(globalEnvPath)) {
+      dotenv.config({ path: globalEnvPath, override: false }); // Do not override if already set
+    }
+  }
+} catch (e) {
+  // Ignore errors reading global config
+}
 
 // Start server
 async function main() {
