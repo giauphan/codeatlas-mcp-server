@@ -2971,11 +2971,11 @@ def register(ctx):
 
               const entryName = entry.name;
               if (seen.has(entryName)) continue;
+              seen.add(entryName);
 
               const skillMd = path.join(scanDir, entryName, "SKILL.md");
               try {
                 const raw = fs.readFileSync(skillMd, "utf-8");
-                seen.add(entryName);
                 // Extract description from frontmatter
                 const fmMatch = raw.match(/^---\s*\n([\s\S]*?)\n---/);
                 let description = "";
@@ -2989,7 +2989,7 @@ def register(ctx):
                   || entryName.startsWith("generating-") || entryName.startsWith("hardening-") || entryName.startsWith("prioritizing-")
                   || entryName.startsWith("post-") || entryName.startsWith("red-teaming-") || entryName.startsWith("orchestrating-")
                   || entryName.startsWith("moving-") || entryName.startsWith("emulating-") || entryName.startsWith("fuzzing-")
-                  || entryName.startsWith("remediating-") || entryName.startsWith("triaging-") || entryName.startsWith("validating-")
+                  || entryName.startsWith("remediating-") || entryName.startsWith("validating-")
                   || entryName.startsWith("verifying-") || entryName.startsWith("containing-") || entryName.startsWith("relaying-")
                   || entryName.startsWith("mapping-") || entryName.startsWith("profiling-") || entryName.startsWith("tracking-")
                   || entryName.startsWith("modeling-")
