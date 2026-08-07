@@ -3078,33 +3078,35 @@ def register(ctx):
         const seen = new Set<string>();
 
         for (const scanDir of [AGENTS_SKILLS, CLAUDE_SKILLS]) {
-          if (!fs.existsSync(scanDir)) continue;
           try {
-            for (const entry of fs.readdirSync(scanDir)) {
-              const skillMd = path.join(scanDir, entry, "SKILL.md");
-              if (!fs.existsSync(skillMd)) continue;
-              if (seen.has(entry)) continue;
-              seen.add(entry);
+            const entries = fs.readdirSync(scanDir, { withFileTypes: true });
+            for (const entry of entries) {
+              if (!entry.isDirectory() && !entry.isSymbolicLink()) continue;
 
+              const entryName = entry.name;
+              if (seen.has(entryName)) continue;
+              seen.add(entryName);
+
+              const skillMd = path.join(scanDir, entryName, "SKILL.md");
               try {
                 const raw = fs.readFileSync(skillMd, "utf-8");
                 // Extract description from frontmatter
                 const fmMatch = raw.match(/^---\s*\n([\s\S]*?)\n---/);
                 let description = "";
-                let source = entry.startsWith("analyzing-") || entry.startsWith("auditing-") || entry.startsWith("configuring-")
-                  || entry.startsWith("building-") || entry.startsWith("detecting-") || entry.startsWith("deploying-")
-                  || entry.startsWith("conducting-") || entry.startsWith("exploiting-") || entry.startsWith("hunting-")
-                  || entry.startsWith("implementing-") || entry.startsWith("performing-") || entry.startsWith("scanning-")
-                  || entry.startsWith("securing-") || entry.startsWith("testing-") || entry.startsWith("triaging-")
-                  || entry.startsWith("operating-") || entry.startsWith("monitoring-") || entry.startsWith("recovering-")
-                  || entry.startsWith("extracting-") || entry.startsWith("evaluating-") || entry.startsWith("collecting-")
-                  || entry.startsWith("generating-") || entry.startsWith("hardening-") || entry.startsWith("prioritizing-")
-                  || entry.startsWith("post-") || entry.startsWith("red-teaming-") || entry.startsWith("orchestrating-")
-                  || entry.startsWith("moving-") || entry.startsWith("emulating-") || entry.startsWith("fuzzing-")
-                  || entry.startsWith("remediating-") || entry.startsWith("triaging-") || entry.startsWith("validating-")
-                  || entry.startsWith("verifying-") || entry.startsWith("containing-") || entry.startsWith("relaying-")
-                  || entry.startsWith("mapping-") || entry.startsWith("profiling-") || entry.startsWith("tracking-")
-                  || entry.startsWith("modeling-")
+                let source = entryName.startsWith("analyzing-") || entryName.startsWith("auditing-") || entryName.startsWith("configuring-")
+                  || entryName.startsWith("building-") || entryName.startsWith("detecting-") || entryName.startsWith("deploying-")
+                  || entryName.startsWith("conducting-") || entryName.startsWith("exploiting-") || entryName.startsWith("hunting-")
+                  || entryName.startsWith("implementing-") || entryName.startsWith("performing-") || entryName.startsWith("scanning-")
+                  || entryName.startsWith("securing-") || entryName.startsWith("testing-") || entryName.startsWith("triaging-")
+                  || entryName.startsWith("operating-") || entryName.startsWith("monitoring-") || entryName.startsWith("recovering-")
+                  || entryName.startsWith("extracting-") || entryName.startsWith("evaluating-") || entryName.startsWith("collecting-")
+                  || entryName.startsWith("generating-") || entryName.startsWith("hardening-") || entryName.startsWith("prioritizing-")
+                  || entryName.startsWith("post-") || entryName.startsWith("red-teaming-") || entryName.startsWith("orchestrating-")
+                  || entryName.startsWith("moving-") || entryName.startsWith("emulating-") || entryName.startsWith("fuzzing-")
+                  || entryName.startsWith("remediating-") || entryName.startsWith("validating-")
+                  || entryName.startsWith("verifying-") || entryName.startsWith("containing-") || entryName.startsWith("relaying-")
+                  || entryName.startsWith("mapping-") || entryName.startsWith("profiling-") || entryName.startsWith("tracking-")
+                  || entryName.startsWith("modeling-")
                   ? "anthropic-cybersecurity" : "hermes";
 
                 if (fmMatch) {
@@ -3122,10 +3124,10 @@ def register(ctx):
                     if (t && !t.startsWith("#") && !t.startsWith("---")) { description = t.substring(0, 200); break; }
                   }
                 }
-                skills.push({ name: entry, description, source });
-              } catch { /* skip corrupt */ }
+                skills.push({ name: entryName, description, source });
+              } catch { /* skip corrupt or missing */ }
             }
-          } catch { /* skip */ }
+          } catch { /* skip missing dir */ }
         }
         return skills;
       };
