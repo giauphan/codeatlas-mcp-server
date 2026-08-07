@@ -21,3 +21,13 @@
 **Vulnerability:** Indirect command injection vulnerability in `run_script` tool where an unvalidated `projectDir` was passed as `cwd` to `child_process.spawnSync` despite `shell: false` being used.
 **Learning:** Target binaries like `npm` or `sh` may internally spawn their own shells. If the `cwd` parameter is attacker-controlled and contains shell metacharacters, it can become an indirect command injection vector even when `spawnSync` is explicitly configured with `shell: false`.
 **Prevention:** Always sanitize user-influenced directory paths (e.g., using `SHELL_METACHAR_RE` regex) before passing them as the `cwd` option in child process executions.
+## 2025-02-28 - Indirect Command Injection Risk via git arguments
+
+**Vulnerability:**
+Git commands invoked via `child_process.spawnSync` can be susceptible to argument injection if arguments are not fully trusted, even when `shell: false` is used. Git accepts global flags like `-c`, `--exec-path`, `--pager`, `--config-env`, and others that can lead to arbitrary code execution if an attacker manages to inject them.
+
+**Learning:**
+Always validate and explicitly allowlist or denylist arguments passed to external binaries like `git`, particularly those that might be influenced by external input. Explicit sanitization ensures that no unexpected or dangerous flags are processed.
+
+**Prevention:**
+Implement an explicit sanitization step (e.g., filtering out strings starting with `-c`, `--exec-path`, `--pager`, etc.) before passing the argument array to `spawnSync` when wrapping tools like `git`.
