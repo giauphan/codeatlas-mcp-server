@@ -2186,24 +2186,25 @@ export function registerTools(server: McpServer) {
 
       if (!fs.existsSync(path.join(resolvedDir, ".git"))) return { content: [{ type: "text" as const, text: JSON.stringify({ error: "Not a git repository" }) }] };
 
-      const maxC = Math.min(commits || 5, 20);
+      const maxC = Math.max(1, Math.min(commits || 5, 20));
       const result: any = { project: loaded.projectName };
       const cp = require("child_process");
 
       const execGit = (args: string[], maxBuffer?: number) => {
-        // Security: Prevent Git argument injection (e.g. --exec-path, -c)
-        const dangerousArgs = args.filter(a =>
-          a === "-c" || a.startsWith("-c=") || a.startsWith("--exec-path") ||
-          a === "-O" || a.startsWith("--pager") || a.startsWith("--config-env") ||
-          a.startsWith("--upload-pack") || a.startsWith("--receive-pack") ||
-          a.startsWith("--alternates-paths") || a.startsWith("--git-dir") ||
-          a.startsWith("--work-tree") || a.startsWith("--namespace")
-        );
-        if (dangerousArgs.length > 0) {
-          throw new Error("Security Error: Forbidden git arguments detected");
+        // Security: Prevent Git argument injection by enforcing a strict allowlist
+        const allowedArgs = new Set([
+          "rev-parse", "--abbrev-ref", "HEAD",
+          "status", "--porcelain",
+          "rev-list", "--left-right", "--count", "HEAD...@{upstream}",
+          "log", "--name-only"
+        ]);
+
+        const isSafe = args.every(a => allowedArgs.has(a) || /^\-\d+$/.test(a) || a.startsWith("--format="));
+        if (!isSafe) {
+          throw new Error("Security Error: Forbidden git argument detected");
         }
 
-        const res = cp.spawnSync("git", args, { cwd: resolvedDir, encoding: "utf-8", shell: false, maxBuffer });
+        const res = cp.spawnSync("git", ["--no-pager", ...args], { cwd: resolvedDir, encoding: "utf-8", shell: false, maxBuffer });
         if (res.error) throw res.error;
         if (res.status !== 0) throw new Error(res.stderr?.toString() || "Git command failed");
         return res.stdout.toString();
@@ -2984,15 +2985,6 @@ def register(ctx):
             }
           }
 
-          const modules: Array<{ id: string, name: string, file?: string }> = [];
-          const classes: Array<{ id: string, name: string, file?: string, line?: number }> = [];
-          const functions: Array<{ id: string, name: string, file?: string, line?: number }> = [];
-
-          for (const n of nodes) {
-            if (n.type === "module") modules.push({ id: n.id, name: n.label, file: n.filePath });
-            else if (n.type === "class") classes.push({ id: n.id, name: n.label, file: n.filePath, line: n.line });
-            else if (n.type === "function") functions.push({ id: n.id, name: n.label, file: n.filePath, line: n.line });
-          }
 
           const summary = {
             version: 1,
