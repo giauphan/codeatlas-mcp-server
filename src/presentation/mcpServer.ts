@@ -2281,7 +2281,7 @@ export function registerTools(server: McpServer) {
             if (!envContent.includes("CODEATLAS_API_KEY=")) {
               envContent += (envContent.endsWith("\n") || envContent === "" ? "" : "\n") + `CODEATLAS_API_KEY=${key}\n`;
             } else {
-              envContent = envContent.replace(/CODEATLAS_API_KEY=.*(\r?\n|$)/g, () => `CODEATLAS_API_KEY=${key}\n`);
+              envContent = envContent.replace(/CODEATLAS_API_KEY=.*(\r?\n|$)/g, `CODEATLAS_API_KEY=${key}\n`);
             }
             // Use writeFileSync with temp file to avoid race conditions (partial mitigate)
             fs.writeFileSync(envPath, envContent, { mode: 0o600 });
