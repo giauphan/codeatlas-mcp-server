@@ -1214,14 +1214,12 @@ export class CodeAnalyzer {
     // Mock AI Insights generation based on simple heuristics
     
     // 1. Large files / God objects
-
     const moduleFunctionCounts = new Map<string, number>();
     for (const l of graph.links) {
       if (l.type === 'contains' && l.target.startsWith('function')) {
         moduleFunctionCounts.set(l.source, (moduleFunctionCounts.get(l.source) || 0) + 1);
       }
     }
-
 
     const affectedModules: string[] = [];
     for (const node of this.nodes.values()) {
@@ -1248,7 +1246,6 @@ export class CodeAnalyzer {
         moduleDependencies.set(l.source, (moduleDependencies.get(l.source) || 0) + 1);
       }
     }
-
 
     const highlyCoupled: string[] = [];
     for (const [id, count] of moduleDependencies.entries()) {
