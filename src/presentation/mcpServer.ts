@@ -2250,7 +2250,10 @@ export function registerTools(server: McpServer) {
           throw new Error("Security Error: Forbidden git arguments detected");
         }
 
-        const res = cp.spawnSync("git", ["--no-pager", ...args], { cwd: resolvedDir, encoding: "utf-8", shell: false, maxBuffer });
+        // Security: Cap maxBuffer to 5MB to prevent DoS via excessive memory consumption
+        const safeMaxBuffer = Math.min(maxBuffer || 1024 * 1024, 5 * 1024 * 1024);
+
+        const res = cp.spawnSync("git", ["--no-pager", ...args], { cwd: resolvedDir, encoding: "utf-8", shell: false, maxBuffer: safeMaxBuffer });
         if (res.error) throw res.error;
         if (res.status !== 0) throw new Error(res.stderr?.toString() || "Git command failed");
         return res.stdout.toString();
