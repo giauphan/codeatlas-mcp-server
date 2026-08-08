@@ -2984,6 +2984,16 @@ def register(ctx):
             }
           }
 
+          const modules: Array<{ id: string, name: string, file?: string }> = [];
+          const classes: Array<{ id: string, name: string, file?: string, line?: number }> = [];
+          const functions: Array<{ id: string, name: string, file?: string, line?: number }> = [];
+
+          for (const n of nodes) {
+            if (n.type === "module") modules.push({ id: n.id, name: n.label, file: n.filePath });
+            else if (n.type === "class") classes.push({ id: n.id, name: n.label, file: n.filePath, line: n.line });
+            else if (n.type === "function") functions.push({ id: n.id, name: n.label, file: n.filePath, line: n.line });
+          }
+
           const summary = {
             version: 1,
             exportedAt: new Date().toISOString(),

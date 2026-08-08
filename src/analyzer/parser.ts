@@ -1214,7 +1214,7 @@ export class CodeAnalyzer {
     // Mock AI Insights generation based on simple heuristics
     
     // 1. Large files / God objects
-    // ⚡ Bolt Optimization: Replace O(N*E) nested array filter with O(E) precomputed Map and O(1) lookups
+
     const moduleFunctionCounts = new Map<string, number>();
     for (const l of graph.links) {
       if (l.type === 'contains' && l.target.startsWith('function')) {
@@ -1222,7 +1222,7 @@ export class CodeAnalyzer {
       }
     }
 
-    // ⚡ Bolt Optimization: Single O(N) pass, eliminating chained Array.from().filter().map() allocations
+
     const affectedModules: string[] = [];
     for (const node of this.nodes.values()) {
       if (node.type === 'module' && (moduleFunctionCounts.get(node.id) || 0) > 10) {
@@ -1249,7 +1249,7 @@ export class CodeAnalyzer {
       }
     }
 
-    // ⚡ Bolt Optimization: Single O(N) pass, eliminating chained Array.from().filter().map() allocations
+
     const highlyCoupled: string[] = [];
     for (const [id, count] of moduleDependencies.entries()) {
       if (count > 15) highlyCoupled.push(id);
