@@ -2236,8 +2236,16 @@ export function registerTools(server: McpServer) {
 
       const execGit = (args: string[], maxBuffer?: number) => {
         // Security: Use strict allowlist for Git arguments instead of denylist
-        const allowedArgsPattern = /^(rev-parse|--abbrev-ref|HEAD|status|--porcelain|rev-list|--left-right|--count|HEAD\.\.\.@\{upstream\}|log|-[0-9]+|--format=.*|--name-only)$/;
-        const invalidArgs = args.filter(a => !allowedArgsPattern.test(a));
+        // Extracted patterns to improve readability and precisely cover the specific commands we run.
+        const revParseFlags = /^(rev-parse|--abbrev-ref|HEAD)$/;
+        const statusFlags = /^(status|--porcelain)$/;
+        const revListFlags = /^(rev-list|--left-right|--count|HEAD\.\.\.@\{upstream\})$/;
+        const logFlags = /^(log|-[0-9]+|--format=.*|--name-only)$/;
+
+        const invalidArgs = args.filter(a =>
+          !(revParseFlags.test(a) || statusFlags.test(a) || revListFlags.test(a) || logFlags.test(a))
+        );
+
         if (invalidArgs.length > 0) {
           throw new Error("Security Error: Forbidden git arguments detected");
         }
