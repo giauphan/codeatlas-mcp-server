@@ -87,3 +87,7 @@
 ## 2024-05-18 - Optimize sync_skills_inventory I/O
 **Learning:** Checking `fs.existsSync` inside tight loops before an operation (like `fs.readdirSync` or `fs.readFileSync`) creates redundant system calls and introduces a minor TOCTOU race condition. Also, iterating over `fs.readdirSync` requires explicit `.statSync` or `.isDirectory()` to filter entries, but using `{ withFileTypes: true }` avoids additional file stat lookups.
 **Action:** Used the EAFP (Easier to Ask for Forgiveness than Permission) pattern by wrapping `fs.readFileSync` in a `try/catch` and removing `fs.existsSync`. Updated `fs.readdirSync` to use `{ withFileTypes: true }` to filter out non-directories without needing extra stat calls.
+
+## 2026-08-07 - Avoid Unrelated Syntax/Compilation Errors During Refactors
+**Learning:** In codebases with existing compilation errors in other files, it's critical to isolate changes cleanly and not accidentally 'adopt' or introduce new errors when attempting to resolve unrelated build failures. Modifying a file that has pre-existing errors outside the scope of the target optimization can lead to rejected code reviews due to unintended side-effects.
+**Action:** When a file outside the intended scope shows compilation errors, stash or revert local changes to verify if the error exists on `main`. Do not blindly delete or "fix" code in unrelated files without full context. Focus strictly on the files relevant to the planned optimization.

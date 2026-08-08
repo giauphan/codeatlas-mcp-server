@@ -1222,31 +1222,39 @@ export class CodeAnalyzer {
       }
     }
 
-    const modulesWithManyFunctions = Array.from(this.nodes.values()).filter(n => {
-      if (n.type !== 'module') return false;
-      return (moduleFunctionCounts.get(n.id) || 0) > 10; // threshold
-    });
+    // ⚡ Bolt Optimization: Single O(N) pass, eliminating chained Array.from().filter().map() allocations
+    const affectedModules: string[] = [];
+    for (const node of this.nodes.values()) {
+      if (node.type === 'module' && (moduleFunctionCounts.get(node.id) || 0) > 10) {
+        affectedModules.push(node.id);
+      }
+    }
 
-    if (modulesWithManyFunctions.length > 0) {
+    if (affectedModules.length > 0) {
       insights.push({
         id: 'i-1',
         type: 'refactor',
         title: 'God Object Detected',
-        description: `Found ${modulesWithManyFunctions.length} modules containing a large number of functions. Consider splitting them.`,
+        description: `Found ${affectedModules.length} modules containing a large number of functions. Consider splitting them.`,
         severity: 'high',
-        affectedNodes: modulesWithManyFunctions.map(n => n.id)
+        affectedNodes: affectedModules
       });
     }
 
     // 2. High coupling
     const moduleDependencies = new Map<string, number>();
-    graph.links.forEach(l => {
+    for (const l of graph.links) {
       if (l.type === 'import' && l.source.startsWith('module:') && l.target.startsWith('module:')) {
         moduleDependencies.set(l.source, (moduleDependencies.get(l.source) || 0) + 1);
       }
-    });
+    }
+
+    // ⚡ Bolt Optimization: Single O(N) pass, eliminating chained Array.from().filter().map() allocations
+    const highlyCoupled: string[] = [];
+    for (const [id, count] of moduleDependencies.entries()) {
+      if (count > 15) highlyCoupled.push(id);
+    }
     
-    const highlyCoupled = Array.from(moduleDependencies.entries()).filter(([_, count]) => count > 15).map(([id]) => id);
     if (highlyCoupled.length > 0) {
       insights.push({
         id: 'i-2',
