@@ -2851,6 +2851,7 @@ def register(ctx):
 
       // Read and tokenize each function
       const tokenized: Array<{ node: typeof functions[0]; tokens: Set<string>; source: string }> = [];
+      const tokenRegex = /[a-zA-Z_$][a-zA-Z0-9_$]*/g;
 
       for (const node of functions.slice(0, 300)) { // Limit to 300 for perf
         const absPath = path.isAbsolute(node.filePath!) ? node.filePath! : path.resolve(loaded.projectDir, node.filePath!);
@@ -2865,7 +2866,7 @@ def register(ctx):
 
           // Tokenize: identifiers + keywords (skip whitespace, punctuation)
           const tokens = new Set<string>();
-          const tokenRegex = /[a-zA-Z_$][a-zA-Z0-9_$]*/g;
+          tokenRegex.lastIndex = 0;
           let m: RegExpExecArray | null;
           while ((m = tokenRegex.exec(body)) !== null) {
             tokens.add(m[0].toLowerCase());
