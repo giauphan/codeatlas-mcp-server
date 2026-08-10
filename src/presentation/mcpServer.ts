@@ -2281,7 +2281,7 @@ export function registerTools(server: McpServer) {
             if (!envContent.includes("CODEATLAS_API_KEY=")) {
               envContent += (envContent.endsWith("\n") || envContent === "" ? "" : "\n") + `CODEATLAS_API_KEY=${key}\n`;
             } else {
-              envContent = envContent.replace(/CODEATLAS_API_KEY=.*(\r?\n|$)/g, `CODEATLAS_API_KEY=${key}\n`);
+              envContent = envContent.replace(/CODEATLAS_API_KEY=.*(\r?\n|$)/g, () => `CODEATLAS_API_KEY=${key}\n`);
             }
             // Use writeFileSync with temp file to avoid race conditions (partial mitigate)
             fs.writeFileSync(envPath, envContent, { mode: 0o600 });
@@ -2984,15 +2984,6 @@ def register(ctx):
             }
           }
 
-          const modules: Array<{ id: string, name: string, file?: string }> = [];
-          const classes: Array<{ id: string, name: string, file?: string, line?: number }> = [];
-          const functions: Array<{ id: string, name: string, file?: string, line?: number }> = [];
-
-          for (const n of nodes) {
-            if (n.type === "module") modules.push({ id: n.id, name: n.label, file: n.filePath });
-            else if (n.type === "class") classes.push({ id: n.id, name: n.label, file: n.filePath, line: n.line });
-            else if (n.type === "function") functions.push({ id: n.id, name: n.label, file: n.filePath, line: n.line });
-          }
 
           const summary = {
             version: 1,
