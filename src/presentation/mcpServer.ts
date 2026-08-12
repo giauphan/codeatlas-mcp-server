@@ -20,6 +20,7 @@ import {
 import { saveDreamMemory, queryDreamMemories, DreamMemoryResult } from "../services/dreamingService.js";
 import { CodeAnalyzer } from "../analyzer/parser.js";
 import { SecurityScanner } from "../securityScanner.js";
+import { GraphLink } from "../analyzer/types.js";
 import {
   listADRs, getADR, saveADR, deleteADR,
   ADR
@@ -503,7 +504,7 @@ export function registerTools(server: McpServer) {
 
       const finalNodeIds = createNodeIdSet(nodes);
       const linkSet = new Set<string>();
-      const finalLinks: import("../analyzer/types.js").GraphLink[] = [];
+      const finalLinks: GraphLink[] = [];
 
       const isModulesOnly = diagramScope === "modules-only";
 
@@ -1290,7 +1291,7 @@ export function registerTools(server: McpServer) {
 
       const traceNodeIds = createNodeIdSet(traceNodes);
       const linkSet = new Set<string>();
-      const dedupLinks: import("../analyzer/types.js").GraphLink[] = [];
+      const dedupLinks: GraphLink[] = [];
 
       // Scope-specific link filtering and endpoint validation
       for (const l of links) {
