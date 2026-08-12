@@ -503,9 +503,9 @@ export function registerTools(server: McpServer) {
 
       const finalNodeIds = createNodeIdSet(nodes);
       const linkSet = new Set<string>();
-      const finalLinks = [];
+      const finalLinks: typeof links = [];
 
-      // ⚡ Bolt Optimization: Combine multiple link filtering and deduplication passes into a single O(L) loop
+      // Combine multiple link filtering and deduplication passes into a single O(L) loop
       for (const l of links) {
         // Validate endpoints exist after node truncation/filtering
         if (!finalNodeIds.has(l.source) || !finalNodeIds.has(l.target)) continue;
@@ -1287,9 +1287,9 @@ export function registerTools(server: McpServer) {
 
       const traceNodeIds = createNodeIdSet(traceNodes);
       const linkSet = new Set<string>();
-      const dedupLinks = [];
+      const dedupLinks: typeof links = [];
 
-      // ⚡ Bolt Optimization: Combine link filtering and deduplication passes into a single O(L) loop
+      // Combine link filtering and deduplication passes into a single O(L) loop
       for (const l of links) {
         if (l.type !== "call") continue;
         if (!traceNodeIds.has(l.source) || !traceNodeIds.has(l.target)) continue;
