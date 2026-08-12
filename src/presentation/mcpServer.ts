@@ -503,7 +503,7 @@ export function registerTools(server: McpServer) {
 
       const finalNodeIds = createNodeIdSet(nodes);
       const linkSet = new Set<string>();
-      const finalLinks: typeof links = [];
+      const finalLinks: import("../analyzer/types.js").GraphLink[] = [];
 
       // Combine multiple link filtering and deduplication passes into a single O(L) loop
       for (const l of links) {
@@ -1287,7 +1287,7 @@ export function registerTools(server: McpServer) {
 
       const traceNodeIds = createNodeIdSet(traceNodes);
       const linkSet = new Set<string>();
-      const dedupLinks: typeof links = [];
+      const dedupLinks: import("../analyzer/types.js").GraphLink[] = [];
 
       // Combine link filtering and deduplication passes into a single O(L) loop
       for (const l of links) {
