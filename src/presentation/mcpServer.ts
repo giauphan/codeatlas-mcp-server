@@ -507,7 +507,8 @@ export function registerTools(server: McpServer) {
 
       const isModulesOnly = diagramScope === "modules-only";
 
-      // Combine multiple link filtering and deduplication passes into a single O(L) loop
+      // Combine multiple link filtering and deduplication passes into a single O(L) loop.
+      // This prevents O(M*N) array iterations and intermediate memory allocations in large datasets.
       for (const l of links) {
         // Scope-specific link filtering
         if (isModulesOnly && l.type !== "import") continue;
