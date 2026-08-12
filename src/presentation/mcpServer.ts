@@ -1293,7 +1293,8 @@ export function registerTools(server: McpServer) {
       const linkSet = new Set<string>();
       const dedupLinks: GraphLink[] = [];
 
-      // Scope-specific link filtering and endpoint validation
+      // Combine link filtering and deduplication passes into a single O(L) loop.
+      // This collapses M sequential passes into a single pass and prevents intermediate memory allocations in large datasets.
       for (const l of links) {
         if (l.type !== "call") continue;
         if (!traceNodeIds.has(l.source) || !traceNodeIds.has(l.target)) continue;
