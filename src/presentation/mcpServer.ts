@@ -514,7 +514,6 @@ export function registerTools(server: McpServer) {
         if (isModulesOnly && l.type !== "import") continue;
 
         // Validate endpoints exist after node truncation/filtering
-        // This is crucial for modules-only since we don't pre-filter the nodes before this loop
         if (!finalNodeIds.has(l.source) || !finalNodeIds.has(l.target)) continue;
 
         // Deduplication
