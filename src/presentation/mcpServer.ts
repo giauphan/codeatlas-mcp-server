@@ -509,7 +509,7 @@ export function registerTools(server: McpServer) {
       const isModulesOnly = diagramScope === "modules-only";
 
       // Combine multiple link filtering and deduplication passes into a single O(L) loop.
-      // This prevents O(M*N) array iterations and intermediate memory allocations in large datasets.
+      // This collapses M sequential passes into a single pass and prevents intermediate memory allocations in large datasets.
       // Note: Endpoint validation (!finalNodeIds.has) here handles both scope-specific node exclusions and post-truncation orphans equivalently.
       for (const l of links) {
         if (isModulesOnly && l.type !== "import") continue;
