@@ -510,6 +510,7 @@ export function registerTools(server: McpServer) {
 
       // Combine multiple link filtering and deduplication passes into a single O(L) loop.
       // This prevents O(M*N) array iterations and intermediate memory allocations in large datasets.
+      // Note: Endpoint validation (!finalNodeIds.has) here handles both scope-specific node exclusions and post-truncation orphans equivalently.
       for (const l of links) {
         if (isModulesOnly && l.type !== "import") continue;
 
