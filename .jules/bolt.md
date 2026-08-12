@@ -50,10 +50,14 @@
 ## 2024-05-18 - Optimize sync_skills_inventory I/O
 **Learning:** Checking `fs.existsSync` inside tight loops before an operation (like `fs.readdirSync` or `fs.readFileSync`) creates redundant system calls and introduces a minor TOCTOU race condition. Also, iterating over `fs.readdirSync` requires explicit `.statSync` or `.isDirectory()` to filter entries, but using `{ withFileTypes: true }` avoids additional file stat lookups.
 **Action:** Used the EAFP (Easier to Ask for Forgiveness than Permission) pattern by wrapping `fs.readFileSync` in a `try/catch` and removing `fs.existsSync`. Updated `fs.readdirSync` to use `{ withFileTypes: true }` to filter out non-directories without needing extra stat calls.
-
 ## 2024-05-18 - Prevent event loop blocking in file search loops
 **Learning:** Using synchronous I/O (`fs.readFileSync`) inside loops when handling concurrent server requests can severely block the Node.js event loop, degrading server concurrency and latency.
 **Action:** Replaced synchronous `fs.readFileSync` with asynchronous `await fs.promises.readFile` inside the `code_search` loop in `src/presentation/mcpServer.ts`. This allows the event loop to yield execution during I/O wait times, maintaining sequential memory bounds while significantly improving concurrent responsiveness.
+
 ## 2024-05-20 - [Performance improvement] Optimized O(N) array filtering and mapping in MCP tools
 **Learning:** Chained array methods like `.filter().filter().slice()` and `.filter().map()` are frequently used but introduce significant performance bottlenecks, particularly when dealing with large datasets like AST nodes or graph edges. Each chained call forces a full O(N) traversal and creates intermediate array allocations, dramatically increasing CPU usage and garbage collection overhead.
 **Action:** When filtering, mapping, and slicing large collections, prefer a single `for...of` loop. Apply filter conditions within the loop, manually manage the result collections by `push`ing to arrays, and implement early exit conditions (`if (results.length >= limit) break;`) to avoid unnecessary iterations over the entire dataset.
+
+## 2024-05-18 - Replacing chained array methods with single for...of loop for graph datasets
+**Learning:** In graph analysis contexts with large datasets (e.g. 200,000+ links), chaining multiple `array.filter().filter().map()` operations creates a significant performance bottleneck due to O(M * N) array iterations and intermediate array allocations in memory.
+**Action:** When filtering, validating endpoints, or deduplicating elements in large arrays (like nodes or edges), always combine the logic into a single `for...of` loop with early `continue` exclusions and a `Set` for deduplication. This collapses multiple O(N) operations into a single O(N) pass, saving memory and CPU cycles.
