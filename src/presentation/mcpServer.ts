@@ -505,13 +505,16 @@ export function registerTools(server: McpServer) {
       const linkSet = new Set<string>();
       const finalLinks: import("../analyzer/types.js").GraphLink[] = [];
 
+      const isModulesOnly = diagramScope === "modules-only";
+
       // Combine multiple link filtering and deduplication passes into a single O(L) loop
       for (const l of links) {
-        // Validate endpoints exist after node truncation/filtering
-        if (!finalNodeIds.has(l.source) || !finalNodeIds.has(l.target)) continue;
-
         // Scope-specific link filtering
-        if (diagramScope === "modules-only" && l.type !== "import") continue;
+        if (isModulesOnly && l.type !== "import") continue;
+
+        // Validate endpoints exist after node truncation/filtering
+        // This is crucial for modules-only since we don't pre-filter the nodes before this loop
+        if (!finalNodeIds.has(l.source) || !finalNodeIds.has(l.target)) continue;
 
         // Deduplication
         const key = `${l.source}|${l.target}|${l.type}`;
@@ -1289,7 +1292,7 @@ export function registerTools(server: McpServer) {
       const linkSet = new Set<string>();
       const dedupLinks: import("../analyzer/types.js").GraphLink[] = [];
 
-      // Combine link filtering and deduplication passes into a single O(L) loop
+      // Scope-specific link filtering and endpoint validation
       for (const l of links) {
         if (l.type !== "call") continue;
         if (!traceNodeIds.has(l.source) || !traceNodeIds.has(l.target)) continue;
