@@ -159,20 +159,23 @@ export function registerTools(server: McpServer) {
         return { content: [{ type: "text" as const, text: "No analysis data found. Run 'analyze' tool first." }] };
       }
 
-      let nodes = loaded.analysis.graph.nodes;
-      if (type && type !== "all") {
-        nodes = nodes.filter((n) => n.type === type);
-      }
-
-      // Filter out venv/node_modules entities
-      nodes = nodes.filter((n) => {
-        const fp = n.filePath || "";
-        return !fp.includes("node_modules") && !fp.includes("venv") && !fp.includes(".venv") && !fp.includes("site-packages");
-      });
-
+      // ⚡ Bolt Optimization: Single O(N) pass with early exit instead of chained .filter().slice()
       const maxResults = limit || 500;
-      const truncated = nodes.length > maxResults;
-      nodes = nodes.slice(0, maxResults);
+      const nodes: typeof loaded.analysis.graph.nodes = [];
+      let truncated = false;
+
+      for (const n of loaded.analysis.graph.nodes) {
+        if (type && type !== "all" && n.type !== type) continue;
+        const fp = n.filePath || "";
+        if (fp.includes("node_modules") || fp.includes("venv") || fp.includes(".venv") || fp.includes("site-packages")) continue;
+
+        if (nodes.length < maxResults) {
+          nodes.push(n);
+        } else {
+          truncated = true;
+          break; // ⚡ Bolt Optimization: Early return!
+        }
+      }
 
       const stats = getStats(loaded.analysis);
 
@@ -311,32 +314,36 @@ export function registerTools(server: McpServer) {
         return { content: [{ type: "text" as const, text: "No analysis data found. Run 'analyze' tool first." }] };
       }
 
-      let nodes = loaded.analysis.graph.nodes;
-      if (type && type !== "all") {
-        nodes = nodes.filter((n) => n.type === type);
-      }
+      const searchRegex = new RegExp(escapeRegExp(query), 'i');
 
-      // Filter out venv/node_modules entities for cleaner results
-      nodes = nodes.filter((n) => {
-        if (n.id.startsWith('external:')) return false;
+      // ⚡ Bolt Optimization: Single O(N) pass with early collection instead of chained filters and slice
+      const topMatches: typeof loaded.analysis.graph.nodes = [];
+      let matchCount = 0;
+
+      for (const n of loaded.analysis.graph.nodes) {
+        if (type && type !== "all" && n.type !== type) continue;
+        if (n.id.startsWith('external:')) continue;
+
         if (n.filePath && (
           n.filePath.includes('/venv/') ||
           n.filePath.includes('/.venv/') ||
           n.filePath.includes('/node_modules/') ||
           n.filePath.includes('/site-packages/')
-        )) return false;
-        return true;
-      });
+        )) continue;
 
-      const searchRegex = new RegExp(escapeRegExp(query), 'i');
-      const matches = nodes.filter((n) => searchRegex.test(n.label));
+        if (searchRegex.test(n.label)) {
+          matchCount++;
+          if (topMatches.length < 50) {
+            topMatches.push(n);
+          }
+        }
+      }
 
       // For each match, find its relationships
       const links = loaded.analysis.graph.links;
       const nodeMap = createNodeLabelMap(loaded.analysis.graph.nodes);
 
       // ⚡ Bolt Optimization: Precompute links for matched nodes to avoid O(N*L) filtering inside map
-      const topMatches = matches.slice(0, 50);
       const matchIds = new Set(topMatches.map((n) => n.id));
 
       const incomingLinksMap = new Map<string, Array<{ from: string, type: string }>>();
@@ -357,7 +364,7 @@ export function registerTools(server: McpServer) {
 
       const result = {
         query,
-        matchCount: matches.length,
+        matchCount,
         results: topMatches.map((n) => {
           return {
             name: n.label,
@@ -1126,22 +1133,34 @@ export function registerTools(server: McpServer) {
           return b.entityCount - a.entityCount;
         });
 
+      // ⚡ Bolt Optimization: Single O(N) pass to gather files and readingOrder instead of chained filters and maps
+      const files: typeof filesArray = [];
+      const readingOrder: string[] = [];
+      for (const f of filesArray) {
+        if (f.filePath !== "external") {
+          if (files.length < 30) {
+            files.push(f);
+          }
+          if (f.hasSeedMatch) {
+            readingOrder.push(f.filePath);
+          }
+        }
+      }
+
       const result = {
         keyword,
         project: loaded.projectName,
         seedMatches: seedNodes.size,
         totalConnected: visited.size,
         depth: maxDepth,
-        files: filesArray.filter((f) => f.filePath !== "external").slice(0, 30),
+        files,
         externalDeps: byFile.get("external")?.map((e) => e.name) || [],
         relationships: traceLinks.slice(0, 50).map((l) => ({
           from: nodeMap.get(l.source)?.label || l.source,
           to: nodeMap.get(l.target)?.label || l.target,
           type: l.type,
         })),
-        readingOrder: filesArray
-          .filter((f) => f.hasSeedMatch && f.filePath !== "external")
-          .map((f) => f.filePath),
+        readingOrder,
         message: `Found ${seedNodes.size} direct matches and ${visited.size - seedNodes.size} connected entities for '${keyword}'. Start reading from the files in 'readingOrder'.`,
       };
 
