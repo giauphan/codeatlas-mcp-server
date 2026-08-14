@@ -24,16 +24,11 @@ try {
 }
 
 // ── CLI command routing ──────────────────────────────────────────────
-// If invoked with 'init', 'setup', or 'doctor', run CLI instead of MCP server
+import { isCLICommand, runCLI } from "./src/cli/commands.js";
+
 const _cmd = process.argv[2];
-if (_cmd === "doctor" || _cmd === "init" || _cmd === "setup" || _cmd === "--help" || _cmd === "-h") {
-  if (_cmd === "doctor") {
-    console.log("doctor command requires commands module — run 'npm install -g codeatlas-enterprise' for full CLI");
-  } else if (_cmd === "--help" || _cmd === "-h") {
-    console.log("Usage: codeatlas-enterprise <command>\n\nCommands:\n  init    Interactive Second Brain setup wizard\n  setup   Same as init\n  doctor  Health check & diagnostics\n\nWithout a command, runs the MCP server.");
-  } else {
-    console.log("Setup wizard requires commands module — run 'npm install -g codeatlas-enterprise' for full CLI");
-  }
+if (isCLICommand(process.argv)) {
+  await runCLI();
   process.exit(0);
 }
 // ──────────────────────────────────────────────────────────────────────

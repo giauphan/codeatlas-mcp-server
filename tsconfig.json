@@ -15,7 +15,8 @@
   },
   "include": [
     "src/**/*",
-    "index.ts"
+    "index.ts",
+    "src/cli/hooks/*.sh"
   ],
   "exclude": [
     "node_modules",

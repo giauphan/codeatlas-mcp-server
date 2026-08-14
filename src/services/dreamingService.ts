@@ -3,16 +3,22 @@ import * as http from "http";
 import { getResolvedApiKey } from "./projectService.js";
 
 export interface DreamMemoryInput {
-  memory_type: "MISTAKE" | "PREFERENCE" | "KNOWLEDGE" | "PATTERN";
+  memory_type: "MISTAKE" | "PREFERENCE" | "KNOWLEDGE" | "PATTERN" | "SESSION_SUMMARY";
   content: string;
   importance?: number;
   session_id?: string;
   project?: string;
+  scope?: string;
+  tags?: string[];
+  related_ids?: string[];
 }
 
 export interface DreamMemoryQuery {
   query: string;
   project?: string;
+  scope?: string;
+  tags?: string[];
+  memory_type?: string;
   limit?: number;
   offset?: number;
 }
@@ -25,6 +31,9 @@ export interface DreamMemoryResult {
   session_id: string | null;
   project: string | null;
   created_at: string;
+  scope?: string | null;
+  tags?: string[];
+  related_ids?: string[];
   score?: number;
 }
 
@@ -126,6 +135,11 @@ export async function queryDreamMemories(params: DreamMemoryQuery): Promise<Drea
       const queryParams: URLSearchParams = new URLSearchParams();
       queryParams.set("query", params.query);
       if (params.project) queryParams.set("project", params.project);
+      if (params.scope) queryParams.set("scope", params.scope);
+      if (params.tags?.length) {
+        queryParams.set("tags", JSON.stringify(params.tags));
+      }
+      if (params.memory_type) queryParams.set("memory_type", params.memory_type);
       if (params.limit) queryParams.set("limit", String(params.limit));
       if (params.offset) queryParams.set("offset", String(params.offset));
 

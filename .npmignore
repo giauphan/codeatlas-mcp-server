@@ -1,14 +1,64 @@
-src/
-tests/
-test/
+# Dependencies
 node_modules/
-.git/
-.github/
-.codeatlas/
-security_reports/
-.gitignore
-.env
-.env.example
-*.ts
+package-lock.json
+pnpm-lock.yaml
+
+# Build output (but not dist/ - that's what gets published)
 *.tsbuildinfo
-CHANGELOG.md
+
+# Environment
+.env
+.env.*
+!.env.example
+serviceAccountKey.json
+wallet/
+instantclient/
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Testing
+coverage/
+*.lcov
+.nyc_output/
+
+# Misc
+*.patch
+*.diff
+.jules/
+.codeatlas/
+.claude/
+.agents/
+
+# Docs and tests (npm package doesn't need these)
+docs/
+tests/
+*.test.ts
+*.test.js
+*.spec.ts
+*.spec.js
+benchmark*.ts
+scripts/
+verify-*.sh
+test-*.sh
+run-*.sh
+sandbox-*.sh
+*-e2e.sh
+auto-e2e.sh
+agent-runner.sh
+reindex.mjs
+nodemon.json
+todo.md
+plan.md

@@ -21,7 +21,7 @@
     "url": "https://github.com/giauphan/codeatlas-mcp-server/issues"
   },
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && node -e \"require('fs').cpSync('src/cli/hooks','dist/src/cli/hooks',{recursive:true})\" && node -e \"const fs=require('fs');['dist/src/cli/hooks/brain-context.sh','dist/src/cli/hooks/brain-save.sh','dist/src/cli/hooks/task-router.sh'].forEach(p=>fs.existsSync(p)&&fs.chmodSync(p,0o755))\"",
     "start": "node dist/index.js",
     "dev": "tsx index.ts",
     "test": "npm run build && node --experimental-test-module-mocks --test \"dist/src/**/*.test.js\"",
@@ -37,8 +37,11 @@
     "codebase-intelligence",
     "enterprise"
   ],
-  "author": "giauphan",
+  "author": "Giau Phan <giauphan012@gmail.com>",
   "license": "MIT",
+  "engines": {
+    "node": ">=20.0.0"
+  },
   "devDependencies": {
     "@types/express": "^4.17.21",
     "@types/node": "^20.19.43",

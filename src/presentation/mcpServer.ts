@@ -683,15 +683,18 @@ export function registerTools(server: McpServer) {
     "save_dream_memory",
     "Save a dream memory (mistake, preference, knowledge, or pattern) to CodeAtlas Cloud for long-term AI recall. The AI uses this to persist learnings across conversations.",
     {
-      memory_type: z.enum(["MISTAKE", "PREFERENCE", "KNOWLEDGE", "PATTERN"]).describe("Category of the memory. Choose one of: MISTAKE, PREFERENCE, KNOWLEDGE, PATTERN"),
+      memory_type: z.enum(["MISTAKE", "PREFERENCE", "KNOWLEDGE", "PATTERN", "SESSION_SUMMARY"]).describe("Category of the memory. Choose one of: MISTAKE, PREFERENCE, KNOWLEDGE, PATTERN, SESSION_SUMMARY"),
       content: z.string().max(50000).describe("The actual memory content or insight"),
       importance: z.number().min(1).max(10).optional().describe("Importance level from 1 (low) to 10 (critical). Defaults to 5."),
       session_id: z.string().max(255).optional().describe("Optional session identifier for grouping related memories"),
       project: z.string().max(255).optional().describe("Optional project name to associate this memory with"),
+      scope: z.string().regex(/^[a-z0-9][a-z0-9/-]{0,499}$/).optional().describe("Optional hierarchical feature scope, e.g. auth/login or payment/checkout"),
+      tags: z.array(z.string().max(100)).max(100).optional().describe("Optional tags for filtering related memories"),
+      related_ids: z.array(z.string().max(100)).max(100).optional().describe("Optional IDs of related dream memories or code entities"),
     },
-    async ({ memory_type, content, importance, session_id, project }: { memory_type: "MISTAKE" | "PREFERENCE" | "KNOWLEDGE" | "PATTERN"; content: string; importance?: number; session_id?: string; project?: string }) => {
+    async ({ memory_type, content, importance, session_id, project, scope, tags, related_ids }: { memory_type: "MISTAKE" | "PREFERENCE" | "KNOWLEDGE" | "PATTERN" | "SESSION_SUMMARY"; content: string; importance?: number; session_id?: string; project?: string; scope?: string; tags?: string[]; related_ids?: string[] }) => {
       const auth = await checkAuth();
-      await logActivity(auth, "save_dream_memory", { memory_type, content: content.substring(0, 100), importance, session_id, project });
+      await logActivity(auth, "save_dream_memory", { memory_type, content: content.substring(0, 100), importance, session_id, project, scope, tags, related_ids });
 
       try {
         const result = await saveDreamMemory({
@@ -700,6 +703,9 @@ export function registerTools(server: McpServer) {
           importance: importance || 5,
           session_id,
           project,
+          scope,
+          tags,
+          related_ids,
         });
 
         return {
@@ -732,16 +738,22 @@ export function registerTools(server: McpServer) {
     {
       query: z.string().max(255).describe("Natural language query to search for relevant memories"),
       project: z.string().max(255).optional().describe("Optional project name filter to scope the search"),
+      scope: z.string().max(500).optional().describe("Optional scope pattern filter, e.g. auth or auth/login"),
+      tags: z.array(z.string().max(100)).max(100).optional().describe("Optional tags to filter memories"),
+      memory_type: z.enum(["MISTAKE", "PREFERENCE", "KNOWLEDGE", "PATTERN", "SESSION_SUMMARY"]).optional().describe("Optional memory type filter"),
       limit: z.number().min(1).max(100).optional().default(10).describe("Maximum number of results to return (default: 10, max: 100)"),
     },
-    async ({ query, project, limit }: { query: string; project?: string; limit?: number }) => {
+    async ({ query, project, scope, tags, memory_type, limit }: { query: string; project?: string; scope?: string; tags?: string[]; memory_type?: string; limit?: number }) => {
       const auth = await checkAuth();
-      await logActivity(auth, "query_dream_memories", { query: query.substring(0, 100), project, limit });
+      await logActivity(auth, "query_dream_memories", { query: query.substring(0, 100), project, scope, tags, memory_type, limit });
 
       try {
         const memories = await queryDreamMemories({
           query,
           project,
+          scope,
+          tags,
+          memory_type,
           limit: limit || 10,
         });
 
@@ -2982,16 +2994,6 @@ def register(ctx):
               });
               if (callGraph.length >= 500) break;
             }
-          }
-
-          const modules: Array<{ id: string, name: string, file?: string }> = [];
-          const classes: Array<{ id: string, name: string, file?: string, line?: number }> = [];
-          const functions: Array<{ id: string, name: string, file?: string, line?: number }> = [];
-
-          for (const n of nodes) {
-            if (n.type === "module") modules.push({ id: n.id, name: n.label, file: n.filePath });
-            else if (n.type === "class") classes.push({ id: n.id, name: n.label, file: n.filePath, line: n.line });
-            else if (n.type === "function") functions.push({ id: n.id, name: n.label, file: n.filePath, line: n.line });
           }
 
           const summary = {

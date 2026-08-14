@@ -79,6 +79,7 @@ import {
   stepVerifySync,
   stepHealthCheck
 } from "./steps.js";
+import { cmdSetupClaude } from "./setupClaude.js";
 
 /* ── CLI Commands ───────────────────────────────────────────────── */
 
@@ -191,15 +192,21 @@ export async function runCLI(): Promise<void> {
   if (cmd === "doctor") {
     await cmdDoctor();
   } else if (cmd === "init" || cmd === "setup") {
-    await cmdSetup();
+    if (process.argv[3] === "claude") {
+      const projectDir = process.argv.find(a => a.startsWith('--projectDir'))?.split('=')[1] || process.cwd();
+      await cmdSetupClaude(projectDir);
+    } else {
+      await cmdSetup();
+    }
   } else if (cmd === "--help" || cmd === "-h") {
     console.log(`
 Usage: codeatlas-enterprise <command>
 
 Commands:
-  init    Interactive Second Brain setup wizard
-  setup   Same as init
-  doctor  Health check & diagnostics
+  init           Interactive Second Brain setup wizard
+  setup          Same as init
+  setup claude   Install Claude hooks and configs
+  doctor         Health check & diagnostics
 
 Without a command, runs the MCP server.
 `);
