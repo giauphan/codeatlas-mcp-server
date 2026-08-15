@@ -87,3 +87,7 @@
 ## 2024-05-18 - Optimize sync_skills_inventory I/O
 **Learning:** Checking `fs.existsSync` inside tight loops before an operation (like `fs.readdirSync` or `fs.readFileSync`) creates redundant system calls and introduces a minor TOCTOU race condition. Also, iterating over `fs.readdirSync` requires explicit `.statSync` or `.isDirectory()` to filter entries, but using `{ withFileTypes: true }` avoids additional file stat lookups.
 **Action:** Used the EAFP (Easier to Ask for Forgiveness than Permission) pattern by wrapping `fs.readFileSync` in a `try/catch` and removing `fs.existsSync`. Updated `fs.readdirSync` to use `{ withFileTypes: true }` to filter out non-directories without needing extra stat calls.
+
+## 2024-05-18 - Prevent event loop blocking in file search loops
+**Learning:** Using synchronous I/O (`fs.readFileSync`) inside loops when handling concurrent server requests can severely block the Node.js event loop, degrading server concurrency and latency.
+**Action:** Replaced synchronous `fs.readFileSync` with asynchronous `await fs.promises.readFile` inside the `code_search` loop in `src/presentation/mcpServer.ts`. This allows the event loop to yield execution during I/O wait times, maintaining sequential memory bounds while significantly improving concurrent responsiveness.

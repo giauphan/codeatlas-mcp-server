@@ -1696,7 +1696,7 @@ export function registerTools(server: McpServer) {
       for (const filePath of allFiles) {
         if (results.length >= maxRes) break;
         try {
-          const content = fs.readFileSync(filePath, "utf-8");
+          const content = await fs.promises.readFile(filePath, "utf-8");
 
           // Fast path to skip files that definitely don't contain the query
           // This avoids expensive .split('\n') and per-line iterations for most files
