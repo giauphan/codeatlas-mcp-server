@@ -1,15 +1,13 @@
-import { cpSync, existsSync, chmodSync } from 'fs';
+import { cpSync, readdirSync, chmodSync } from 'fs';
+import { join } from 'path';
 
-cpSync('src/cli/hooks', 'dist/src/cli/hooks', { recursive: true });
+const SRC = 'src/cli/hooks';
+const DEST = 'dist/src/cli/hooks';
 
-const hookScripts = [
-  'dist/src/cli/hooks/brain-context.sh',
-  'dist/src/cli/hooks/brain-save.sh',
-  'dist/src/cli/hooks/task-router.sh'
-];
+cpSync(SRC, DEST, { recursive: true });
 
-for (const scriptPath of hookScripts) {
-  if (existsSync(scriptPath)) {
-    chmodSync(scriptPath, 0o755);
+for (const name of readdirSync(DEST)) {
+  if (name.endsWith('.sh')) {
+    chmodSync(join(DEST, name), 0o755);
   }
 }

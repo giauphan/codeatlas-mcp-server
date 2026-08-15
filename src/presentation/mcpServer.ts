@@ -758,13 +758,13 @@ export function registerTools(server: McpServer) {
         });
 
         // Client-side fallback filtering in case backend ignores query parameters
-        if (scope && memories.some(m => m.scope && !m.scope.startsWith(scope))) {
-          memories = memories.filter(m => !m.scope || m.scope.startsWith(scope));
+        if (scope) {
+          memories = memories.filter(m => m.scope && m.scope.startsWith(scope));
         }
-        if (memory_type && memories.some(m => m.memory_type !== memory_type)) {
+        if (memory_type) {
           memories = memories.filter(m => m.memory_type === memory_type);
         }
-        if (tags?.length && memories.some(m => m.tags && !tags.some(t => m.tags?.includes(t)))) {
+        if (tags?.length) {
           memories = memories.filter(m => m.tags && tags.some(t => m.tags?.includes(t)));
         }
 

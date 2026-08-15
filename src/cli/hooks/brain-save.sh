@@ -149,10 +149,10 @@ log "Reading conversation: $LATEST_CONVO"
 
 # ── Step 2: Extract last N user+assistant message pairs ──
 # Also extract model info and session_id from the convo
-TRANSCRIPT=$(python3 -c "
+TRANSCRIPT=$(python3 - "$LATEST_CONVO" <<'PYEOF'
 import json, sys
 
-filepath = '$LATEST_CONVO'
+filepath = sys.argv[1]
 messages = []
 session_id = None
 model = None
