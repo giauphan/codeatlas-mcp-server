@@ -41,7 +41,8 @@ if [ "$TASK_TYPE" = "skill_invocation" ]; then
         fi
         SKILLS_DIR="${SKILLS_DIR:-$HOME/.agents/skills}"
         # Canonicalize SKILLS_DIR to prevent path traversal via env override
-        if ! SKILLS_DIR="$(realpath -e "$SKILLS_DIR" 2>/dev/null)"; then
+        # realpath -e is GNU; use readlink -f as BSD/macOS fallback
+        if ! SKILLS_DIR="$(realpath -e "$SKILLS_DIR" 2>/dev/null || readlink -f "$SKILLS_DIR" 2>/dev/null)"; then
             echo "MODEL_NAME=ag/claude-sonnet-4-6"
             echo "EFFORT=medium"
             exit 0
