@@ -2852,10 +2852,11 @@ def register(ctx):
       // Read and tokenize each function
       const tokenized: Array<{ node: typeof functions[0]; tokens: Set<string>; source: string }> = [];
 
+      // Note: must reset tokenRegex.lastIndex = 0 before use since it's a global regex
+      const tokenRegex = /[a-zA-Z_$][a-zA-Z0-9_$]*/g;
+
       function getTokensFromSource(text: string): Set<string> {
         const tokens = new Set<string>();
-        // Note: must reset tokenRegex.lastIndex = 0 before use since it's a global regex
-        const tokenRegex = /[a-zA-Z_$][a-zA-Z0-9_$]*/g;
         tokenRegex.lastIndex = 0;
         let m: RegExpExecArray | null;
         while ((m = tokenRegex.exec(text)) !== null) {
