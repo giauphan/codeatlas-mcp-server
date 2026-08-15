@@ -193,7 +193,8 @@ export async function runCLI(): Promise<void> {
     await cmdDoctor();
   } else if (cmd === "init" || cmd === "setup") {
     if (process.argv[3] === "claude") {
-      const projectDir = process.argv.find(a => a.startsWith('--projectDir'))?.split('=')[1] || process.cwd();
+      const projectDirArg = process.argv.find(a => a.startsWith('--projectDir='));
+      const projectDir = projectDirArg ? projectDirArg.split('=')[1] : process.cwd();
       await cmdSetupClaude(projectDir);
     } else {
       await cmdSetup();

@@ -688,7 +688,7 @@ export function registerTools(server: McpServer) {
       importance: z.number().min(1).max(10).optional().describe("Importance level from 1 (low) to 10 (critical). Defaults to 5."),
       session_id: z.string().max(255).optional().describe("Optional session identifier for grouping related memories"),
       project: z.string().max(255).optional().describe("Optional project name to associate this memory with"),
-      scope: z.string().regex(/^[a-z0-9][a-z0-9/-]{0,499}$/).optional().describe("Optional hierarchical feature scope, e.g. auth/login or payment/checkout"),
+      scope: z.string().max(500).optional().describe("Optional hierarchical feature scope, e.g. auth/login or Auth/Login. Lowercase recommended for consistency."),
       tags: z.array(z.string().max(100)).max(100).optional().describe("Optional tags for filtering related memories"),
       related_ids: z.array(z.string().max(100)).max(100).optional().describe("Optional IDs of related dream memories or code entities"),
     },
