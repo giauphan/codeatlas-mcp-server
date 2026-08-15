@@ -1,30 +1,74 @@
-# Contributing to CodeAtlas MCP Enterprise
+# Contributing to CodeAtlas MCP Server
 
-Thank you for your interest in contributing! We welcome contributions from the community.
+Thank you for contributing! Please read this guide before opening a PR.
 
-## Getting Started
+## Requirements
 
-1. **Fork** the repository
-2. **Clone** your fork
-3. Install dependencies: `npm install`
-4. Build: `npm run build`
-5. Run tests: `npm test`
+- Node.js >= 20.0.0
+- pnpm 9 (`corepack enable && corepack prepare pnpm@9 --activate`)
 
-## Development Workflow
+## Setup
 
-- Create a feature branch
-- Make your changes with tests
-- Build and test: `npm run build && npm test`
-- Commit with conventional commits
-- Open a Pull Request
+```bash
+git clone https://github.com/giauphan/codeatlas-mcp-server.git
+cd codeatlas-mcp-server
+pnpm install
+cp .env.example .env
+# Edit .env with your credentials
+pnpm run build
+pnpm test
+```
 
-## Code Style
+## Project Structure
 
-- TypeScript strict mode
-- Meaningful variable names
-- Comments for non-obvious logic
-- No `any` types
+```
+codeatlas-mcp-server/
+├── src/
+│   ├── index.ts             # Entry point
+│   ├── cli/                 # CLI hooks (brain-context, brain-save)
+│   ├── tools/               # MCP tool implementations
+│   └── utils/               # Shared utilities
+├── dist/                    # Compiled output (git-ignored)
+├── docs/                    # Documentation
+├── .env.example             # Environment variable template
+└── package.json
+```
+
+## Workflow
+
+1. Fork and create a branch with a prefix:
+   - `feat/` — new feature
+   - `fix/` — bug fix
+   - `docs/` — documentation only
+   - `refactor/` — code restructure
+   - `test/` — tests only
+
+2. Make changes with tests where applicable.
+
+3. Run quality gate before opening PR:
+   ```bash
+   pnpm run build && pnpm test
+   ```
+
+4. Commit using [Conventional Commits](https://www.conventionalcommits.org/):
+   ```
+   feat: add new AST parser for Ruby
+   fix: handle null dependency graph nodes
+   docs: update MCP tools table
+   ```
+
+5. Open a Pull Request against `main`.
+
+## Code Standards
+
+- TypeScript strict mode — no `any` types.
+- Meaningful variable names, no abbreviations.
+- Comments only for non-obvious logic.
+- All public functions must have return type annotations.
 
 ## Questions?
 
-Open a [discussion](https://github.com/giauphan/codeatlas-mcp-enterprise/discussions) or [issue](https://github.com/giauphan/codeatlas-mcp-enterprise/issues).
+Open an [issue](https://github.com/giauphan/codeatlas-mcp-server/issues) or
+[discussion](https://github.com/giauphan/codeatlas-mcp-server/discussions).
+
+See [CODE_OF_CONDUCT.md](./CODE_OF_CONDUCT.md) for community standards.

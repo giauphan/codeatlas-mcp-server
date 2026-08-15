@@ -3,16 +3,22 @@ import * as http from "http";
 import { getResolvedApiKey } from "./projectService.js";
 
 export interface DreamMemoryInput {
-  memory_type: "MISTAKE" | "PREFERENCE" | "KNOWLEDGE" | "PATTERN";
+  memory_type: "MISTAKE" | "PREFERENCE" | "KNOWLEDGE" | "PATTERN" | "SESSION_SUMMARY";
   content: string;
   importance?: number;
   session_id?: string;
   project?: string;
+  scope?: string;
+  tags?: string[];
+  related_ids?: string[];
 }
 
 export interface DreamMemoryQuery {
   query: string;
   project?: string;
+  scope?: string;
+  tags?: string[];
+  memory_type?: string;
   limit?: number;
   offset?: number;
 }
@@ -25,6 +31,9 @@ export interface DreamMemoryResult {
   session_id: string | null;
   project: string | null;
   created_at: string;
+  scope?: string | null;
+  tags?: string[];
+  related_ids?: string[];
   score?: number;
 }
 
@@ -126,8 +135,21 @@ export async function queryDreamMemories(params: DreamMemoryQuery): Promise<Drea
       const queryParams: URLSearchParams = new URLSearchParams();
       queryParams.set("query", params.query);
       if (params.project) queryParams.set("project", params.project);
+      if (params.scope) queryParams.set("scope", params.scope);
+      if (params.tags?.length) {
+        // Tags are URL-encoded JSON array, e.g. ?tags=%5B%22a%22%2C%22b%22%5D.
+        // Backend must parse JSON array from query param.
+        queryParams.set("tags", JSON.stringify(params.tags));
+      }
+      if (params.memory_type) queryParams.set("memory_type", params.memory_type);
       if (params.limit) queryParams.set("limit", String(params.limit));
       if (params.offset) queryParams.set("offset", String(params.offset));
+
+      // URL length safety check (common server limit ~8KB)
+      const urlPath = "/api/dreams/query?" + queryParams.toString();
+      if (urlPath.length > 8000) {
+        throw new Error(`Query URL too long (${urlPath.length} chars). Reduce tags/scope/memory_type filters.`);
+      }
 
       const options: https.RequestOptions = {
         hostname: serverUrl.hostname,
