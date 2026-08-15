@@ -54,7 +54,6 @@
 ## 2024-05-18 - Prevent event loop blocking in file search loops
 **Learning:** Using synchronous I/O (`fs.readFileSync`) inside loops when handling concurrent server requests can severely block the Node.js event loop, degrading server concurrency and latency.
 **Action:** Replaced synchronous `fs.readFileSync` with asynchronous `await fs.promises.readFile` inside the `code_search` loop in `src/presentation/mcpServer.ts`. This allows the event loop to yield execution during I/O wait times, maintaining sequential memory bounds while significantly improving concurrent responsiveness.
-
 ## 2024-05-20 - [Performance improvement] Optimized O(N) array filtering and mapping in MCP tools
 **Learning:** Chained array methods like `.filter().filter().slice()` and `.filter().map()` are frequently used but introduce significant performance bottlenecks, particularly when dealing with large datasets like AST nodes or graph edges. Each chained call forces a full O(N) traversal and creates intermediate array allocations, dramatically increasing CPU usage and garbage collection overhead.
 **Action:** When filtering, mapping, and slicing large collections, prefer a single `for...of` loop. Apply filter conditions within the loop, manually manage the result collections by `push`ing to arrays, and implement early exit conditions (`if (results.length >= limit) break;`) to avoid unnecessary iterations over the entire dataset.
