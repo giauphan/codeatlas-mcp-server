@@ -140,14 +140,28 @@ CLAUDE_PROJECTS="$HOME/.claude/projects"
 # ── Step 1: Find current session's conversation file ──
 # Pick the most recently written .jsonl under projects/ (not subagents/)
 LATEST_CONVO=""
-# Portable across GNU/BSD: ls -t sorts by mtime (newest first). -maxdepth bounds the scan.
-for f in $(find "$CLAUDE_PROJECTS" -maxdepth 5 -name "*.jsonl" ! -path "*/subagents/*" -type f 2>/dev/null | xargs -r ls -t 2>/dev/null | head -3); do
-  # Must have at least 10 lines and be recently modified (< 5 min)
+# Portable + deterministic: emit "mtime\tpath", sort numerically desc, take top 3.
+# Uses stat (GNU: -c %Y, BSD: -f %m) so ordering does not depend on find/xargs batching.
+while IFS=$'\t' read -r _mtime f; do
+  [ -z "$f" ] && continue
   if [ -f "$f" ] && [ "$(wc -l < "$f" 2>/dev/null || echo 0)" -ge 10 ]; then
     LATEST_CONVO="$f"
     break
   fi
-done
+done < <(
+  python3 -c "
+import os, glob
+root = os.path.expanduser('~/.claude/projects')
+files = []
+for p in glob.glob(os.path.join(root, '**', '*.jsonl'), recursive=True):
+    if '/subagents/' in p: continue
+    try: files.append((os.path.getmtime(p), p))
+    except OSError: pass
+files.sort(reverse=True)
+for mtime, p in files[:3]:
+    print(f'{int(mtime)}\t{p}')
+" 2>/dev/null
+)
 
 if [ -z "$LATEST_CONVO" ]; then
   log "No recent conversation file found"
