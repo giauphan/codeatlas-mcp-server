@@ -2851,8 +2851,18 @@ def register(ctx):
 
       // Read and tokenize each function
       const tokenized: Array<{ node: typeof functions[0]; tokens: Set<string>; source: string }> = [];
-      // Note: must reset tokenRegex.lastIndex = 0 before use since it's a global regex
-      const tokenRegex = /[a-zA-Z_$][a-zA-Z0-9_$]*/g;
+
+      function getTokensFromSource(text: string): Set<string> {
+        const tokens = new Set<string>();
+        // Note: must reset tokenRegex.lastIndex = 0 before use since it's a global regex
+        const tokenRegex = /[a-zA-Z_$][a-zA-Z0-9_$]*/g;
+        tokenRegex.lastIndex = 0;
+        let m: RegExpExecArray | null;
+        while ((m = tokenRegex.exec(text)) !== null) {
+          tokens.add(m[0].toLowerCase());
+        }
+        return tokens;
+      }
 
       for (const node of functions.slice(0, 300)) { // Limit to 300 for perf
         const absPath = path.isAbsolute(node.filePath!) ? node.filePath! : path.resolve(loaded.projectDir, node.filePath!);
@@ -2866,12 +2876,7 @@ def register(ctx):
           const body = lines.slice(start, start + 80).map(l => l.substring(0, 1000)).join("\n");
 
           // Tokenize: identifiers + keywords (skip whitespace, punctuation)
-          const tokens = new Set<string>();
-          tokenRegex.lastIndex = 0;
-          let m: RegExpExecArray | null;
-          while ((m = tokenRegex.exec(body)) !== null) {
-            tokens.add(m[0].toLowerCase());
-          }
+          const tokens = getTokensFromSource(body);
           tokenized.push({ node, tokens, source: body.substring(0, 300) });
         } catch { /* skip */ }
       }
