@@ -120,12 +120,20 @@ print(json.dumps(payload, ensure_ascii=False))
   fi
 fi
 
-# Lock 15s — prevent concurrent runs
-if [ -f "$LOCK" ] && [ "$(($(date +%s) - $(stat -c %Y "$LOCK" 2>/dev/null || echo 0)))" -lt 15 ]; then
-  exit 0
+# Lock via atomic mkdir — prevent concurrent runs
+LOCK_DIR="/tmp/claude-brain-save.lockdir"
+if ! mkdir "$LOCK_DIR" 2>/dev/null; then
+  # If lock directory exists and is < 15 seconds old, skip
+  mtime=$(stat -c %Y "$LOCK_DIR" 2>/dev/null || stat -f %m "$LOCK_DIR" 2>/dev/null || echo 0)
+  now=$(date +%s)
+  if [ $((now - mtime)) -lt 15 ]; then
+    exit 0
+  fi
+  # Stale lock: clean and recreate
+  rm -rf "$LOCK_DIR" 2>/dev/null
+  mkdir "$LOCK_DIR" 2>/dev/null || exit 0
 fi
-echo "$$" > "$LOCK"
-trap 'rm -f "$LOCK"' EXIT
+trap 'rm -rf "$LOCK_DIR"' EXIT
 
 CLAUDE_PROJECTS="$HOME/.claude/projects"
 

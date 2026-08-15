@@ -196,7 +196,8 @@ export async function runCLI(): Promise<void> {
       const prefix = "--projectDir=";
       const projectDirArgs = process.argv.filter(a => a.startsWith(prefix));
       if (projectDirArgs.length === 0) {
-        throw new Error("--projectDir= value is required");
+        console.error("Error: --projectDir= value is required");
+        process.exit(1);
       }
       if (projectDirArgs.length > 1) {
         console.warn("Multiple --projectDir= values provided; using the first one");
@@ -204,7 +205,8 @@ export async function runCLI(): Promise<void> {
       const projectDirArg = projectDirArgs[0];
       const value = projectDirArg.slice(prefix.length).trim();
       if (!value) {
-        throw new Error("--projectDir= value cannot be empty or whitespace-only");
+        console.error("Error: --projectDir= value cannot be empty or whitespace-only");
+        process.exit(1);
       }
       await cmdSetupClaude(value);
     } else {
