@@ -20,6 +20,7 @@ import {
 import { saveDreamMemory, queryDreamMemories, DreamMemoryResult } from "../services/dreamingService.js";
 import { CodeAnalyzer } from "../analyzer/parser.js";
 import { SecurityScanner } from "../securityScanner.js";
+import { GraphLink } from "../analyzer/types.js";
 import {
   listADRs, getADR, saveADR, deleteADR,
   ADR
@@ -475,8 +476,6 @@ export function registerTools(server: McpServer) {
       // Filter by scope
       if (diagramScope === "modules-only") {
         nodes = nodes.filter((n) => n.type === "module" && (n.filePath || n.id.startsWith("external:")));
-        const nodeIds = createNodeIdSet(nodes);
-        links = links.filter((l) => nodeIds.has(l.source) && nodeIds.has(l.target) && l.type === "import");
       } else if (diagramScope === "feature" && feature) {
         const featureRegex = new RegExp(escapeRegExp(feature), 'i');
         const matchingNodes = new Set<string>();
@@ -490,8 +489,6 @@ export function registerTools(server: McpServer) {
           if (matchingNodes.has(l.target)) matchingNodes.add(l.source);
         });
         nodes = nodes.filter((n) => matchingNodes.has(n.id));
-        const nodeIds = createNodeIdSet(nodes);
-        links = links.filter((l) => nodeIds.has(l.source) && nodeIds.has(l.target));
       }
 
       // Truncate if too many nodes
@@ -505,17 +502,29 @@ export function registerTools(server: McpServer) {
         nodes = nodes.slice(0, max);
       }
 
-      const truncatedNodeIds = createNodeIdSet(nodes);
-      links = links.filter((l) => truncatedNodeIds.has(l.source) && truncatedNodeIds.has(l.target));
-
-      // Remove duplicate links
+      const finalNodeIds = createNodeIdSet(nodes);
       const linkSet = new Set<string>();
-      links = links.filter((l) => {
+      const finalLinks: GraphLink[] = [];
+
+      const isModulesOnly = diagramScope === "modules-only";
+
+      // Combine multiple link filtering and deduplication passes into a single O(L) loop.
+      // This collapses M sequential passes into a single pass and prevents intermediate memory allocations in large datasets.
+      // Note: Endpoint validation (!finalNodeIds.has) here handles both scope-specific node exclusions and post-truncation orphans equivalently.
+      for (const l of links) {
+        if (isModulesOnly && l.type !== "import") continue;
+
+        // Validate endpoints exist after node truncation/filtering
+        if (!finalNodeIds.has(l.source) || !finalNodeIds.has(l.target)) continue;
+
+        // Deduplication
         const key = `${l.source}|${l.target}|${l.type}`;
-        if (linkSet.has(key)) return false;
-        linkSet.add(key);
-        return true;
-      });
+        if (!linkSet.has(key)) {
+          linkSet.add(key);
+          finalLinks.push(l);
+        }
+      }
+      links = finalLinks;
 
       // Generate Mermaid JS flowchart syntax from the entity graph.
       const nodeIdMap = new Map<string, string>();
@@ -1281,17 +1290,21 @@ export function registerTools(server: McpServer) {
       }
 
       const traceNodeIds = createNodeIdSet(traceNodes);
-      const traceLinks = links.filter(
-        (l) => traceNodeIds.has(l.source) && traceNodeIds.has(l.target) && l.type === "call"
-      );
-
       const linkSet = new Set<string>();
-      const dedupLinks = traceLinks.filter((l) => {
+      const dedupLinks: GraphLink[] = [];
+
+      // Combine link filtering and deduplication passes into a single O(L) loop.
+      // This collapses M sequential passes into a single pass and prevents intermediate memory allocations in large datasets.
+      for (const l of links) {
+        if (l.type !== "call") continue;
+        if (!traceNodeIds.has(l.source) || !traceNodeIds.has(l.target)) continue;
+
         const key = `${l.source}|${l.target}`;
-        if (linkSet.has(key)) return false;
-        linkSet.add(key);
-        return true;
-      });
+        if (!linkSet.has(key)) {
+          linkSet.add(key);
+          dedupLinks.push(l);
+        }
+      }
 
       const hasIncoming = new Set<string>();
       for (const link of dedupLinks) {
