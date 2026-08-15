@@ -149,8 +149,9 @@ log "Reading conversation: $LATEST_CONVO"
 
 # ── Step 2: Extract last N user+assistant message pairs ──
 # Also extract model info and session_id from the convo
+export BRAIN_SAVE_HISTORY_DEPTH="${BRAIN_SAVE_HISTORY_DEPTH:-8}"
 TRANSCRIPT=$(python3 - "$LATEST_CONVO" <<'PYEOF'
-import json, sys
+import json, sys, os
 
 filepath = sys.argv[1]
 messages = []
@@ -204,8 +205,9 @@ with open(filepath) as f:
 
         messages.append({'role': role, 'content': text.strip()})
 
-# Keep last 8 messages (4 user+assistant pairs)
-msgs = messages[-8:] if len(messages) > 8 else messages
+# Keep last N messages (N user+assistant pairs) — configurable via BRAIN_SAVE_HISTORY_DEPTH
+depth = int(os.environ.get('BRAIN_SAVE_HISTORY_DEPTH', '8'))
+msgs = messages[-depth:] if len(messages) > depth else messages
 
 transcript = '\n\n---\n\n'.join(f'[{m[\"role\"].upper()}]\n{m[\"content\"]}' for m in msgs)
 print(f'SESSION_ID:{session_id or \"unknown\"}')
@@ -213,7 +215,8 @@ print(f'MODEL:{model or \"Claude\"}')
 print(f'COUNT:{len(msgs)}')
 print('---TRANSCRIPT_BELOW---')
 print(transcript)
-" 2>/dev/null || echo "")
+PYEOF
+)
 
 [ -z "$TRANSCRIPT" ] && exit 0
 

@@ -33,8 +33,14 @@ fi
 if [ "$TASK_TYPE" = "skill_invocation" ]; then
     SKILL_NAME=$(echo "$LOWER_TASK_NAME" | sed -n 's/^\/skill \([a-zA-Z0-9-]\+\).*/\1/p')
     if [ -n "$SKILL_NAME" ]; then
+        # Directory traversal guard: only allow alphanumeric, dash, underscore
+        if ! echo "$SKILL_NAME" | grep -qE '^[a-zA-Z0-9_-]+$'; then
+            echo "MODEL_NAME=ag/claude-sonnet-4-6"
+            echo "EFFORT=medium"
+            exit 0
+        fi
         SKILLS_DIR="${SKILLS_DIR:-$HOME/.agents/skills}"
-SKILL_MD_PATH="${SKILLS_DIR}/${SKILL_NAME}/SKILL.md"
+        SKILL_MD_PATH="${SKILLS_DIR}/${SKILL_NAME}/SKILL.md"
         if [ -f "$SKILL_MD_PATH" ]; then
             PREFERRED_MODEL=$(grep -E "^(model|preferred_model):" "$SKILL_MD_PATH" | head -n 1 | cut -d':' -f2 | tr -d ' ' | tr -d '"')
             if [ -n "$PREFERRED_MODEL" ]; then

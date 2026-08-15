@@ -8,16 +8,16 @@ API_URL="${CODEATLAS_API_URL:-http://localhost:3381}"
 API_KEY="${CODEATLAS_API_KEY:-}"
 [ -z "$API_KEY" ] && exit 0
 
-HOOK_INPUT="$(cat)"
+export HOOK_INPUT="$(cat)"
 readarray -t HOOK_FIELDS < <(python3 -c '
 import json, os, sys
 try:
-    payload = json.loads(sys.stdin.read())
+    payload = json.loads(os.environ.get("HOOK_INPUT", ""))
 except json.JSONDecodeError:
     payload = {}
 print(payload.get("prompt", "session context"))
 print(payload.get("cwd") or os.environ.get("CLAUDE_PROJECT_DIR") or os.getcwd())
-' <<< "$HOOK_INPUT")
+')
 
 PROMPT="${HOOK_FIELDS[0]:-session context}"
 CWD="${HOOK_FIELDS[1]:-$(pwd)}"

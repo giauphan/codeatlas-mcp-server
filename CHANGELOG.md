@@ -59,26 +59,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## Template
-
-```markdown
-## [Unreleased]
-
-### Added
-- New features
-
-### Changed
-- Changes in existing functionality
-
-### Deprecated
-- Soon-to-be removed features
-
-### Removed
-- Features removed in this release
-
-### Fixed
-- Bug fixes
-
-### Security
-- Vulnerabilities fixed
-```
+Format based on [Keep a Changelog](https://keepachangelog.com/) and [Semantic Versioning](https://semver.org/).

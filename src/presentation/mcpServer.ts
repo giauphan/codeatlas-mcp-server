@@ -743,7 +743,7 @@ export function registerTools(server: McpServer) {
       memory_type: z.enum(["MISTAKE", "PREFERENCE", "KNOWLEDGE", "PATTERN", "SESSION_SUMMARY"]).optional().describe("Optional memory type filter"),
       limit: z.number().min(1).max(100).optional().default(10).describe("Maximum number of results to return (default: 10, max: 100)"),
     },
-    async ({ query, project, scope, tags, memory_type, limit }: { query: string; project?: string; scope?: string; tags?: string[]; memory_type?: string; limit?: number }) => {
+    async ({ query, project, scope, tags, memory_type, limit }: { query: string; project?: string; scope?: string; tags?: string[]; memory_type?: "MISTAKE" | "PREFERENCE" | "KNOWLEDGE" | "PATTERN" | "SESSION_SUMMARY"; limit?: number }) => {
       const auth = await checkAuth();
       await logActivity(auth, "query_dream_memories", { query: query.substring(0, 100), project, scope, tags, memory_type, limit });
 
@@ -757,7 +757,9 @@ export function registerTools(server: McpServer) {
           limit: limit || 10,
         });
 
-        // Client-side fallback filtering in case backend ignores query parameters
+        // Client-side fallback filtering in case backend ignores query parameters.
+        // related_ids is backend-only — no client-side filter (server is expected
+        // to resolve related memory IDs via vector + SQL hybrid search).
         if (scope) {
           memories = memories.filter(m => m.scope && m.scope.startsWith(scope));
         }
