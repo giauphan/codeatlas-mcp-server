@@ -61,3 +61,7 @@
 ## 2024-05-18 - Replacing chained array methods with single for...of loop for graph datasets
 **Learning:** In graph analysis contexts with large datasets (e.g. 200,000+ links), chaining multiple `array.filter().filter().map()` operations creates a significant performance bottleneck due to O(M * N) array iterations and intermediate array allocations in memory.
 **Action:** When filtering, validating endpoints, or deduplicating elements in large arrays (like nodes or edges), always combine the logic into a single `for...of` loop with early `continue` exclusions and a `Set` for deduplication. This collapses multiple O(N) operations into a single O(N) pass, saving memory and CPU cycles.
+
+## 2024-05-24 - Hoisting Global Regular Expressions Safely
+**Learning:** Moving a global regular expression (`/g`) outside a loop is a common performance optimization to avoid recompilation overhead. However, when doing so, it is critical to reset the regex's internal state (specifically the `lastIndex` property) before reusing it within the loop. Failure to reset `lastIndex` causes the regex to continue matching from where it left off in the previous string, leading to missed matches or incorrect tokenization across different strings.
+**Action:** When hoisting global regexes out of loops (e.g., in `mcpServer.ts`), always explicitly set `regex.lastIndex = 0` immediately before the loop or matching block that reuses it.
