@@ -109,7 +109,7 @@ print(json.dumps(payload, ensure_ascii=False))
 " 2>/dev/null || true)
 
   if [ -n "$OUTCOME_PAYLOAD" ]; then
-    OUTCOME_RESP=$(curl --max-time 10 -s -X POST "$BASE/api/memory/outcome" \
+    OUTCOME_RESP=$(curl --connect-timeout 3 --max-time 10 -s -X POST "$BASE/api/memory/outcome" \
       -H "x-api-key: $API_KEY" \
       -H "Content-Type: application/json" \
       -d "$OUTCOME_PAYLOAD" 2>/dev/null || echo '{"error":"curl failed"}')
@@ -132,7 +132,8 @@ CLAUDE_PROJECTS="$HOME/.claude/projects"
 # ── Step 1: Find current session's conversation file ──
 # Pick the most recently written .jsonl under projects/ (not subagents/)
 LATEST_CONVO=""
-for f in $(find "$CLAUDE_PROJECTS" -name "*.jsonl" ! -path "*/subagents/*" -printf '%T@ %p\n' 2>/dev/null | sort -rn | head -3 | awk '{print $2}'); do
+# Portable across GNU/BSD: ls -t sorts by mtime (newest first). -maxdepth bounds the scan.
+for f in $(find "$CLAUDE_PROJECTS" -maxdepth 5 -name "*.jsonl" ! -path "*/subagents/*" -type f 2>/dev/null | xargs -r ls -t 2>/dev/null | head -3); do
   # Must have at least 10 lines and be recently modified (< 5 min)
   if [ -f "$f" ] && [ "$(wc -l < "$f" 2>/dev/null || echo 0)" -ge 10 ]; then
     LATEST_CONVO="$f"
@@ -235,19 +236,19 @@ log "Session: $SESSION_ID, Model: $MODEL, Messages: $MSG_COUNT"
 PROJECT_HINT=$(echo "$LATEST_CONVO" | sed -n 's|.*/projects/\([^/]*\)/.*|\1|p' | tr '-' '_' | sed 's/^_//')
 [ -z "$PROJECT_HINT" ] && PROJECT_HINT="hermes_auto"
 
-export BODY
+export BODY SESSION_ID PROJECT_HINT MODEL
 PAYLOAD=$(python3 -c "
 import json, os
 body = os.environ.get('BODY', '')
 print(json.dumps({
     'content': body,
-    'session_id': '$SESSION_ID',
-    'project': '$PROJECT_HINT',
-    'provider': '$MODEL'
+    'session_id': os.environ.get('SESSION_ID', ''),
+    'project': os.environ.get('PROJECT_HINT', ''),
+    'provider': os.environ.get('MODEL', '')
 }))
 ")
 
-RESP=$(curl --max-time 15 -s -X POST "$BASE/api/dreams/ingest-session" \
+RESP=$(curl --connect-timeout 3 --max-time 15 -s -X POST "$BASE/api/dreams/ingest-session" \
   -H "x-api-key: $API_KEY" \
   -H "Content-Type: application/json" \
   -d "$PAYLOAD" 2>/dev/null || echo '{"error":"curl failed"}')

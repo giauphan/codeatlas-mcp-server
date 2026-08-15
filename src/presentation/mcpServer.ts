@@ -760,15 +760,13 @@ export function registerTools(server: McpServer) {
         // Client-side fallback filtering in case backend ignores query parameters.
         // related_ids is backend-only — no client-side filter (server is expected
         // to resolve related memory IDs via vector + SQL hybrid search).
-        if (scope) {
-          memories = memories.filter(m => m.scope && m.scope.startsWith(scope));
-        }
-        if (memory_type) {
-          memories = memories.filter(m => m.memory_type === memory_type);
-        }
-        if (tags?.length) {
-          memories = memories.filter(m => m.tags && tags.some(t => m.tags?.includes(t)));
-        }
+        // Single-pass filter for efficiency.
+        memories = memories.filter(m => {
+          if (scope && !(m.scope === scope || m.scope?.startsWith(scope + '/'))) return false;
+          if (memory_type && m.memory_type !== memory_type) return false;
+          if (tags?.length && !(m.tags && tags.some(t => m.tags?.includes(t)))) return false;
+          return true;
+        });
 
         return {
           content: [{

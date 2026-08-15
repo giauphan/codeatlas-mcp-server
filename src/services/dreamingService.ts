@@ -137,6 +137,8 @@ export async function queryDreamMemories(params: DreamMemoryQuery): Promise<Drea
       if (params.project) queryParams.set("project", params.project);
       if (params.scope) queryParams.set("scope", params.scope);
       if (params.tags?.length) {
+        // Tags are URL-encoded JSON array, e.g. ?tags=%5B%22a%22%2C%22b%22%5D.
+        // Backend must parse JSON array from query param.
         queryParams.set("tags", JSON.stringify(params.tags));
       }
       if (params.memory_type) queryParams.set("memory_type", params.memory_type);
