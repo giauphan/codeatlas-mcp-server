@@ -2851,6 +2851,7 @@ def register(ctx):
 
       // Read and tokenize each function
       const tokenized: Array<{ node: typeof functions[0]; tokens: Set<string>; source: string }> = [];
+      // Note: must reset tokenRegex.lastIndex = 0 before use since it's a global regex
       const tokenRegex = /[a-zA-Z_$][a-zA-Z0-9_$]*/g;
 
       for (const node of functions.slice(0, 300)) { // Limit to 300 for perf
