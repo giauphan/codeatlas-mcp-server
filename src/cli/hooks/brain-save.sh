@@ -144,7 +144,7 @@ LATEST_CONVO=""
 # Uses stat (GNU: -c %Y, BSD: -f %m) so ordering does not depend on find/xargs batching.
 while IFS=$'\t' read -r _mtime f; do
   [ -z "$f" ] && continue
-  if [ -f "$f" ] && [ "$(wc -l < "$f" 2>/dev/null || echo 0)" -ge 10 ]; then
+  if [ -f "$f" ] && [ "$(wc -l < "$f" 2>/dev/null | tr -d ' ' || echo 0)" -ge 10 ]; then
     LATEST_CONVO="$f"
     break
   fi

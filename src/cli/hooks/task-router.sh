@@ -54,7 +54,7 @@ if [ "$TASK_TYPE" = "skill_invocation" ]; then
             exit 0
         fi
         if [ -f "$SKILL_MD_PATH" ]; then
-            PREFERRED_MODEL=$(grep -E "^(model|preferred_model):" "$SKILL_MD_PATH" | head -n 1 | cut -d':' -f2 | tr -d ' ' | tr -d '"')
+            PREFERRED_MODEL=$(grep -E "^(model|preferred_model)[[:space:]]*:" "$SKILL_MD_PATH" | head -n 1 | cut -d':' -f2 | tr -d ' ' | tr -d '"')
             if [ -n "$PREFERRED_MODEL" ]; then
                 echo "MODEL_NAME=$PREFERRED_MODEL"
                 echo "EFFORT=medium"
