@@ -148,8 +148,7 @@ export async function queryDreamMemories(params: DreamMemoryQuery): Promise<Drea
       // URL length safety check (common server limit ~8KB)
       const urlPath = "/api/dreams/query?" + queryParams.toString();
       if (urlPath.length > 8000) {
-        reject(new Error(`Query URL too long (${urlPath.length} chars). Reduce tags/scope/memory_type filters.`));
-        return;
+        throw new Error(`Query URL too long (${urlPath.length} chars). Reduce tags/scope/memory_type filters.`);
       }
 
       const options: https.RequestOptions = {

@@ -23,19 +23,19 @@ PROMPT="${HOOK_FIELDS[0]:-session context}"
 CWD="${HOOK_FIELDS[1]:-$(pwd)}"
 PROJECT="${CODEATLAS_PROJECT:-$(basename "$CWD")}"
 
-DREAMS=$(curl --max-time 3 -sS --get -H "x-api-key: $API_KEY" \
+DREAMS=$(curl --max-time 3 -sS --fail --get -H "x-api-key: $API_KEY" \
   --data-urlencode "query=$PROMPT" \
   --data-urlencode "project=$PROJECT" \
   --data-urlencode "limit=5" \
   "$API_URL/api/dreams/query" 2>/dev/null || true)
 
-GENOME=$(curl --max-time 3 -sS --get -H "x-api-key: $API_KEY" \
+GENOME=$(curl --max-time 3 -sS --fail --get -H "x-api-key: $API_KEY" \
   --data-urlencode "query=$PROMPT" \
   --data-urlencode "project=$PROJECT" \
   --data-urlencode "limit=5" \
   "$API_URL/api/genome/search" 2>/dev/null || true)
 
-IMMUNE=$(curl --max-time 3 -sS --get -H "x-api-key: $API_KEY" \
+IMMUNE=$(curl --max-time 3 -sS --fail --get -H "x-api-key: $API_KEY" \
   --data-urlencode "problem=$PROMPT" \
   --data-urlencode "project=$PROJECT" \
   "$API_URL/api/genome/immune/context" 2>/dev/null || true)

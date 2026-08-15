@@ -194,15 +194,12 @@ export async function runCLI(): Promise<void> {
   } else if (cmd === "init" || cmd === "setup") {
     if (process.argv[3] === "claude") {
       const prefix = "--projectDir=";
-      const projectDirArgs = process.argv.filter(a => a.startsWith(prefix));
-      if (projectDirArgs.length === 0) {
+      const projectDirArg = process.argv.find(a => a.startsWith(prefix));
+      if (!projectDirArg) {
         console.error("Error: --projectDir= value is required");
         process.exit(1);
       }
-      if (projectDirArgs.length > 1) {
-        console.warn("Multiple --projectDir= values provided; using the first one");
-      }
-      const projectDirArg = projectDirArgs[0];
+      // No need to warn on multiple --projectDir= — find() returns the first match
       const value = projectDirArg.slice(prefix.length).trim();
       if (!value) {
         console.error("Error: --projectDir= value cannot be empty or whitespace-only");
