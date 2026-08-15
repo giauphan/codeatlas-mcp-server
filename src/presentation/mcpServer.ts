@@ -2230,24 +2230,30 @@ export function registerTools(server: McpServer) {
 
       if (!fs.existsSync(path.join(resolvedDir, ".git"))) return { content: [{ type: "text" as const, text: JSON.stringify({ error: "Not a git repository" }) }] };
 
-      const maxC = Math.min(commits || 5, 20);
+      const maxC = Math.max(1, Math.min(commits || 5, 20));
       const result: any = { project: loaded.projectName };
       const cp = require("child_process");
 
       const execGit = (args: string[], maxBuffer?: number) => {
-        // Security: Prevent Git argument injection (e.g. --exec-path, -c)
-        const dangerousArgs = args.filter(a =>
-          a === "-c" || a.startsWith("-c=") || a.startsWith("--exec-path") ||
-          a === "-O" || a.startsWith("--pager") || a.startsWith("--config-env") ||
-          a.startsWith("--upload-pack") || a.startsWith("--receive-pack") ||
-          a.startsWith("--alternates-paths") || a.startsWith("--git-dir") ||
-          a.startsWith("--work-tree") || a.startsWith("--namespace")
+        // Security: Use strict allowlist for Git arguments instead of denylist
+        // Extracted patterns to improve readability and precisely cover the specific commands we run.
+        const revParseFlags = /^(rev-parse|--abbrev-ref|HEAD)$/;
+        const statusFlags = /^(status|--porcelain)$/;
+        const revListFlags = /^(rev-list|--left-right|--count|HEAD\.\.\.@\{upstream\})$/;
+        const logFlags = /^(log|-[0-9]+|--format=.*|--name-only)$/;
+
+        const invalidArgs = args.filter(a =>
+          !(revParseFlags.test(a) || statusFlags.test(a) || revListFlags.test(a) || logFlags.test(a))
         );
-        if (dangerousArgs.length > 0) {
+
+        if (invalidArgs.length > 0) {
           throw new Error("Security Error: Forbidden git arguments detected");
         }
 
-        const res = cp.spawnSync("git", args, { cwd: resolvedDir, encoding: "utf-8", shell: false, maxBuffer });
+        // Security: Cap maxBuffer to 5MB to prevent DoS via excessive memory consumption
+        const safeMaxBuffer = Math.min(maxBuffer || 1024 * 1024, 5 * 1024 * 1024);
+
+        const res = cp.spawnSync("git", ["--no-pager", ...args], { cwd: resolvedDir, encoding: "utf-8", shell: false, maxBuffer: safeMaxBuffer });
         if (res.error) throw res.error;
         if (res.status !== 0) throw new Error(res.stderr?.toString() || "Git command failed");
         return res.stdout.toString();
