@@ -193,8 +193,12 @@ export async function runCLI(): Promise<void> {
     await cmdDoctor();
   } else if (cmd === "init" || cmd === "setup") {
     if (process.argv[3] === "claude") {
-      const projectDirArg = process.argv.find(a => a.startsWith('--projectDir='));
-      const projectDir = projectDirArg ? projectDirArg.split('=')[1] : process.cwd();
+      const prefix = "--projectDir=";
+      const projectDirArg = process.argv.find(a => a.startsWith(prefix));
+      if (projectDirArg && projectDirArg.length === prefix.length) {
+        throw new Error("--projectDir= requires a value");
+      }
+      const projectDir = projectDirArg ? projectDirArg.slice(prefix.length) : process.cwd();
       await cmdSetupClaude(projectDir);
     } else {
       await cmdSetup();

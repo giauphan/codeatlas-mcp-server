@@ -151,7 +151,7 @@ MIT © [Giau Phan](mailto:giauphan012@gmail.com)
 ## ⚠️ Known Limitations
 
 - **Oracle DB Required for Persistent Memory**: Local-only mode works without Oracle, but dream memory persistence requires it.
-- **Cloud Dream Query Filters**: When querying memories with `scope`, `tags`, or `memory_type` filters, the backend performs vector hybrid search on the query text plus SQL filtering on the other parameters. The `tags` parameter is passed as a JSON string to the upstream API.
+- **Cloud Dream Query Filters**: When querying memories with `scope`, `tags`, or `memory_type` filters, the backend performs vector hybrid search on the query text plus SQL filtering on the other parameters. The `tags` parameter is passed as a JSON string to the upstream API. The `related_ids` parameter is also supported for filtering by related memory IDs.
 - **Multi-Tenant Not Supported**: Only single-tenant mode available.
 - **Security**: No built-in rate limiting; use a reverse proxy (Nginx) in production.
 

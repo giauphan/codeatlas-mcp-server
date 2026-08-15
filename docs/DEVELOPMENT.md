@@ -18,7 +18,7 @@
 | `ORACLE_USER` | Oracle DB username | No | - | oracle_user |
 | `ORACLE_PASSWORD` | Oracle DB password | No | - | oracle_password |
 | `ORACLE_CONNECTION_STRING` | Oracle DB connection string | No | - | localhost:1521/ORCLPDB1 |
-| `GOOGLE_APPLICATION_CREDENTIALS` | Firebase Admin credentials path | No | - | ./serviceAccountKey.json |
+| `GOOGLE_APPLICATION_CREDENTIALS` | Firebase Admin credentials path | No | - | /absolute/path/to/serviceAccountKey.json |
 | `NVIDIA_API_KEY` | NVIDIA API key | No | - | nvapi-xyz123 |
 | `CODEATLAS_API_KEY` | CodeAtlas API key | No | - | api_key_123 |
 | `CODEATLAS_MULTI_TENANT` | Enable multi-tenant mode | No | false | true |
