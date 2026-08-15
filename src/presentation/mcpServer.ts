@@ -748,7 +748,7 @@ export function registerTools(server: McpServer) {
       await logActivity(auth, "query_dream_memories", { query: query.substring(0, 100), project, scope, tags, memory_type, limit });
 
       try {
-        const memories = await queryDreamMemories({
+        let memories = await queryDreamMemories({
           query,
           project,
           scope,
@@ -756,6 +756,17 @@ export function registerTools(server: McpServer) {
           memory_type,
           limit: limit || 10,
         });
+
+        // Client-side fallback filtering in case backend ignores query parameters
+        if (scope && memories.some(m => m.scope && !m.scope.startsWith(scope))) {
+          memories = memories.filter(m => !m.scope || m.scope.startsWith(scope));
+        }
+        if (memory_type && memories.some(m => m.memory_type !== memory_type)) {
+          memories = memories.filter(m => m.memory_type === memory_type);
+        }
+        if (tags?.length && memories.some(m => m.tags && !tags.some(t => m.tags?.includes(t)))) {
+          memories = memories.filter(m => m.tags && tags.some(t => m.tags?.includes(t)));
+        }
 
         return {
           content: [{
