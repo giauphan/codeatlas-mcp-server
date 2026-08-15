@@ -16,14 +16,14 @@ TASK_NAME="${CLAUDE_TASK_NAME:-unknown}"
 LOWER_TASK_NAME=$(echo "$TASK_NAME" | tr '[:upper:]' '[:lower:]')
 
 # --- 1. Auto-router: High Complexity / Critical Tasks -> Opus/Sonnet High ---
-if echo "$LOWER_TASK_NAME" | grep -qE "design|architecture|complex|optimize|security audit|deep analysis|performance|bug fix|error|debug|broken"; then
+if echo "$LOWER_TASK_NAME" | grep -qF -e "design" -e "architecture" -e "complex" -e "optimize" -e "security audit" -e "deep analysis" -e "performance" -e "bug fix" -e "error" -e "debug" -e "broken"; then
     echo "MODEL_NAME=ag/claude-opus-4-6-thinking"
     echo "EFFORT=max"
     exit 0
 fi
 
 # --- 2. Auto-router: Medium Complexity / Standard Dev Tasks -> Sonnet Medium ---
-if [ "$TASK_TYPE" = "code_generation" ] || [ "$TASK_TYPE" = "code_editing" ] || [ "$TASK_TYPE" = "code_review" ] || echo "$LOWER_TASK_NAME" | grep -qE "implement|add feature|integrate|develop|review|refactor"; then
+if [ "$TASK_TYPE" = "code_generation" ] || [ "$TASK_TYPE" = "code_editing" ] || [ "$TASK_TYPE" = "code_review" ] || echo "$LOWER_TASK_NAME" | grep -qF -e "implement" -e "add feature" -e "integrate" -e "develop" -e "review" -e "refactor"; then
     echo "MODEL_NAME=ag/claude-sonnet-4-6"
     echo "EFFORT=medium"
     exit 0
@@ -65,7 +65,7 @@ if [ "$TASK_TYPE" = "skill_invocation" ]; then
 fi
 
 # --- 4. Cost-aware routing: Low Complexity / Quick Tasks -> cheap model ---
-if [ "$TASK_TYPE" = "qa_response" ] || [ "$TASK_TYPE" = "documentation" ] || [ "$TASK_TYPE" = "summarize" ] || [ "$TASK_TYPE" = "explain" ] || echo "$LOWER_TASK_NAME" | grep -qE "typo|minor change|read|list|simple|what is|how to|find"; then
+if [ "$TASK_TYPE" = "qa_response" ] || [ "$TASK_TYPE" = "documentation" ] || [ "$TASK_TYPE" = "summarize" ] || [ "$TASK_TYPE" = "explain" ] || echo "$LOWER_TASK_NAME" | grep -qF -e "typo" -e "minor change" -e "read" -e "list" -e "simple" -e "what is" -e "how to" -e "find"; then
     echo "MODEL_NAME=ag/claude-sonnet-4-6"
     echo "EFFORT=low"
     exit 0

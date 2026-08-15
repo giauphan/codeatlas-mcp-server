@@ -13,7 +13,12 @@ set -euo pipefail
 LOCK="/tmp/claude-brain-save.lock"
 LOG="$HOME/.claude/brain-save.log"
 
-log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" >> "$LOG"; }
+log() {
+  if [ -f "$LOG" ] && [ "$(stat -c %s "$LOG" 2>/dev/null || stat -f %z "$LOG" 2>/dev/null || echo 0)" -gt 5242880 ]; then
+    tail -n 1000 "$LOG" > "$LOG.tmp" 2>/dev/null && mv "$LOG.tmp" "$LOG" 2>/dev/null || true
+  fi
+  echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" >> "$LOG"
+}
 
 API_KEY="${CODEATLAS_API_KEY:-}"
 [ -z "$API_KEY" ] && exit 0
