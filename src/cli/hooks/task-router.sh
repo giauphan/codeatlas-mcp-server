@@ -40,7 +40,19 @@ if [ "$TASK_TYPE" = "skill_invocation" ]; then
             exit 0
         fi
         SKILLS_DIR="${SKILLS_DIR:-$HOME/.agents/skills}"
+        # Canonicalize SKILLS_DIR to prevent path traversal via env override
+        if ! SKILLS_DIR="$(realpath -e "$SKILLS_DIR" 2>/dev/null)"; then
+            echo "MODEL_NAME=ag/claude-sonnet-4-6"
+            echo "EFFORT=medium"
+            exit 0
+        fi
         SKILL_MD_PATH="${SKILLS_DIR}/${SKILL_NAME}/SKILL.md"
+        # Extra guard: ensure SKILL_MD_PATH is inside SKILLS_DIR
+        if [ "${SKILL_MD_PATH#$SKILLS_DIR/}" = "${SKILL_MD_PATH}" ]; then
+            echo "MODEL_NAME=ag/claude-sonnet-4-6"
+            echo "EFFORT=medium"
+            exit 0
+        fi
         if [ -f "$SKILL_MD_PATH" ]; then
             PREFERRED_MODEL=$(grep -E "^(model|preferred_model):" "$SKILL_MD_PATH" | head -n 1 | cut -d':' -f2 | tr -d ' ' | tr -d '"')
             if [ -n "$PREFERRED_MODEL" ]; then
