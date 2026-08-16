@@ -2743,8 +2743,6 @@ def register(ctx):
       const links = loaded.analysis.graph.links;
 
       // Entity type distribution
-      // Variables to compute: type distribution, file entity counts, mapping of files to types,
-      // coverage ratio (validNodesWithFilePathCount / validNodesCount)
       const typeCounts: Record<string, number> = {};
       const fileEntityCount = new Map<string, number>();
       const fileTypeMap = new Map<string, Set<string>>();
@@ -2759,8 +2757,8 @@ def register(ctx):
 
         if (n.filePath) {
           validNodesWithFilePathCount++;
-          const fp = path.isAbsolute(n.filePath) ? path.relative(loaded.projectDir, n.filePath) : n.filePath;
 
+          const fp = path.isAbsolute(n.filePath) ? path.relative(loaded.projectDir, n.filePath) : n.filePath;
           fileEntityCount.set(fp, (fileEntityCount.get(fp) || 0) + 1);
 
           let typeSet = fileTypeMap.get(fp);
