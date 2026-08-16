@@ -2764,6 +2764,9 @@ def register(ctx):
              let cached = relativePathCache.get(n.filePath);
              if (!cached) {
                  cached = path.relative(loaded.projectDir, n.filePath);
+                 if (relativePathCache.size >= 5000) {
+                     relativePathCache.delete(relativePathCache.keys().next().value!);
+                 }
                  relativePathCache.set(n.filePath, cached);
              }
              fp = cached;
@@ -2795,7 +2798,7 @@ def register(ctx):
       // Coverage quality score
       const coveragePct = validNodesCount > 0 ? Math.round((validNodesWithFilePathCount / validNodesCount) * 100) : 0;
 
-      // ⚡ Bolt Optimization: Use a precomputed Set for O(1) link lookups instead of O(N*L) Array.some()
+      // Use a precomputed Set for O(1) link lookups instead of O(N*L) Array.some()
       const linkedNodeIds = new Set<string>();
       for (const l of links) {
         linkedNodeIds.add(l.source);
