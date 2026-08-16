@@ -2768,7 +2768,10 @@ def register(ctx):
               cached = path.relative(loaded.projectDir, n.filePath);
               if (relativePathCache.size >= 5000) {
                 // Uses FIFO eviction
-                relativePathCache.delete(relativePathCache.keys().next().value!);
+                const firstKey = relativePathCache.keys().next().value;
+                if (firstKey !== undefined) {
+                  relativePathCache.delete(firstKey);
+                }
               }
               relativePathCache.set(n.filePath, cached);
             }
