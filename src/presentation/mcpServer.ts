@@ -2793,6 +2793,7 @@ def register(ctx):
       }
       let orphanNodes = 0;
       for (const n of allNodes) {
+        // Exclude external nodes from orphan count to match coverage semantics
         if (n.id.startsWith("external:")) continue;
         if (n.type !== "variable" && !linkedNodeIds.has(n.id)) {
           orphanNodes++;
