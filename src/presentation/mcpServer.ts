@@ -2750,6 +2750,8 @@ def register(ctx):
       let entityCount = 0;
 
       for (const n of allNodes) {
+        // Externals are explicitly excluded from aggregate metrics and coverage
+        // as they represent dependencies, not internal project source code.
         if (n.id.startsWith("external:")) continue;
         entityCount++;
 
