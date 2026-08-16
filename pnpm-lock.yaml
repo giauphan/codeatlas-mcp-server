@@ -28,7 +28,7 @@ importers:
         version: 10.5.0
       hono:
         specifier: ^4.12.27
-        version: 4.12.29
+        version: 4.13.2
       ignore:
         specifier: ^7.0.5
         version: 7.0.5
@@ -620,8 +620,8 @@ packages:
     resolution: {integrity: sha512-T2UbfbBEF32wiepXIsMlTW9+dDYC6wMh/t/vYA4tuOMKqWz/n3vr1NFSxQiyP+zk2mXsoMA/i/7qV6LKut1t1A==}
     engines: {node: '>= 0.4'}
 
-  hono@4.12.29:
-    resolution: {integrity: sha512-1hNiRjawYrLq/4m3DQQjPGFg0VZkk4RjQJDff/excI6Dm9BiL75qxGrd7/c6YOxPdq6AscP3LiXhQ6fKFC1Waw==}
+  hono@4.13.2:
+    resolution: {integrity: sha512-JydRilDRkYBQMt9qR9U92mXxmbGqsqSn/IKOrh4e7/gEbn+0zSr8igTu0obwJoNGN4sez28DIql7FBHWydoJpA==}
     engines: {node: '>=16.9.0'}
 
   http-errors@2.0.1:
@@ -1122,9 +1122,13 @@ snapshots:
   '@esbuild/win32-x64@0.28.1':
     optional: true
 
+<<<<<<< HEAD
   '@hono/node-server@2.1.1(hono@4.12.29)':
+=======
+  '@hono/node-server@1.19.14(hono@4.13.2)':
+>>>>>>> e762c79 (Bump hono from 4.12.27 to 4.13.2)
     dependencies:
-      hono: 4.12.29
+      hono: 4.13.2
 
   '@isaacs/cliui@8.0.2':
     dependencies:
@@ -1137,7 +1141,11 @@ snapshots:
 
   '@modelcontextprotocol/sdk@1.30.0(zod@3.25.76)':
     dependencies:
+<<<<<<< HEAD
       '@hono/node-server': 2.1.1(hono@4.12.29)
+=======
+      '@hono/node-server': 1.19.14(hono@4.13.2)
+>>>>>>> e762c79 (Bump hono from 4.12.27 to 4.13.2)
       ajv: 8.20.0
       ajv-formats: 3.0.1(ajv@8.20.0)
       content-type: 1.0.5
@@ -1146,9 +1154,15 @@ snapshots:
       eventsource: 3.0.7
       eventsource-parser: 3.1.1
       express: 5.2.1
+<<<<<<< HEAD
       express-rate-limit: 8.6.2(express@5.2.1)
       hono: 4.12.29
       jose: 6.2.9
+=======
+      express-rate-limit: 8.5.2(express@5.2.1)
+      hono: 4.13.2
+      jose: 6.2.3
+>>>>>>> e762c79 (Bump hono from 4.12.27 to 4.13.2)
       json-schema-typed: 8.0.2
       pkce-challenge: 5.0.1
       raw-body: 3.0.2
@@ -1645,7 +1659,7 @@ snapshots:
     dependencies:
       function-bind: 1.1.2
 
-  hono@4.12.29: {}
+  hono@4.13.2: {}
 
   http-errors@2.0.1:
     dependencies:
