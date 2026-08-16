@@ -2766,7 +2766,9 @@ def register(ctx):
             typeSet = new Set();
             fileTypeMap.set(fp, typeSet);
           }
-          typeSet.add(n.type);
+          if (!typeSet.has(n.type)) {
+            typeSet.add(n.type);
+          }
         }
       }
 
