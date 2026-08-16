@@ -2761,12 +2761,10 @@ def register(ctx):
           const fp = path.isAbsolute(n.filePath) ? path.relative(loaded.projectDir, n.filePath) : n.filePath;
           fileEntityCount.set(fp, (fileEntityCount.get(fp) || 0) + 1);
 
-          let typeSet = fileTypeMap.get(fp);
-          if (!typeSet) {
-            typeSet = new Set();
-            fileTypeMap.set(fp, typeSet);
+          if (!fileTypeMap.has(fp)) {
+            fileTypeMap.set(fp, new Set());
           }
-          typeSet.add(n.type);
+          fileTypeMap.get(fp)!.add(n.type);
         }
       }
 
