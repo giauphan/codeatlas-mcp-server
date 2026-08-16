@@ -2746,7 +2746,7 @@ def register(ctx):
       const typeCounts: Record<string, number> = {};
       const fileEntityCount = new Map<string, number>();
       const fileTypeMap = new Map<string, Set<string>>();
-      let withFilePath = 0;
+      let validNodesWithFilePathCount = 0;
       let validNodesCount = 0;
 
       for (const n of allNodes) {
@@ -2756,7 +2756,7 @@ def register(ctx):
         typeCounts[n.type] = (typeCounts[n.type] || 0) + 1;
 
         if (n.filePath) {
-          withFilePath++;
+          validNodesWithFilePathCount++;
           const fp = path.isAbsolute(n.filePath) ? path.relative(loaded.projectDir, n.filePath) : n.filePath;
           fileEntityCount.set(fp, (fileEntityCount.get(fp) || 0) + 1);
           if (!fileTypeMap.has(fp)) fileTypeMap.set(fp, new Set());
@@ -2777,7 +2777,7 @@ def register(ctx):
       }
 
       // Coverage quality score
-      const coveragePct = validNodesCount > 0 ? Math.round((withFilePath / validNodesCount) * 100) : 0;
+      const coveragePct = validNodesCount > 0 ? Math.round((validNodesWithFilePathCount / validNodesCount) * 100) : 0;
 
       // ⚡ Bolt Optimization: Use a precomputed Set for O(1) link lookups instead of O(N*L) Array.some()
       const linkedNodeIds = new Set<string>();
