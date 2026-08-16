@@ -2759,8 +2759,13 @@ def register(ctx):
           validNodesWithFilePathCount++;
           const fp = path.isAbsolute(n.filePath) ? path.relative(loaded.projectDir, n.filePath) : n.filePath;
           fileEntityCount.set(fp, (fileEntityCount.get(fp) || 0) + 1);
-          if (!fileTypeMap.has(fp)) fileTypeMap.set(fp, new Set());
-          fileTypeMap.get(fp)!.add(n.type);
+
+          let typeSet = fileTypeMap.get(fp);
+          if (!typeSet) {
+            typeSet = new Set();
+            fileTypeMap.set(fp, typeSet);
+          }
+          typeSet.add(n.type);
         }
       }
 
