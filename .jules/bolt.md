@@ -65,3 +65,7 @@
 ## 2024-05-24 - Hoisting Global Regular Expressions Safely
 **Learning:** Moving a global regular expression (`/g`) outside a loop is a common performance optimization to avoid recompilation overhead. However, when doing so, it is critical to reset the regex's internal state (specifically the `lastIndex` property) before reusing it within the loop. Failure to reset `lastIndex` causes the regex to continue matching from where it left off in the previous string, leading to missed matches or incorrect tokenization across different strings.
 **Action:** When hoisting global regexes out of loops (e.g., in `mcpServer.ts`), always explicitly set `regex.lastIndex = 0` immediately before the loop or matching block that reuses it.
+
+## 2024-05-24 - [Performance improvement] Optimized O(N) multi-pass metric aggregation
+**Learning:** During analysis of the `index_coverage` tool in `src/presentation/mcpServer.ts`, it was discovered that generating project coverage statistics involved iterating over the `nodes` array 4 separate times (one `.filter()` and three separate `for...of` loops) to calculate valid node subsets, type distributions, file distributions, and coverage percentages.
+**Action:** When calculating multiple distinct aggregates over a single large dataset (like the `nodes` array), replace chained `.filter()` calls and multiple iterations with a single, consolidated `for...of` loop. Accumulate all required metrics within the same loop to drastically reduce iterations, saving significant O(N) traversal time and intermediate array allocations.
