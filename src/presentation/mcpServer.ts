@@ -2778,7 +2778,10 @@ def register(ctx):
           fileEntityCount.set(fp, (fileEntityCount.get(fp) || 0) + 1);
 
           let typeSet = fileTypeMap.get(fp);
-          if (!typeSet) { fileTypeMap.set(fp, (typeSet = new Set())); }
+          if (!typeSet) {
+            typeSet = new Set();
+            fileTypeMap.set(fp, typeSet);
+          }
           typeSet.add(n.type);
         }
       }
