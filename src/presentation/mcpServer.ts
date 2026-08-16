@@ -2743,6 +2743,8 @@ def register(ctx):
       const links = loaded.analysis.graph.links;
 
       // Entity type distribution
+      // Variables to compute: type distribution, file entity counts, mapping of files to types,
+      // coverage ratio (validNodesWithFilePathCount / validNodesCount)
       const typeCounts: Record<string, number> = {};
       const fileEntityCount = new Map<string, number>();
       const fileTypeMap = new Map<string, Set<string>>();
