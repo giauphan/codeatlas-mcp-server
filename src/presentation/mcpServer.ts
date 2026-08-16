@@ -2738,7 +2738,7 @@ def register(ctx):
       const loaded = await loadAnalysisAsync(project);
       if (!loaded) return { content: [{ type: "text" as const, text: "No analysis found. Run 'analyze' first." }] };
 
-      // ⚡ Bolt Optimization: Use a single O(N) pass to gather multiple metrics instead of multiple loops and filters
+      // ⚡ Bolt Optimization: Consolidate multiple O(N) passes to gather metrics and reduce allocations
       const allNodes = loaded.analysis.graph.nodes;
       const links = loaded.analysis.graph.links;
 
