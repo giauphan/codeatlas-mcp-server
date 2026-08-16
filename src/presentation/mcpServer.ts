@@ -2749,6 +2749,8 @@ def register(ctx):
       let validNodesWithFilePathCount = 0;
       let validNodesCount = 0;
 
+      const relativePathCache = new Map<string, string>();
+
       for (const n of allNodes) {
         if (n.id.startsWith("external:")) continue;
         validNodesCount++;
@@ -2757,7 +2759,16 @@ def register(ctx):
 
         if (n.filePath) {
           validNodesWithFilePathCount++;
-          const fp = path.isAbsolute(n.filePath) ? path.relative(loaded.projectDir, n.filePath) : n.filePath;
+          let fp = n.filePath;
+          if (path.isAbsolute(n.filePath)) {
+             let cached = relativePathCache.get(n.filePath);
+             if (!cached) {
+                 cached = path.relative(loaded.projectDir, n.filePath);
+                 relativePathCache.set(n.filePath, cached);
+             }
+             fp = cached;
+          }
+
           fileEntityCount.set(fp, (fileEntityCount.get(fp) || 0) + 1);
 
           let typeSet = fileTypeMap.get(fp);
