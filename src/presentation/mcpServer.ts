@@ -2763,15 +2763,16 @@ def register(ctx):
           validNodesWithFilePathCount++;
           let fp = n.filePath;
           if (path.isAbsolute(n.filePath)) {
-             let cached = relativePathCache.get(n.filePath);
-             if (!cached) {
-                 cached = path.relative(loaded.projectDir, n.filePath);
-                 if (relativePathCache.size >= 5000) {
-                     relativePathCache.delete(relativePathCache.keys().next().value!);
-                 }
-                 relativePathCache.set(n.filePath, cached);
-             }
-             fp = cached;
+            let cached = relativePathCache.get(n.filePath);
+            if (!cached) {
+              cached = path.relative(loaded.projectDir, n.filePath);
+              if (relativePathCache.size >= 5000) {
+                // Uses FIFO eviction
+                relativePathCache.delete(relativePathCache.keys().next().value!);
+              }
+              relativePathCache.set(n.filePath, cached);
+            }
+            fp = cached;
           }
 
           fileEntityCount.set(fp, (fileEntityCount.get(fp) || 0) + 1);
