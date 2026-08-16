@@ -2763,7 +2763,8 @@ def register(ctx):
 
           let typeSet = fileTypeMap.get(fp);
           if (!typeSet) {
-            fileTypeMap.set(fp, (typeSet = new Set()));
+            typeSet = new Set();
+            fileTypeMap.set(fp, typeSet);
           }
           typeSet.add(n.type);
         }
