@@ -1073,7 +1073,7 @@ export function registerTools(server: McpServer) {
 
       if (seedNodes.size === 0) {
         // ⚡ Bolt Optimization: Replace chained .filter().map().slice() with a single O(N) pass and early exit
-        const suggestions: string[] = [];
+        const suggestions = [] as string[];
         for (const n of nodes) {
           if (n.type === "module" && n.filePath) {
             suggestions.push(n.label);
