@@ -2738,22 +2738,36 @@ def register(ctx):
       const loaded = await loadAnalysisAsync(project);
       if (!loaded) return { content: [{ type: "text" as const, text: "No analysis found. Run 'analyze' first." }] };
 
-      const nodes = loaded.analysis.graph.nodes.filter(n => !n.id.startsWith("external:"));
+      // Consolidate multiple O(N) passes to gather metrics and reduce allocations
+      const allNodes = loaded.analysis.graph.nodes;
       const links = loaded.analysis.graph.links;
 
       // Entity type distribution
       const typeCounts: Record<string, number> = {};
-      for (const n of nodes) typeCounts[n.type] = (typeCounts[n.type] || 0) + 1;
-
-      // File distribution
       const fileEntityCount = new Map<string, number>();
       const fileTypeMap = new Map<string, Set<string>>();
-      for (const n of nodes) {
-        if (!n.filePath) continue;
-        const fp = path.isAbsolute(n.filePath) ? path.relative(loaded.projectDir, n.filePath) : n.filePath;
-        fileEntityCount.set(fp, (fileEntityCount.get(fp) || 0) + 1);
-        if (!fileTypeMap.has(fp)) fileTypeMap.set(fp, new Set());
-        fileTypeMap.get(fp)!.add(n.type);
+      let entitiesWithFilePath = 0;
+      let entityCount = 0;
+
+      for (const n of allNodes) {
+        // Externals are explicitly excluded from aggregate metrics and coverage
+        // as they represent dependencies, not internal project source code.
+        if (n.id.startsWith("external:")) continue;
+        entityCount++;
+
+        typeCounts[n.type] = (typeCounts[n.type] || 0) + 1;
+
+        if (n.filePath) {
+          entitiesWithFilePath++;
+
+          const fp = path.isAbsolute(n.filePath) ? path.relative(loaded.projectDir, n.filePath) : n.filePath;
+          fileEntityCount.set(fp, (fileEntityCount.get(fp) || 0) + 1);
+
+          if (!fileTypeMap.has(fp)) {
+            fileTypeMap.set(fp, new Set());
+          }
+          fileTypeMap.get(fp)!.add(n.type);
+        }
       }
 
       const topFiles = Array.from(fileEntityCount.entries())
@@ -2769,17 +2783,18 @@ def register(ctx):
       }
 
       // Coverage quality score
-      const withFilePath = nodes.filter(n => n.filePath).length;
-      const coveragePct = nodes.length > 0 ? Math.round((withFilePath / nodes.length) * 100) : 0;
+      const coveragePct = entityCount > 0 ? Math.round((entitiesWithFilePath / entityCount) * 100) : 0;
 
-      // ⚡ Bolt Optimization: Use a precomputed Set for O(1) link lookups instead of O(N*L) Array.some()
+      // Use a Set for O(1) link lookups instead of O(N*L) Array.some()
       const linkedNodeIds = new Set<string>();
       for (const l of links) {
         linkedNodeIds.add(l.source);
         linkedNodeIds.add(l.target);
       }
       let orphanNodes = 0;
-      for (const n of nodes) {
+      for (const n of allNodes) {
+        // Exclude external nodes from orphan count to match coverage semantics
+        if (n.id.startsWith("external:")) continue;
         if (n.type !== "variable" && !linkedNodeIds.has(n.id)) {
           orphanNodes++;
         }
@@ -2809,7 +2824,7 @@ def register(ctx):
       const result = {
         project: loaded.projectName,
         summary: {
-          totalEntities: nodes.length,
+          totalEntities: entityCount,
           totalRelationships: links.length,
           uniqueFiles: fileEntityCount.size,
           coveragePercent: coveragePct,
