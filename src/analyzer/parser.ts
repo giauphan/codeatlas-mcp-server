@@ -1213,11 +1213,17 @@ export class CodeAnalyzer {
     
     // Mock AI Insights generation based on simple heuristics
     
-    // 1. Large files / God objects
+    // 1. Large files / God objects & High coupling (Combined O(E) traversal)
+    // ⚡ Bolt Optimization: Combine multiple O(E) double link traversal operations into a single O(E) pass
     const moduleFunctionCounts = new Map<string, number>();
+    const moduleDependencies = new Map<string, number>();
+
     for (const l of graph.links) {
       if (l.type === 'contains' && l.target.startsWith('function')) {
         moduleFunctionCounts.set(l.source, (moduleFunctionCounts.get(l.source) || 0) + 1);
+      }
+      if (l.type === 'import' && l.source.startsWith('module:') && l.target.startsWith('module:')) {
+        moduleDependencies.set(l.source, (moduleDependencies.get(l.source) || 0) + 1);
       }
     }
 
@@ -1240,12 +1246,6 @@ export class CodeAnalyzer {
     }
 
     // 2. High coupling
-    const moduleDependencies = new Map<string, number>();
-    for (const l of graph.links) {
-      if (l.type === 'import' && l.source.startsWith('module:') && l.target.startsWith('module:')) {
-        moduleDependencies.set(l.source, (moduleDependencies.get(l.source) || 0) + 1);
-      }
-    }
 
     const highlyCoupled: string[] = [];
     for (const [id, count] of moduleDependencies.entries()) {
