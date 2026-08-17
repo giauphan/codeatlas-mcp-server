@@ -2785,7 +2785,7 @@ def register(ctx):
       // Coverage quality score
       const coveragePct = entityCount > 0 ? Math.round((entitiesWithFilePath / entityCount) * 100) : 0;
 
-      // Use a precomputed Set for O(1) link lookups instead of O(N*L) Array.some()
+      // Use a Set for O(1) link lookups instead of O(N*L) Array.some()
       const linkedNodeIds = new Set<string>();
       for (const l of links) {
         linkedNodeIds.add(l.source);
