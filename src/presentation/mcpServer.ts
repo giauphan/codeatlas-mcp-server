@@ -2746,7 +2746,7 @@ def register(ctx):
       const typeCounts: Record<string, number> = {};
       const fileEntityCount = new Map<string, number>();
       const fileTypeMap = new Map<string, Set<string>>();
-      let withFilePathCount = 0;
+      let entitiesWithFilePath = 0;
       let entityCount = 0;
 
       for (const n of allNodes) {
@@ -2758,7 +2758,7 @@ def register(ctx):
         typeCounts[n.type] = (typeCounts[n.type] || 0) + 1;
 
         if (n.filePath) {
-          withFilePathCount++;
+          entitiesWithFilePath++;
 
           const fp = path.isAbsolute(n.filePath) ? path.relative(loaded.projectDir, n.filePath) : n.filePath;
           fileEntityCount.set(fp, (fileEntityCount.get(fp) || 0) + 1);
@@ -2783,7 +2783,7 @@ def register(ctx):
       }
 
       // Coverage quality score
-      const coveragePct = entityCount > 0 ? Math.round((withFilePathCount / entityCount) * 100) : 0;
+      const coveragePct = entityCount > 0 ? Math.round((entitiesWithFilePath / entityCount) * 100) : 0;
 
       // Use a precomputed Set for O(1) link lookups instead of O(N*L) Array.some()
       const linkedNodeIds = new Set<string>();
