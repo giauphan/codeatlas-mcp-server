@@ -1245,8 +1245,7 @@ export class CodeAnalyzer {
       });
     }
 
-    // 2. High coupling
-
+    // Process High coupling using previously combined O(E) loop data
     const highlyCoupled: string[] = [];
     for (const [id, count] of moduleDependencies.entries()) {
       if (count > 15) highlyCoupled.push(id);
