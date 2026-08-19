@@ -3191,8 +3191,8 @@ def register(ctx):
       }
 
       if (action === "query") {
-        const q = (query || "").toLowerCase();
-        const maxResults = limit || 20;
+        const q = query || "";
+        const maxResults = typeof limit === 'number' && limit > 0 ? limit : 20;
         const results: Array<{ name: string; description: string; source: string }> = [];
         let matchCount = 0;
 
