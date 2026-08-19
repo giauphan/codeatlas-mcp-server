@@ -3193,7 +3193,7 @@ def register(ctx):
       if (action === "query") {
         const q = (query || "").toLowerCase();
         const maxResults = limit || 20;
-        const results = [];
+        const results: Array<{ name: string; description: string; source: string }> = [];
         let matchCount = 0;
 
         if (q) {
