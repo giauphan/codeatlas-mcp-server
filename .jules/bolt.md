@@ -65,3 +65,7 @@
 ## 2024-05-24 - Hoisting Global Regular Expressions Safely
 **Learning:** Moving a global regular expression (`/g`) outside a loop is a common performance optimization to avoid recompilation overhead. However, when doing so, it is critical to reset the regex's internal state (specifically the `lastIndex` property) before reusing it within the loop. Failure to reset `lastIndex` causes the regex to continue matching from where it left off in the previous string, leading to missed matches or incorrect tokenization across different strings.
 **Action:** When hoisting global regexes out of loops (e.g., in `mcpServer.ts`), always explicitly set `regex.lastIndex = 0` immediately before the loop or matching block that reuses it.
+
+## 2025-07-31 - [Performance improvement] Optimized O(N) Array filtering with early exit over large directories
+**Learning:** In contexts where a directory contains thousands of files (e.g. `/proc`), using `.filter(regex).slice(0, N)` iterates and evaluates the regex against every single item in the entire directory list. This creates massive overhead when only the first few items are needed.
+**Action:** Replace `array.filter(condition).slice(0, limit)` over large arrays with a single `for...of` loop that `push`es matches and immediately `break`s once the limit is reached.
