@@ -65,6 +65,7 @@
 ## 2024-05-24 - Hoisting Global Regular Expressions Safely
 **Learning:** Moving a global regular expression (`/g`) outside a loop is a common performance optimization to avoid recompilation overhead. However, when doing so, it is critical to reset the regex's internal state (specifically the `lastIndex` property) before reusing it within the loop. Failure to reset `lastIndex` causes the regex to continue matching from where it left off in the previous string, leading to missed matches or incorrect tokenization across different strings.
 **Action:** When hoisting global regexes out of loops (e.g., in `mcpServer.ts`), always explicitly set `regex.lastIndex = 0` immediately before the loop or matching block that reuses it.
+
 ## 2026-08-04 - [Performance improvement] Optimized O(E) double link traversal in AI Insights
 **Learning:** In `src/analyzer/parser.ts`, the `generateAIInsights` method iterated over `graph.links` twice in separate `for...of` loops to compute module function counts and module dependencies. This forced multiple full passes over the entire relationship dataset, increasing execution time and CPU overhead on large graphs.
 **Action:** When gathering multiple independent metrics from a large collection (like links in a graph), always combine them into a single pass using one `for...of` loop. Initialize the necessary `Map`s beforehand and populate them concurrently within the loop body.
@@ -72,3 +73,7 @@
 ## 2026-08-16 - [Performance improvement] Optimized O(N) multi-pass metric aggregation
 **Learning:** During analysis of the `index_coverage` tool in `src/presentation/mcpServer.ts`, it was discovered that generating project coverage statistics involved iterating over the `nodes` array 4 separate times (one `.filter()` and three separate `for...of` loops) to calculate valid node subsets, type distributions, file distributions, and coverage percentages.
 **Action:** When calculating multiple distinct aggregates over a single large dataset (like the `nodes` array), replace chained `.filter()` calls and multiple iterations with a single, consolidated `for...of` loop. Accumulate all required metrics within the same loop to drastically reduce iterations, saving significant O(N) traversal time and intermediate array allocations.
+
+## 2025-07-31 - [Performance improvement] Optimized O(N) Array filtering with early exit over large directories
+**Learning:** In contexts where a directory contains thousands of files (e.g. `/proc`), using `.filter(regex).slice(0, N)` iterates and evaluates the regex against every single item in the entire directory list. This creates massive overhead when only the first few items are needed.
+**Action:** Replace `array.filter(condition).slice(0, limit)` over large arrays with a single `for...of` loop that `push`es matches and immediately `break`s once the limit is reached.
