@@ -2720,7 +2720,7 @@ def register(ctx):
             snippet,
           });
         } catch (err: unknown) {
-          if (err instanceof Error && 'code' in err && (err as any).code === 'ENOENT') {
+          if (err instanceof Error && 'code' in err && (err as NodeJS.ErrnoException).code === 'ENOENT') {
             results.push({ symbol: node.label, file: absPath, error: "File not found" });
           } else {
             results.push({ symbol: node.label, file: absPath, error: err instanceof Error ? err.message?.substring(0, 200) : String(err).substring(0, 200) });
@@ -2907,7 +2907,7 @@ def register(ctx):
           const tokens = getTokensFromSource(body);
           tokenized.push({ node, tokens, source: body.substring(0, 300) });
         } catch (err: unknown) {
-          if (err instanceof Error && 'code' in err && (err as any).code === 'ENOENT') continue;
+          if (err instanceof Error && 'code' in err && (err as NodeJS.ErrnoException).code === 'ENOENT') continue;
           console.error(`[detect_code_similarities] Error reading ${absPath}:`, err);
         }
       }
