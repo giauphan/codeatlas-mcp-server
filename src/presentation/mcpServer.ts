@@ -1976,7 +1976,7 @@ export function registerTools(server: McpServer) {
         if (n?.filePath) {
           const absPath = path.isAbsolute(n.filePath) ? n.filePath : path.resolve(loaded.projectDir, n.filePath);
           try {
-            const entries = fs.readdirSync(path.dirname(absPath));
+            const entries = await fs.promises.readdir(path.dirname(absPath));
             const base = path.basename(absPath).replace(path.extname(absPath), "");
             // ⚡ Bolt Optimization: Use precompiled regex to avoid memory-intensive .toLowerCase() string allocations in tight loops
             const baseRegex = new RegExp(base.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), "i");
@@ -2667,9 +2667,8 @@ def register(ctx):
           ? node.filePath!
           : path.resolve(loaded.projectDir, node.filePath!);
 
-        if (!fs.existsSync(absPath)) { results.push({ symbol: node.label, file: absPath, error: "File not found" }); continue; }
         try {
-          const content = fs.readFileSync(absPath, "utf-8");
+          const content = await fs.promises.readFile(absPath, "utf-8");
           const lines = content.split("\n");
           const targetLine = (node.line || 1) - 1;
 
@@ -2721,7 +2720,11 @@ def register(ctx):
             snippet,
           });
         } catch (err: any) {
-          results.push({ symbol: node.label, file: absPath, error: err.message?.substring(0, 200) });
+          if (err.code === 'ENOENT') {
+            results.push({ symbol: node.label, file: absPath, error: "File not found" });
+          } else {
+            results.push({ symbol: node.label, file: absPath, error: err.message?.substring(0, 200) });
+          }
         }
       }
 
@@ -2893,8 +2896,7 @@ def register(ctx):
       for (const node of functions.slice(0, 300)) { // Limit to 300 for perf
         const absPath = path.isAbsolute(node.filePath!) ? node.filePath! : path.resolve(loaded.projectDir, node.filePath!);
         try {
-          if (!fs.existsSync(absPath)) continue;
-          const content = fs.readFileSync(absPath, "utf-8");
+          const content = await fs.promises.readFile(absPath, "utf-8");
           const lines = content.split("\n");
           const start = (node.line || 1) - 1;
 
@@ -2904,7 +2906,10 @@ def register(ctx):
           // Tokenize: identifiers + keywords (skip whitespace, punctuation)
           const tokens = getTokensFromSource(body);
           tokenized.push({ node, tokens, source: body.substring(0, 300) });
-        } catch { /* skip */ }
+        } catch (err: any) {
+          if (err.code === 'ENOENT') continue;
+          /* skip other errors */
+        }
       }
 
       // Compute Jaccard similarity pairs
