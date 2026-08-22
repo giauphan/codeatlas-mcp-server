@@ -2727,7 +2727,7 @@ def register(ctx):
           if (isFileNotFound(err)) {
             results.push({ symbol: node.label, file: absPath, error: "File not found" });
           } else {
-            results.push({ symbol: node.label, file: absPath, error: err instanceof Error ? err.message?.substring(0, 200) : String(err).substring(0, 200) });
+            results.push({ symbol: node.label, file: absPath, error: err instanceof Error ? err.message.substring(0, 200) : String(err).substring(0, 200) });
           }
         }
       }
