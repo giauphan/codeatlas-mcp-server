@@ -62,6 +62,10 @@ function createNodeIdSet<T extends { id: string }>(nodes: T[]): Set<string> {
 
 const SHELL_METACHAR_RE = /[&|;<>$`\\\n\r]/;
 
+function isFileNotFound(err: unknown): boolean {
+  return err instanceof Error && 'code' in err && (err as NodeJS.ErrnoException).code === 'ENOENT';
+}
+
 export function registerTools(server: McpServer) {
   // Tool -1: Analyze a project
   server.tool(
@@ -2720,7 +2724,7 @@ def register(ctx):
             snippet,
           });
         } catch (err: unknown) {
-          if (err instanceof Error && 'code' in err && (err as NodeJS.ErrnoException).code === 'ENOENT') {
+          if (isFileNotFound(err)) {
             results.push({ symbol: node.label, file: absPath, error: "File not found" });
           } else {
             results.push({ symbol: node.label, file: absPath, error: err instanceof Error ? err.message?.substring(0, 200) : String(err).substring(0, 200) });
@@ -2907,7 +2911,7 @@ def register(ctx):
           const tokens = getTokensFromSource(body);
           tokenized.push({ node, tokens, source: body.substring(0, 300) });
         } catch (err: unknown) {
-          if (err instanceof Error && 'code' in err && (err as NodeJS.ErrnoException).code === 'ENOENT') continue;
+          if (isFileNotFound(err)) continue;
           console.error(`[detect_code_similarities] Error reading ${absPath}:`, err);
         }
       }
