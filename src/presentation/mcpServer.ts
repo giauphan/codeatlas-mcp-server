@@ -2719,11 +2719,11 @@ def register(ctx):
             lines: endLine - startLine + 1,
             snippet,
           });
-        } catch (err: any) {
-          if (err.code === 'ENOENT') {
+        } catch (err: unknown) {
+          if (err instanceof Error && 'code' in err && (err as any).code === 'ENOENT') {
             results.push({ symbol: node.label, file: absPath, error: "File not found" });
           } else {
-            results.push({ symbol: node.label, file: absPath, error: err.message?.substring(0, 200) });
+            results.push({ symbol: node.label, file: absPath, error: err instanceof Error ? err.message?.substring(0, 200) : String(err).substring(0, 200) });
           }
         }
       }
@@ -2906,9 +2906,9 @@ def register(ctx):
           // Tokenize: identifiers + keywords (skip whitespace, punctuation)
           const tokens = getTokensFromSource(body);
           tokenized.push({ node, tokens, source: body.substring(0, 300) });
-        } catch (err: any) {
-          if (err.code === 'ENOENT') continue;
-          /* skip other errors */
+        } catch (err: unknown) {
+          if (err instanceof Error && 'code' in err && (err as any).code === 'ENOENT') continue;
+          console.error(`[detect_code_similarities] Error reading ${absPath}:`, err);
         }
       }
 
