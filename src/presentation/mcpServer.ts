@@ -1705,6 +1705,13 @@ export function registerTools(server: McpServer) {
       const allFiles: string[] = [];
       const extSet = new Set([".ts", ".tsx", ".js", ".jsx", ".py", ".php", ".json", ".yaml", ".yml", ".md", ".css", ".scss", ".html"]);
 
+      let resolvedProjectDir: string;
+      try {
+        resolvedProjectDir = fs.realpathSync(loaded.projectDir);
+      } catch {
+        return { content: [{ type: "text" as const, text: JSON.stringify({ error: "Invalid project directory" }) }] };
+      }
+
       try {
         const walkDir = (dir: string, depth: number) => {
           if (depth > 8) return;
@@ -1728,7 +1735,13 @@ export function registerTools(server: McpServer) {
       for (const filePath of allFiles) {
         if (results.length >= maxRes) break;
         try {
-          const content = await fs.promises.readFile(filePath, "utf-8");
+          // Resolve file path to prevent TOCTOU symlink path traversal
+          const resolvedFilePath = fs.realpathSync(filePath);
+          if (resolvedFilePath !== resolvedProjectDir && !resolvedFilePath.startsWith(resolvedProjectDir + path.sep)) {
+            continue;
+          }
+
+          const content = await fs.promises.readFile(resolvedFilePath, "utf-8");
 
           // Fast path to skip files that definitely don't contain the query
           // This avoids expensive .split('\n') and per-line iterations for most files
