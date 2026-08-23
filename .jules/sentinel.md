@@ -31,3 +31,8 @@
 **Vulnerability:** Git commands invoked via `child_process.spawnSync` can be susceptible to argument injection if arguments are not fully trusted, even when `shell: false` is used. Git accepts global flags like `-c`, `--exec-path`, `--pager`, `--config-env`, and others that can lead to arbitrary code execution if an attacker manages to inject them.
 **Learning:** Always validate and explicitly allowlist or denylist arguments passed to external binaries like `git`, particularly those that might be influenced by external input. Explicit sanitization ensures that no unexpected or dangerous flags are processed.
 **Prevention:** Implement an explicit sanitization step (e.g., filtering out strings starting with `-c`, `--exec-path`, `--pager`, etc.) before passing the argument array to `spawnSync` when wrapping tools like `git`.
+
+## 2024-08-16 - [Path Traversal and TOCTOU in file reading]
+**Vulnerability:** Tools that read files from the filesystem (like `get_code_snippet` and `code_search`) failed to use `fs.realpathSync` combined with an authorization check (`isPathInAuthorizedProjects`) immediately before reading the file.
+**Learning:** Using `path.resolve` or reading unverified file paths directly inside an authorized workspace allows an attacker to access arbitrary files via Path Traversal (`../`) or Time-of-Check to Time-of-Use (TOCTOU) symlink attacks if a file is replaced by a symlink to an unauthorized location before reading.
+**Prevention:** Always resolve the file path with `fs.realpathSync()` immediately before reading, and explicitly verify that the resolved path falls within the authorized root directory using `isPathInAuthorizedProjects()`.

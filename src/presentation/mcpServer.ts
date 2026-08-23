@@ -1724,11 +1724,15 @@ export function registerTools(server: McpServer) {
         walkDir(loaded.projectDir, 0);
       } catch { /* fallback */ }
 
+      const authorizedProjects = await discoverProjectsAsync(auth.uid);
+
       const results: Array<{ file: string; line: number; content: string; contextBefore: string[]; contextAfter: string[] }> = [];
       for (const filePath of allFiles) {
         if (results.length >= maxRes) break;
         try {
-          const content = await fs.promises.readFile(filePath, "utf-8");
+          const realPath = fs.realpathSync(filePath);
+          if (!isPathInAuthorizedProjects(realPath, authorizedProjects)) continue;
+          const content = await fs.promises.readFile(realPath, "utf-8");
 
           // Fast path to skip files that definitely don't contain the query
           // This avoids expensive .split('\n') and per-line iterations for most files
@@ -2658,14 +2662,30 @@ def register(ctx):
       const ctx = Math.min(contextLines ?? 5, 30);
       const results: any[] = [];
 
+      const authorizedProjects = await discoverProjectsAsync(auth.uid);
+
       for (const node of matches) {
         const absPath = path.isAbsolute(node.filePath!)
           ? node.filePath!
           : path.resolve(loaded.projectDir, node.filePath!);
 
-        if (!fs.existsSync(absPath)) { results.push({ symbol: node.label, file: absPath, error: "File not found" }); continue; }
+        let content: string;
         try {
-          const content = fs.readFileSync(absPath, "utf-8");
+          const realPath = fs.realpathSync(absPath);
+          if (!isPathInAuthorizedProjects(realPath, authorizedProjects)) {
+            results.push({ symbol: node.label, file: absPath, error: "Unauthorized file path" });
+            continue;
+          }
+          content = fs.readFileSync(realPath, "utf-8");
+        } catch (err: any) {
+          if (err.code === 'ENOENT') {
+            results.push({ symbol: node.label, file: absPath, error: "File not found" });
+          } else {
+            results.push({ symbol: node.label, file: absPath, error: err.message?.substring(0, 200) });
+          }
+          continue;
+        }
+        try {
           const lines = content.split("\n");
           const targetLine = (node.line || 1) - 1;
 
@@ -2871,11 +2891,15 @@ def register(ctx):
         return tokens;
       }
 
+      const authorizedProjects = await discoverProjectsAsync(auth.uid);
+
       for (const node of functions.slice(0, 300)) { // Limit to 300 for perf
         const absPath = path.isAbsolute(node.filePath!) ? node.filePath! : path.resolve(loaded.projectDir, node.filePath!);
         try {
-          if (!fs.existsSync(absPath)) continue;
-          const content = fs.readFileSync(absPath, "utf-8");
+          const realPath = fs.realpathSync(absPath);
+          if (!isPathInAuthorizedProjects(realPath, authorizedProjects)) continue;
+
+          const content = fs.readFileSync(realPath, "utf-8");
           const lines = content.split("\n");
           const start = (node.line || 1) - 1;
 
