@@ -31,7 +31,7 @@
 **Vulnerability:** Git commands invoked via `child_process.spawnSync` can be susceptible to argument injection if arguments are not fully trusted, even when `shell: false` is used. Git accepts global flags like `-c`, `--exec-path`, `--pager`, `--config-env`, and others that can lead to arbitrary code execution if an attacker manages to inject them.
 **Learning:** Always validate and explicitly allowlist or denylist arguments passed to external binaries like `git`, particularly those that might be influenced by external input. Explicit sanitization ensures that no unexpected or dangerous flags are processed.
 **Prevention:** Implement an explicit sanitization step (e.g., filtering out strings starting with `-c`, `--exec-path`, `--pager`, etc.) before passing the argument array to `spawnSync` when wrapping tools like `git`.
-## 2024-05-24 - TOCTOU Path Traversal in Directory Walk
+## 2024-05-24 - [TOCTOU Path Traversal in Directory Walk]
 
 **Vulnerability:** A Time-of-Check to Time-of-Use (TOCTOU) vulnerability existed in `code_search` where a file path identified as a regular file during a directory walk could be swapped with a symlink to an external sensitive file immediately before it was read, allowing an attacker to read arbitrary files outside the authorized workspace.
 

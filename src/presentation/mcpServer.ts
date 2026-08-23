@@ -1753,7 +1753,7 @@ export function registerTools(server: McpServer) {
             if (results.length >= maxRes) break;
             if (searchRegex.test(lines[i])) {
               results.push({
-                file: path.relative(loaded.projectDir, filePath),
+                file: path.relative(loaded.projectDir, resolvedFilePath),
                 line: i + 1,
                 content: lines[i].trim(),
                 contextBefore: lines.slice(Math.max(0, i - ctx), i).map(l => l.trim()).filter(Boolean),

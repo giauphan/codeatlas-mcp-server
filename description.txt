@@ -1,0 +1,12 @@
+🎯 **What:**
+Fixed a Time-of-Check to Time-of-Use (TOCTOU) path traversal vulnerability in the `code_search` MCP tool. The tool previously relied on the initial directory walk's `isFile()` check to guarantee path safety, but didn't validate the path's safety at the exact moment of reading.
+
+⚠️ **Risk:**
+An attacker could theoretically swap a legitimate file within the workspace with a symlink to an external, sensitive file (like `/etc/passwd` or ssh keys) during the fraction of a second between the directory walk identifying it and the `fs.promises.readFile` executing. This would result in the server reading the external file and returning its contents as part of the search results, leading to an arbitrary file read vulnerability.
+
+🛡️ **Solution:**
+1. Computed the absolute, symlink-resolved path of the base project directory using `fs.realpathSync`.
+2. Before reading any file discovered during the walk, the file's path is resolved using `fs.realpathSync`.
+3. Added a strict directory boundary check (`startsWith` with `path.sep` appended) to ensure the newly resolved file path still legitimately resides within the resolved project directory. If the check fails, the read is skipped.
+
+Note: A previous CI run failed due to a GitHub Advanced Security / Copilot `autofind.js` failure (`CAPIError: 400 The requested model is not supported` for `claude-opus-4.6`), which is a known external API issue and not related to the code changes. Local tests pass successfully.

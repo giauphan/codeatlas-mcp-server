@@ -1,0 +1,3 @@
+🔒 Fix TOCTOU path traversal in code_search
+
+Resolves a Time-of-Check to Time-of-Use path traversal vulnerability in the `code_search` MCP tool by ensuring paths read strictly belong to the intended project directory after symlink resolution.
