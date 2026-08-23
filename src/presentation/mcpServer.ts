@@ -1732,6 +1732,7 @@ export function registerTools(server: McpServer) {
         try {
           const realPath = fs.realpathSync(filePath);
           if (!isPathInAuthorizedProjects(realPath, authorizedProjects)) continue;
+
           const content = await fs.promises.readFile(realPath, "utf-8");
 
           // Fast path to skip files that definitely don't contain the query

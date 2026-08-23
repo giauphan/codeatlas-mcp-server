@@ -2,6 +2,7 @@
 **Vulnerability:** The `checkAuth` function used for authorization fell back to granting full privileges via a mock local user if no authentication context was found and `CODEATLAS_MULTI_TENANT` was not explicitly enabled.
 **Learning:** Returning mock authentication credentials as a default fallback allows attackers to easily bypass authentication simply by not providing any credentials.
 **Prevention:** Never use mock objects or fallback roles when authentication fails or is missing. Always throw an explicit unauthorized error.
+
 ## 2026-08-02 - [Authorization Bypass in Export Tool]
 **Vulnerability:** The `export_team_artifact` tool lacked authorization checks, potentially allowing arbitrary file creation inside unauthorized directories due to unvalidated `projectDir`.
 **Learning:** Any tool that performs file system operations (like writing export files) must validate the target directory against authorized workspace bounds, even if the directory appears to be loaded from internal state (`loadAnalysisAsync`), to prevent authorization bypasses.
