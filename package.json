@@ -1,6 +1,6 @@
 {
   "name": "codeatlas-mcp-server",
-  "version": "3.0.1",
+  "version": "3.1.1",
   "description": "Local-first MCP server for CodeAtlas — AST analysis, codebase intelligence, semantic memory, and A2A orchestration.",
   "type": "module",
   "bin": {

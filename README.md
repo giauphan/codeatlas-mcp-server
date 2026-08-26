@@ -45,38 +45,54 @@ AI IDE → MCP stdio/SSE → Parser (AST) → Dependency Graph → Code Search
 
 ## 🔧 Quick Start
 
-### 1. Install
+### Install from npm
+
+```bash
+npm install -g codeatlas-mcp-server
+codeatlas-mcp --help
+```
+
+Use it directly from an AI client with `npx`:
+
+```bash
+npx -y codeatlas-mcp-server
+```
+
+### Install from source
+
 ```bash
 # Clone the repo
 git clone https://github.com/giauphan/codeatlas-mcp-server.git
 cd codeatlas-mcp-server
-
-# Install dependencies (requires Node.js 20+)
 pnpm install
-```
-
-### 2. Configure
-```bash
-# Copy env template
-cp .env.example .env
-
-# Edit .env (Oracle DB optional for persistent memory)
-# Set CODEATLAS_API_URL and CODEATLAS_API_KEY if using cloud
-```
-
-### 3. Build
-```bash
 pnpm run build
 ```
 
-### 4. Run
+### Configure optional cloud memory
+
+```bash
+export CODEATLAS_API_URL="http://localhost:3381"
+export CODEATLAS_API_KEY="your_api_key_here"
+```
+
+### Run
+
 ```bash
 # Local-only mode (no cloud)
-pnpm start
+codeatlas-mcp
 
-# With cloud connection (requires codeatlas-platform running)
-CODEATLAS_API_URL=http://localhost:8080 CODEATLAS_API_KEY=your_api_key_here pnpm start
+# From a source checkout
+pnpm start
 ```
+
+### Install Claude Code Second Brain hooks
+
+```bash
+codeatlas-mcp install-hooks --dry-run
+codeatlas-mcp install-hooks
+```
+
+See [Second Brain Hooks Setup](./docs/HOOKS_SETUP.md) for requirements, verification, and uninstall/rollback.
 
 ---
 
@@ -126,6 +142,7 @@ Add to `settings.json`:
 | [Development Guide](./docs/DEVELOPMENT.md) | Full environment setup, commands, and troubleshooting. |
 | [Deployment Guide](./docs/DEPLOYMENT.md) | PM2, systemd, Nginx TLS, and healthchecks. |
 | [API Examples](./docs/API_EXAMPLES.md) | Auth, dream memory, and MCP config examples. |
+| [Second Brain Hooks Setup](./docs/HOOKS_SETUP.md) | Install, configure, verify, and uninstall Claude Code memory hooks. |
 
 ---
 
