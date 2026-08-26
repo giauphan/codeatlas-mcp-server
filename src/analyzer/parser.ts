@@ -166,11 +166,9 @@ export class CodeAnalyzer {
         this.allFiles.delete(absPath);
       }
     } catch (err: any) {
-      if (err.code === 'ENOENT') {
-        this.allFiles.delete(absPath);
-      } else {
-        this.allFiles.delete(absPath);
-        // We handle general errors but keep the pattern to avoid generic empty blocks
+      this.allFiles.delete(absPath);
+      if (err.code !== 'ENOENT') {
+        console.warn(`[CodeAnalyzer] Unexpected error accessing file ${absPath}:`, err);
       }
     }
 
