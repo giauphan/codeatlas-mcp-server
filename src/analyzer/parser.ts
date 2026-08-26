@@ -86,7 +86,7 @@ export class CodeAnalyzer {
     return this.getIgnoreFilter().ignores(normalizedPath);
   }
 
-  // Using Set to optimize addition, deletion, and lookup operations for file paths
+  // Using Set to optimize addition, deletion, and lookup operations for file paths. Reduces O(N) operations (e.g., .includes or .indexOf) to O(1) for large datasets.
   private allFiles: Set<string> = new Set();
   private totalSkippedCount = 0;
 
