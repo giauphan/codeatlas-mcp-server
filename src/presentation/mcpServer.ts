@@ -63,32 +63,36 @@ function createNodeIdSet<T extends { id: string }>(nodes: T[]): Set<string> {
 const SHELL_METACHAR_RE = /[&|;<>$`\\\n\r]/;
 
 /**
- * Safely reads a file by resolving its realpath, verifying authorization,
- * and reading from a secure file descriptor to prevent TOCTOU symlink races.
+ * Helper to safely read a file inside authorized projects asynchronously.
+ * Prevents TOCTOU symlink races by resolving the real path first, validating it,
+ * and then opening the validated path with O_NOFOLLOW to ensure it hasn't been swapped.
+ * Uses async operations to prevent blocking the Node.js event loop.
  */
-function readAuthorizedFileSync(absPath: string, authorizedProjects: { dir: string }[]): { content: string | null; error?: string; errorCode?: string } {
-  let fd: number | null = null;
+async function readAuthorizedFileAsync(absPath: string, authorizedProjects: { dir: string }[]): Promise<{ content: string | null; error?: string; errorCode?: string }> {
+  let fh: fs.promises.FileHandle | null = null;
   try {
-    // Open the file descriptor in read-only mode to prevent TOCTOU substitution
-    fd = fs.openSync(absPath, "r");
-    const realPath = fs.realpathSync(absPath);
+    // Resolve the real path first to expand symlinks and get the canonical path
+    const realPath = await fs.promises.realpath(absPath);
     if (!isPathInAuthorizedProjects(realPath, authorizedProjects)) {
       // Do not log the actual realPath in production to avoid leaking sensitive directory structure
       console.warn(`[Security] Unauthorized file access attempt blocked for requested path: ${path.basename(absPath)}`);
       return { content: null, error: "Unauthorized file path" };
     }
-    const content = fs.readFileSync(fd, "utf-8");
+
+    // Open the validated real path with O_NOFOLLOW to ensure it hasn't been swapped back to a symlink
+    fh = await fs.promises.open(realPath, fs.constants.O_RDONLY | fs.constants.O_NOFOLLOW);
+    const content = await fh.readFile("utf-8");
     return { content };
   } catch (err) {
     const error = err as NodeJS.ErrnoException;
     return { content: null, error: error.message, errorCode: error.code };
   } finally {
-    if (fd !== null) {
+    if (fh !== null) {
       try {
-        fs.closeSync(fd);
+        await fh.close();
       } catch (closeErr) {
         if (process.env.DEBUG === "true") {
-          console.error(`[Security] Warning: Failed to close file descriptor for path: ${path.basename(absPath)}. Error:`, closeErr);
+          console.error(`[Security] Warning: Failed to close file handle for path: ${path.basename(absPath)}. Error:`, closeErr);
         }
       }
     }
@@ -1777,7 +1781,7 @@ export function registerTools(server: McpServer) {
       for (const filePath of allFiles) {
         if (results.length >= maxRes) break;
         try {
-          const fileResult = readAuthorizedFileSync(filePath, authorizedProjects);
+          const fileResult = await readAuthorizedFileAsync(filePath, authorizedProjects);
           if (fileResult.error || fileResult.content === null) {
             const errorMessage = formatFileResultError(fileResult);
             if (errorMessage === "Unknown error" || errorMessage === fileResult.error?.substring(0, 200)) {
@@ -2724,7 +2728,7 @@ def register(ctx):
           ? node.filePath!
           : path.resolve(loaded.projectDir, node.filePath!);
 
-        const fileResult = readAuthorizedFileSync(absPath, authorizedProjects);
+        const fileResult = await readAuthorizedFileAsync(absPath, authorizedProjects);
         if (fileResult.error || fileResult.content === null) {
           if (fileResult.errorCode === 'ENOENT') {
             results.push({ symbol: node.label, file: absPath, error: "File not found" });
@@ -2952,7 +2956,7 @@ def register(ctx):
       for (const node of functions.slice(0, MAX_FUNCTIONS_TO_COMPARE)) {
         const absPath = path.isAbsolute(node.filePath!) ? node.filePath! : path.resolve(loaded.projectDir, node.filePath!);
         try {
-          const fileResult = readAuthorizedFileSync(absPath, authorizedProjects);
+          const fileResult = await readAuthorizedFileAsync(absPath, authorizedProjects);
           if (fileResult.error || fileResult.content === null) {
             const errorMessage = formatFileResultError(fileResult);
             if (errorMessage === "Unknown error" || errorMessage === fileResult.error?.substring(0, 200)) {
