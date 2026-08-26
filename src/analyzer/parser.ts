@@ -101,7 +101,7 @@ export class CodeAnalyzer {
       files = files.slice(0, this.maxFiles);
     }
     
-    this.allFiles = new Set(files);
+    this.allFiles = new Set(files.map(f => path.resolve(f)));
     const total = files.length;
 
     // Log the files to be indexed
