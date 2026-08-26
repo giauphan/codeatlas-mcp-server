@@ -65,6 +65,11 @@ const SHELL_METACHAR_RE = /[&|;<>$`\\\n\r]/;
 /**
  * Safely reads a file by resolving its realpath, verifying authorization,
  * and reading from a secure file descriptor to prevent TOCTOU symlink races.
+ *
+ * @returns An object containing the `content` of the file if successful.
+ *          If an error occurs, `content` is null.
+ *          `errorCode` explicitly returns standard NodeJS codes like 'ENOENT'
+ *          for programmatic handling. `error` contains the full error message.
  */
 function readAuthorizedFileSync(absPath: string, authorizedProjects: { dir: string }[]): { content: string | null; error?: string; errorCode?: string } {
   let fd: number | null = null;
@@ -1756,7 +1761,12 @@ export function registerTools(server: McpServer) {
         if (results.length >= maxRes) break;
         try {
           const fileResult = readAuthorizedFileSync(filePath, authorizedProjects);
-          if (fileResult.error || fileResult.content === null) continue;
+          if (fileResult.error || fileResult.content === null) {
+            if (fileResult.errorCode !== 'ENOENT') {
+               console.warn(`[code_search] Unexpected error reading file ${filePath}: ${fileResult.error}`);
+            }
+            continue;
+          }
           const content = fileResult.content;
 
           // Fast path to skip files that definitely don't contain the query
@@ -2698,7 +2708,12 @@ def register(ctx):
         if (fileResult.error || fileResult.content === null) {
           if (fileResult.errorCode === 'ENOENT') {
             results.push({ symbol: node.label, file: absPath, error: "File not found" });
+          } else if (fileResult.errorCode === 'EACCES') {
+            results.push({ symbol: node.label, file: absPath, error: "Permission denied" });
+          } else if (fileResult.errorCode === 'EISDIR') {
+            results.push({ symbol: node.label, file: absPath, error: "Path is a directory" });
           } else {
+            console.warn(`[get_code_snippet] Unexpected error reading file ${absPath}: ${fileResult.error}`);
             results.push({ symbol: node.label, file: absPath, error: fileResult.error?.substring(0, 200) || "Unknown error" });
           }
           continue;
@@ -2917,7 +2932,12 @@ def register(ctx):
         const absPath = path.isAbsolute(node.filePath!) ? node.filePath! : path.resolve(loaded.projectDir, node.filePath!);
         try {
           const fileResult = readAuthorizedFileSync(absPath, authorizedProjects);
-          if (fileResult.error || fileResult.content === null) continue;
+          if (fileResult.error || fileResult.content === null) {
+            if (fileResult.errorCode !== 'ENOENT') {
+               console.warn(`[detect_code_similarities] Unexpected error reading file ${absPath}: ${fileResult.error}`);
+            }
+            continue;
+          }
 
           const content = fileResult.content;
 
