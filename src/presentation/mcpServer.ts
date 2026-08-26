@@ -74,7 +74,7 @@ interface FileReadResult {
  * and then opening the validated path with O_NOFOLLOW to ensure it hasn't been swapped.
  * Uses async operations to prevent blocking the Node.js event loop.
  */
-async function readAuthorizedFileAsync(absPath: string, authorizedProjects: { dir: string }[]): Promise<FileReadResult> {
+async function safeReadAuthorizedFile(absPath: string, authorizedProjects: { dir: string }[]): Promise<FileReadResult> {
   let fh: fs.promises.FileHandle | null = null;
   try {
     // Resolve the real path first to expand symlinks and get the canonical path
@@ -1810,7 +1810,7 @@ export function registerTools(server: McpServer) {
       for (const filePath of allFiles) {
         if (results.length >= maxRes) break;
         try {
-          const fileResult = await readAuthorizedFileAsync(filePath, authorizedProjects);
+          const fileResult = await safeReadAuthorizedFile(filePath, authorizedProjects);
           if (fileResult.error || fileResult.content === null) {
             const errorMessage = formatFileResultError(fileResult);
             if (errorMessage === "Unknown error" || errorMessage === fileResult.error?.substring(0, 200)) {
@@ -2757,7 +2757,7 @@ def register(ctx):
           ? node.filePath!
           : path.resolve(loaded.projectDir, node.filePath!);
 
-        const fileResult = await readAuthorizedFileAsync(absPath, authorizedProjects);
+        const fileResult = await safeReadAuthorizedFile(absPath, authorizedProjects);
         if (fileResult.error || fileResult.content === null) {
           if (fileResult.errorCode === 'ENOENT') {
             results.push({ symbol: node.label, file: absPath, error: "File not found" });
@@ -2985,7 +2985,7 @@ def register(ctx):
       for (const node of functions.slice(0, MAX_FUNCTIONS_TO_COMPARE)) {
         const absPath = path.isAbsolute(node.filePath!) ? node.filePath! : path.resolve(loaded.projectDir, node.filePath!);
         try {
-          const fileResult = await readAuthorizedFileAsync(absPath, authorizedProjects);
+          const fileResult = await safeReadAuthorizedFile(absPath, authorizedProjects);
           if (fileResult.error || fileResult.content === null) {
             const errorMessage = formatFileResultError(fileResult);
             if (errorMessage === "Unknown error" || errorMessage === fileResult.error?.substring(0, 200)) {
