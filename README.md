@@ -85,6 +85,56 @@ codeatlas-mcp
 pnpm start
 ```
 
+### Add to an AI agent (CLI)
+
+**Claude Code** (`claude mcp add`):
+
+```bash
+# stdio server from npm, user scope (available in every project)
+claude mcp add codeatlas -s user -- npx -y codeatlas-mcp-server
+
+# with optional cloud memory
+claude mcp add codeatlas -s user \
+  --env CODEATLAS_API_URL=http://localhost:3381 \
+  --env CODEATLAS_API_KEY=your_api_key_here \
+  -- npx -y codeatlas-mcp-server
+
+# from a source checkout
+claude mcp add codeatlas -- node /absolute/path/to/codeatlas-mcp-server/dist/index.js
+
+claude mcp list          # verify connection
+claude mcp remove codeatlas
+```
+
+Scopes: `-s local` (default, current project only), `-s project` (shared via `.mcp.json`), `-s user` (all projects).
+
+**Codex CLI** (`codex mcp add`):
+
+```bash
+codex mcp add codeatlas -- npx -y codeatlas-mcp-server
+codex mcp list
+```
+
+Or edit `~/.codex/config.toml`:
+
+```toml
+[mcp_servers.codeatlas]
+command = "npx"
+args = ["-y", "codeatlas-mcp-server"]
+
+[mcp_servers.codeatlas.env]
+CODEATLAS_API_URL = "http://localhost:3381"
+CODEATLAS_API_KEY = "your_api_key_here"
+```
+
+Secrets go in env vars or `~/.codeatlas/.env`, never in CLI args — command lines are visible to other users via `ps aux`.
+
+Verify after setup:
+
+```bash
+codeatlas-mcp doctor
+```
+
 ### Install Claude Code Second Brain hooks
 
 ```bash
