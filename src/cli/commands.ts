@@ -10,6 +10,8 @@
 import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
+import { spawnSync } from "child_process";
+import { fileURLToPath } from "url";
 import { getHermesConfigPath, getHermesPluginDir } from "../utils/pathUtils.js";
 import * as readline from "readline";
 
@@ -184,7 +186,7 @@ export async function cmdDoctor(): Promise<void> {
 export function isCLICommand(argv: string[]): boolean {
   const cmd = argv[2];
   if (!cmd) return false;
-  return ["init", "setup", "doctor", "--help", "-h"].includes(cmd);
+  return ["init", "setup", "doctor", "install-hooks", "--help", "-h"].includes(cmd);
 }
 
 export async function runCLI(): Promise<void> {
@@ -209,6 +211,16 @@ export async function runCLI(): Promise<void> {
     } else {
       await cmdSetup();
     }
+  } else if (cmd === "install-hooks") {
+    const dryRun = process.argv.includes("--dry-run");
+    const script = new URL("./hooks/install-brain-hooks.sh", import.meta.url);
+    const dryArgs = dryRun ? ["--dry-run"] : [];
+    if (!fs.existsSync(script)) {
+      console.error("Error: install-brain-hooks.sh missing from package. Rebuild with 'npm run build' or reinstall.");
+      process.exit(1);
+    }
+    const r = spawnSync("bash", [fileURLToPath(script), ...dryArgs], { stdio: "inherit" });
+    process.exit(r.status ?? 1);
   } else if (cmd === "--help" || cmd === "-h") {
     console.log(`
 Usage: codeatlas-enterprise <command>
@@ -217,6 +229,7 @@ Commands:
   init           Interactive Second Brain setup wizard
   setup          Same as init
   setup claude   Install Claude hooks and configs
+  install-hooks  Install/update Second Brain hooks in ~/.claude
   doctor         Health check & diagnostics
 
 Without a command, runs the MCP server.
