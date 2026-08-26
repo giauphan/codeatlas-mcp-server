@@ -1,119 +1,25 @@
 name: CI
 
-# ──────────────────────────────────────────────
-# Triggers
-# ──────────────────────────────────────────────
 on:
-  pull_request:
-    branches: [main]
   push:
+    branches: [main]
+  pull_request:
     branches: [main]
   workflow_dispatch:
 
-# Cancel redundant runs on the same ref (PR or branch)
+# Cancel redundant runs on the same ref
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 permissions:
   contents: read
 
-# ──────────────────────────────────────────────
-# Strategy: test on multiple Node.js versions
-# All jobs run sequentially via `needs` dependencies
-# ──────────────────────────────────────────────
 jobs:
-  # ── Stage 1: Fast feedback gates ──────────────
-  lint:
-    name: Lint (Node ${{ matrix.node }})
+  ci:
+    name: CI
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        node: [20]
-        # Expand to test multiple versions when ready:
-        # node: [18, 20, 22]
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
 
-      - name: Setup Node.js ${{ matrix.node }}
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ matrix.node }}
-          cache: npm
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: TypeScript type check
-        run: npm run lint
-
-  # ── Stage 2: Build (Node ${{ matrix.node }}) ─
-  build:
-    name: Build (Node ${{ matrix.node }})
-    runs-on: ubuntu-latest
-    needs: lint
-    strategy:
-      matrix:
-        node: [20]
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js ${{ matrix.node }}
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ matrix.node }}
-          cache: npm
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Build
-        run: npm run build
-
-      - name: Validate package contents
-        run: npm pack --dry-run
-
-      - name: Upload build artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: dist-node-${{ matrix.node }}
-          path: dist/
-          retention-days: 1
-
-  # ── Stage 3: Unit + integration tests ──────────
-  test:
-    name: Test (Node ${{ matrix.node }})
-    runs-on: ubuntu-latest
-    needs: build
-    strategy:
-      matrix:
-        node: [20]
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js ${{ matrix.node }}
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ matrix.node }}
-          cache: npm
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Run tests
-        run: npm test
-
-  # ── Stage 4: Coverage report ─────────────────
-  coverage:
-    name: Coverage
-    runs-on: ubuntu-latest
-    needs: build
-    # Runs in parallel with `test` but only after `build` passes.
-    # This lets developers see test results quickly while coverage
-    # is computed separately (coverage is slower).
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -127,15 +33,30 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # ── Stage 1: Fastest feedback first ─────────────
+      - name: TypeScript type check
+        run: npm run lint
+
+      # ── Stage 2: Build ──────────────────────────────
       - name: Build
         run: npm run build
 
-      - name: Collect coverage
+      # ── Stage 3: Validate package ─────────────────
+      - name: Validate package contents
+        run: npm pack --dry-run
+
+      # ── Stage 4: Tests ─────────────────────────────
+      - name: Test
+        run: npm test
+
+      # ── Stage 5: Coverage gate ─────────────────────
+      - name: Coverage
         run: npx c8 --reporter=text --reportDir=coverage --check-coverage --lines=40 npm test
 
+      # ── Upload coverage report ───────────────────────
       - name: Upload coverage report
-        uses: actions/upload-artifact@v4
         if: always()
+        uses: actions/upload-artifact@v4
         with:
           name: coverage-report
           path: coverage/
