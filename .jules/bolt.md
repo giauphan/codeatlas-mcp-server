@@ -72,3 +72,7 @@
 ## 2026-08-16 - [Performance improvement] Optimized O(N) multi-pass metric aggregation
 **Learning:** During analysis of the `index_coverage` tool in `src/presentation/mcpServer.ts`, it was discovered that generating project coverage statistics involved iterating over the `nodes` array 4 separate times (one `.filter()` and three separate `for...of` loops) to calculate valid node subsets, type distributions, file distributions, and coverage percentages.
 **Action:** When calculating multiple distinct aggregates over a single large dataset (like the `nodes` array), replace chained `.filter()` calls and multiple iterations with a single, consolidated `for...of` loop. Accumulate all required metrics within the same loop to drastically reduce iterations, saving significant O(N) traversal time and intermediate array allocations.
+
+## 2024-05-19 - Use Set instead of Array for repeated O(N) array filtering
+**Learning:** In `CodeAnalyzer`, the `allFiles` property was an array being filtered repeatedly (`this.allFiles = this.allFiles.filter(f => f !== absPath)`) for each deleted or ignored file, creating an `O(N²)` time complexity loop. Replacing this with a `Set` turns addition and removal into `O(1)` operations.
+**Action:** Always watch for large arrays that are iteratively filtered or searched with `.indexOf` or `.includes` inside loops, especially when maintaining collections of paths or IDs. Replace them with `Set` or `Map` to prevent severe CPU and event loop bottlenecks in high-volume scenarios.

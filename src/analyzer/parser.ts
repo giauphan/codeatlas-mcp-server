@@ -86,7 +86,7 @@ export class CodeAnalyzer {
     return this.getIgnoreFilter().ignores(normalizedPath);
   }
 
-  private allFiles: string[] = [];
+  private allFiles: Set<string> = new Set();
   private totalSkippedCount = 0;
 
   public async analyzeProject(onProgress?: (percent: number, done: number, total: number, currentFile?: string) => void): Promise<AnalysisResult> {
@@ -100,7 +100,7 @@ export class CodeAnalyzer {
       files = files.slice(0, this.maxFiles);
     }
     
-    this.allFiles = [...files];
+    this.allFiles = new Set(files);
     const total = files.length;
 
     // Log the files to be indexed
@@ -159,15 +159,13 @@ export class CodeAnalyzer {
     try {
       if (fs.existsSync(absPath) && !this.isIgnored(absPath, false)) {
         this.analyzeFile(absPath);
-        if (!this.allFiles.includes(absPath)) {
-          this.allFiles.push(absPath);
-        }
+        this.allFiles.add(absPath);
       } else {
         // File was deleted or is ignored
-        this.allFiles = this.allFiles.filter(f => f !== absPath);
+        this.allFiles.delete(absPath);
       }
     } catch {
-      this.allFiles = this.allFiles.filter(f => f !== absPath);
+      this.allFiles.delete(absPath);
     }
 
     return this.buildAnalysisResult();
@@ -231,7 +229,7 @@ export class CodeAnalyzer {
       graph,
       insights,
       entityCounts: counts,
-      totalFilesAnalyzed: this.allFiles.length - this.totalSkippedCount,
+      totalFilesAnalyzed: this.allFiles.size - this.totalSkippedCount,
       totalFilesSkipped: this.totalSkippedCount
     };
   }
