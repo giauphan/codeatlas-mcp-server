@@ -65,11 +65,6 @@ const SHELL_METACHAR_RE = /[&|;<>$`\\\n\r]/;
 /**
  * Safely reads a file by resolving its realpath, verifying authorization,
  * and reading from a secure file descriptor to prevent TOCTOU symlink races.
- *
- * @returns An object containing the `content` of the file if successful.
- *          If an error occurs, `content` is null.
- *          `errorCode` explicitly returns standard NodeJS codes like 'ENOENT'
- *          for programmatic handling. `error` contains the full error message.
  */
 function readAuthorizedFileSync(absPath: string, authorizedProjects: { dir: string }[]): { content: string | null; error?: string; errorCode?: string } {
   let fd: number | null = null;
@@ -92,19 +87,6 @@ function readAuthorizedFileSync(absPath: string, authorizedProjects: { dir: stri
       try { fs.closeSync(fd); } catch { /* ignore */ }
     }
   }
-}
-
-function formatFileResultError(fileResult: { error?: string; errorCode?: string }): string {
-  if (fileResult.errorCode === 'ENOENT') {
-    return "File not found";
-  } else if (fileResult.errorCode === 'EACCES') {
-    return "Permission denied";
-  } else if (fileResult.errorCode === 'EISDIR') {
-    return "Path is a directory";
-  } else if (fileResult.error === "Unauthorized file path") {
-    return "Unauthorized file path";
-  }
-  return fileResult.error?.substring(0, 200) || "Unknown error";
 }
 
 export function registerTools(server: McpServer) {
@@ -1778,7 +1760,7 @@ export function registerTools(server: McpServer) {
           const fileResult = readAuthorizedFileSync(filePath, authorizedProjects);
           if (fileResult.error || fileResult.content === null) {
             if (fileResult.errorCode !== 'ENOENT') {
-               console.warn(`[code_search] Unexpected error reading file ${filePath}: ${fileResult.error}`);
+               console.warn(`[code_search] Unexpected error reading file ${path.basename(filePath)}: ${fileResult.error}`);
             }
             continue;
           }
@@ -2721,11 +2703,16 @@ def register(ctx):
 
         const fileResult = readAuthorizedFileSync(absPath, authorizedProjects);
         if (fileResult.error || fileResult.content === null) {
-          const errorMessage = formatFileResultError(fileResult);
-          if (errorMessage === "Unknown error" || errorMessage === fileResult.error?.substring(0, 200)) {
+          if (fileResult.errorCode === 'ENOENT') {
+            results.push({ symbol: node.label, file: absPath, error: "File not found" });
+          } else if (fileResult.errorCode === 'EACCES') {
+            results.push({ symbol: node.label, file: absPath, error: "Permission denied" });
+          } else if (fileResult.errorCode === 'EISDIR') {
+            results.push({ symbol: node.label, file: absPath, error: "Path is a directory" });
+          } else {
             console.warn(`[get_code_snippet] Unexpected error reading file ${path.basename(absPath)}: ${fileResult.error}`);
+            results.push({ symbol: node.label, file: absPath, error: fileResult.error?.substring(0, 200) || "Unknown error" });
           }
-          results.push({ symbol: node.label, file: absPath, error: errorMessage });
           continue;
         }
         const content = fileResult.content;
@@ -2944,7 +2931,7 @@ def register(ctx):
           const fileResult = readAuthorizedFileSync(absPath, authorizedProjects);
           if (fileResult.error || fileResult.content === null) {
             if (fileResult.errorCode !== 'ENOENT') {
-               console.warn(`[detect_code_similarities] Unexpected error reading file ${absPath}: ${fileResult.error}`);
+               console.warn(`[detect_code_similarities] Unexpected error reading file ${path.basename(absPath)}: ${fileResult.error}`);
             }
             continue;
           }
