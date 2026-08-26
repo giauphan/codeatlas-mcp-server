@@ -84,7 +84,13 @@ function readAuthorizedFileSync(absPath: string, authorizedProjects: { dir: stri
     return { content: null, error: error.message, errorCode: error.code };
   } finally {
     if (fd !== null) {
-      try { fs.closeSync(fd); } catch { /* ignore */ }
+      try {
+        fs.closeSync(fd);
+      } catch (closeErr) {
+        if (process.env.DEBUG === "true") {
+          console.error(`[Security] Warning: Failed to close file descriptor for path: ${path.basename(absPath)}. Error:`, closeErr);
+        }
+      }
     }
   }
 }
