@@ -72,6 +72,7 @@ function readAuthorizedFileSync(absPath: string, authorizedProjects: { dir: stri
     fd = fs.openSync(absPath, "r");
     const realPath = fs.realpathSync(absPath);
     if (!isPathInAuthorizedProjects(realPath, authorizedProjects)) {
+      console.warn(`Unauthorized file access attempt: ${realPath}`);
       return { content: null, error: "Unauthorized file path" };
     }
     const content = fs.readFileSync(fd, "utf-8");
