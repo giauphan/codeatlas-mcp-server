@@ -165,8 +165,13 @@ export class CodeAnalyzer {
         // File was deleted or is ignored
         this.allFiles.delete(absPath);
       }
-    } catch {
-      this.allFiles.delete(absPath);
+    } catch (err: any) {
+      if (err.code === 'ENOENT') {
+        this.allFiles.delete(absPath);
+      } else {
+        this.allFiles.delete(absPath);
+        // We handle general errors but keep the pattern to avoid generic empty blocks
+      }
     }
 
     return this.buildAnalysisResult();
