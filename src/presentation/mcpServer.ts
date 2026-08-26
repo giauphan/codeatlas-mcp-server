@@ -130,9 +130,15 @@ function formatFileResultError(fileResult: FileReadResult): string {
     return FileReadErrorCode.UNAUTHORIZED;
   }
 
-  return (fileResult.errorCode && fileErrorCodeMap[fileResult.errorCode])
-    ?? fileResult.error?.substring(0, 200)
-    ?? FileReadErrorCode.UNKNOWN;
+  if (fileResult.errorCode && fileErrorCodeMap[fileResult.errorCode]) {
+    return fileErrorCodeMap[fileResult.errorCode];
+  }
+
+  if (fileResult.errorCode) {
+    return `UnmappedError(${fileResult.errorCode}): ${fileResult.error?.substring(0, 150) ?? 'No details'}`;
+  }
+
+  return fileResult.error?.substring(0, 200) ?? FileReadErrorCode.UNKNOWN;
 }
 
 export function registerTools(server: McpServer) {
