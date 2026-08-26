@@ -62,20 +62,27 @@ function createNodeIdSet<T extends { id: string }>(nodes: T[]): Set<string> {
 
 const SHELL_METACHAR_RE = /[&|;<>$`\\\n\r]/;
 
+interface FileReadResult {
+  content: string | null;
+  error?: string;
+  errorCode?: string;
+}
+
 /**
  * Helper to safely read a file inside authorized projects asynchronously.
  * Prevents TOCTOU symlink races by resolving the real path first, validating it,
  * and then opening the validated path with O_NOFOLLOW to ensure it hasn't been swapped.
  * Uses async operations to prevent blocking the Node.js event loop.
  */
-async function readAuthorizedFileAsync(absPath: string, authorizedProjects: { dir: string }[]): Promise<{ content: string | null; error?: string; errorCode?: string }> {
+async function readAuthorizedFileAsync(absPath: string, authorizedProjects: { dir: string }[]): Promise<FileReadResult> {
   let fh: fs.promises.FileHandle | null = null;
   try {
     // Resolve the real path first to expand symlinks and get the canonical path
     const realPath = await fs.promises.realpath(absPath);
     if (!isPathInAuthorizedProjects(realPath, authorizedProjects)) {
       // Do not log the actual realPath in production to avoid leaking sensitive directory structure
-      console.warn(`[Security] Unauthorized file access attempt blocked for requested path: ${path.basename(absPath)}`);
+      // Including a generic contextual marker helps maintainers correlate blocked access logs without leaking paths.
+      console.warn(`[Security][FileAccess] Unauthorized file access attempt blocked for requested path: ${path.basename(absPath)}`);
       return { content: null, error: "Unauthorized file path" };
     }
 
@@ -99,17 +106,25 @@ async function readAuthorizedFileAsync(absPath: string, authorizedProjects: { di
   }
 }
 
+enum FileReadErrorCode {
+  ENOENT = "File not found",
+  EACCES = "Permission denied",
+  EISDIR = "Path is a directory",
+  UNAUTHORIZED = "Unauthorized file path",
+  UNKNOWN = "Unknown error"
+}
+
 function formatFileResultError(fileResult: { error?: string; errorCode?: string }): string {
   if (fileResult.errorCode === 'ENOENT') {
-    return "File not found";
+    return FileReadErrorCode.ENOENT;
   } else if (fileResult.errorCode === 'EACCES') {
-    return "Permission denied";
+    return FileReadErrorCode.EACCES;
   } else if (fileResult.errorCode === 'EISDIR') {
-    return "Path is a directory";
+    return FileReadErrorCode.EISDIR;
   } else if (fileResult.error === "Unauthorized file path") {
-    return "Unauthorized file path";
+    return FileReadErrorCode.UNAUTHORIZED;
   }
-  return fileResult.error?.substring(0, 200) || "Unknown error";
+  return fileResult.error?.substring(0, 200) || FileReadErrorCode.UNKNOWN;
 }
 
 export function registerTools(server: McpServer) {

@@ -37,3 +37,17 @@
 **Vulnerability:** Tools that read files from the filesystem (like `get_code_snippet` and `code_search`) failed to use `fs.realpathSync` combined with an authorization check (`isPathInAuthorizedProjects`) immediately before reading the file, leading to potential path traversal and TOCTOU symlink races. Additionally, reading operations were repeated without abstracting error handling, leading to maintainability issues and potential leaked file descriptors in case of unexpected errors during realpath checks.
 **Learning:** Using `path.resolve` or reading unverified file paths directly inside an authorized workspace allows an attacker to access arbitrary files via Path Traversal (`../`) or Time-of-Check to Time-of-Use (TOCTOU) symlink substitution if the filesystem changes between the `realpath` validation and the `readFile` call. Repeating this logic across multiple tools increases the risk of subtle bugs or omissions in resource cleanup (like missing `finally` blocks).
 **Prevention:** Consolidate path validation and file reading logic into a single robust helper function (e.g., `readAuthorizedFileSync`) that uses file descriptors (`fs.openSync`) to lock the target, performs `realpath` resolution on the descriptor, validates it against authorized boundaries, and reads directly from the descriptor, ensuring consistent `finally` blocks to prevent handle leaks.
+## 2025-02-28 - Secure File Reading Helper Refinements
+
+**Vulnerability:** Addressed several structural feedback points on the newly introduced `readAuthorizedFileAsync` helper, including loose typings, magic strings for error codes, and misplaced security comments that could confuse future maintainers.
+
+**Learning:**
+- TypeScript interfaces (like `FileReadResult`) improve type safety and maintainability when handling complex objects across module boundaries.
+- Using Enums for string constants (like `FileReadErrorCode`) prevents typos and standardizes error checking logic.
+- Misplaced comments in a diff can pollute the codebase if not properly pruned.
+- Contextual markers in logs (e.g., `[Security][FileAccess]`) allow safe debugging and monitoring without exposing actual payload values (like paths).
+
+**Prevention:**
+- Extract repeated return object structures into `interface` definitions early in development.
+- Abstract magic strings into enums immediately upon introducing standardized logic branches based on them.
+- Ensure log formats are structured and distinct before requesting code review.
