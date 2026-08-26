@@ -1737,14 +1737,13 @@ export function registerTools(server: McpServer) {
             fh = await fs.promises.open(filePath, "r");
             const fdRealPath = await fs.promises.realpath(filePath);
             if (!isPathInAuthorizedProjects(fdRealPath, authorizedProjects)) {
-               await fh.close();
                continue;
             }
             content = await fh.readFile("utf-8");
-            await fh.close();
           } catch {
-            if (fh) await fh.close();
             continue;
+          } finally {
+            if (fh) await fh.close();
           }
 
           // Fast path to skip files that definitely don't contain the query
@@ -2688,21 +2687,22 @@ def register(ctx):
           fd = fs.openSync(absPath, "r");
           const realPath = fs.realpathSync(absPath);
           if (!isPathInAuthorizedProjects(realPath, authorizedProjects)) {
-            fs.closeSync(fd);
             results.push({ symbol: node.label, file: absPath, error: "Unauthorized file path" });
             continue;
           }
           content = fs.readFileSync(fd, "utf-8");
-          fs.closeSync(fd);
-          fd = null;
         } catch (err: any) {
-          if (fd !== null) fs.closeSync(fd);
           if (err.code === 'ENOENT') {
             results.push({ symbol: node.label, file: absPath, error: "File not found" });
           } else {
             results.push({ symbol: node.label, file: absPath, error: err.message?.substring(0, 200) });
           }
           continue;
+        } finally {
+          if (fd !== null) {
+            fs.closeSync(fd);
+            fd = null;
+          }
         }
         try {
           const lines = content.split("\n");
@@ -2919,13 +2919,10 @@ def register(ctx):
           fd = fs.openSync(absPath, "r");
           const realPath = fs.realpathSync(absPath);
           if (!isPathInAuthorizedProjects(realPath, authorizedProjects)) {
-            fs.closeSync(fd);
             continue;
           }
 
           const content = fs.readFileSync(fd, "utf-8");
-          fs.closeSync(fd);
-          fd = null;
 
           const lines = content.split("\n");
           const start = (node.line || 1) - 1;
@@ -2936,7 +2933,14 @@ def register(ctx):
           // Tokenize: identifiers + keywords (skip whitespace, punctuation)
           const tokens = getTokensFromSource(body);
           tokenized.push({ node, tokens, source: body.substring(0, 300) });
-        } catch { /* skip */ }
+        } catch {
+          /* skip */
+        } finally {
+          if (fd !== null) {
+            fs.closeSync(fd);
+            fd = null;
+          }
+        }
       }
 
       // Compute Jaccard similarity pairs
