@@ -51,3 +51,8 @@
 - Extract repeated return object structures into `interface` definitions early in development.
 - Abstract magic strings into enums immediately upon introducing standardized logic branches based on them.
 - Ensure log formats are structured and distinct before requesting code review.
+
+## 2025-02-28 - Abstract Security Patterns to Prevent Accidental Bypasses
+**Vulnerability:** While developing secure file-reading logic (e.g., mitigating TOCTOU symlink races), developers may copy-paste raw `fs.promises.realpath` and `O_NOFOLLOW` logic instead of using centralized utility functions, leading to incomplete implementations or regressions over time.
+**Learning:** Security fixes are fragile if they rely on developers perfectly replicating complex boilerplate (like descriptor handling or TOCTOU mitigations) in multiple places.
+**Prevention:** Developers should strictly prefer consolidated utilities (like `safeReadAuthorizedFile`) for all file I/O operations rather than duplicating logic manually. Security-critical utilities should be well-documented and treated as mandatory API boundaries within the application.
