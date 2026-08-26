@@ -116,24 +116,23 @@ enum FileReadErrorCode {
   UNKNOWN = "Unknown error"
 }
 
+// Initialize errorMap outside the function to avoid recreation on every function call
+const fileErrorCodeMap: Record<string, string> = {
+  ENOENT: FileReadErrorCode.ENOENT,
+  EACCES: FileReadErrorCode.EACCES,
+  EISDIR: FileReadErrorCode.EISDIR,
+  EMFILE: FileReadErrorCode.EMFILE,
+  EBUSY: FileReadErrorCode.EBUSY
+};
+
 function formatFileResultError(fileResult: { error?: string; errorCode?: string }): string {
   if (fileResult.error === "Unauthorized file path") {
     return FileReadErrorCode.UNAUTHORIZED;
   }
 
-  const errorMap: Record<string, string> = {
-    ENOENT: FileReadErrorCode.ENOENT,
-    EACCES: FileReadErrorCode.EACCES,
-    EISDIR: FileReadErrorCode.EISDIR,
-    EMFILE: FileReadErrorCode.EMFILE,
-    EBUSY: FileReadErrorCode.EBUSY
-  };
-
-  if (fileResult.errorCode && errorMap[fileResult.errorCode]) {
-    return errorMap[fileResult.errorCode];
-  }
-
-  return fileResult.error?.substring(0, 200) || FileReadErrorCode.UNKNOWN;
+  return (fileResult.errorCode && fileErrorCodeMap[fileResult.errorCode])
+    ?? fileResult.error?.substring(0, 200)
+    ?? FileReadErrorCode.UNKNOWN;
 }
 
 export function registerTools(server: McpServer) {
