@@ -43,7 +43,9 @@ jobs:
       - name: Run tests
         run: npm test
 
-  # ── ② Release: semantic-release bumps version + publishes to npm ──────────
+  # ── ② Release: semantic-release bumps version + publishes to npm ──────────────
+  # Note: semantic-release internally runs npm install and build as part of its
+  # publish process. We run npm pack --dry-run here as a fast pre-publish check.
   release:
     name: Release and publish
     needs: ci
@@ -51,7 +53,6 @@ jobs:
     environment: npm
     permissions:
       contents: write
-      id-token: write
     outputs:
       version: ${{ steps.sr.outputs.version }}
     steps:
