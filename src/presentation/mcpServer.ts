@@ -62,6 +62,30 @@ function createNodeIdSet<T extends { id: string }>(nodes: T[]): Set<string> {
 
 const SHELL_METACHAR_RE = /[&|;<>$`\\\n\r]/;
 
+/**
+ * Safely reads a file by resolving its realpath, verifying authorization,
+ * and reading from a secure file descriptor to prevent TOCTOU symlink races.
+ */
+function readAuthorizedFileSync(absPath: string, authorizedProjects: { dir: string }[]): { content: string | null; error?: string; errorCode?: string } {
+  let fd: number | null = null;
+  try {
+    fd = fs.openSync(absPath, "r");
+    const realPath = fs.realpathSync(absPath);
+    if (!isPathInAuthorizedProjects(realPath, authorizedProjects)) {
+      return { content: null, error: "Unauthorized file path" };
+    }
+    const content = fs.readFileSync(fd, "utf-8");
+    return { content };
+  } catch (err) {
+    const error = err as NodeJS.ErrnoException;
+    return { content: null, error: error.message, errorCode: error.code };
+  } finally {
+    if (fd !== null) {
+      try { fs.closeSync(fd); } catch { /* ignore */ }
+    }
+  }
+}
+
 export function registerTools(server: McpServer) {
   // Tool -1: Analyze a project
   server.tool(
@@ -1730,21 +1754,9 @@ export function registerTools(server: McpServer) {
       for (const filePath of allFiles) {
         if (results.length >= maxRes) break;
         try {
-          let fh;
-          let content: string;
-          try {
-            // Open a file handle to prevent symlink substitution after realpath resolution
-            fh = await fs.promises.open(filePath, "r");
-            const fdRealPath = await fs.promises.realpath(filePath);
-            if (!isPathInAuthorizedProjects(fdRealPath, authorizedProjects)) {
-               continue;
-            }
-            content = await fh.readFile("utf-8");
-          } catch {
-            continue;
-          } finally {
-            if (fh) await fh.close();
-          }
+          const fileResult = readAuthorizedFileSync(filePath, authorizedProjects);
+          if (fileResult.error || fileResult.content === null) continue;
+          const content = fileResult.content;
 
           // Fast path to skip files that definitely don't contain the query
           // This avoids expensive .split('\n') and per-line iterations for most files
@@ -2681,29 +2693,17 @@ def register(ctx):
           ? node.filePath!
           : path.resolve(loaded.projectDir, node.filePath!);
 
-        let content: string;
-        let fd: number | null = null;
-        try {
-          fd = fs.openSync(absPath, "r");
-          const realPath = fs.realpathSync(absPath);
-          if (!isPathInAuthorizedProjects(realPath, authorizedProjects)) {
-            results.push({ symbol: node.label, file: absPath, error: "Unauthorized file path" });
-            continue;
-          }
-          content = fs.readFileSync(fd, "utf-8");
-        } catch (err: any) {
-          if (err.code === 'ENOENT') {
+        const fileResult = readAuthorizedFileSync(absPath, authorizedProjects);
+        if (fileResult.error || fileResult.content === null) {
+          if (fileResult.errorCode === 'ENOENT') {
             results.push({ symbol: node.label, file: absPath, error: "File not found" });
           } else {
-            results.push({ symbol: node.label, file: absPath, error: err.message?.substring(0, 200) });
+            results.push({ symbol: node.label, file: absPath, error: fileResult.error?.substring(0, 200) || "Unknown error" });
           }
           continue;
-        } finally {
-          if (fd !== null) {
-            fs.closeSync(fd);
-            fd = null;
-          }
         }
+        const content = fileResult.content;
+
         try {
           const lines = content.split("\n");
           const targetLine = (node.line || 1) - 1;
@@ -2914,15 +2914,11 @@ def register(ctx):
 
       for (const node of functions.slice(0, 300)) { // Limit to 300 for perf
         const absPath = path.isAbsolute(node.filePath!) ? node.filePath! : path.resolve(loaded.projectDir, node.filePath!);
-        let fd: number | null = null;
         try {
-          fd = fs.openSync(absPath, "r");
-          const realPath = fs.realpathSync(absPath);
-          if (!isPathInAuthorizedProjects(realPath, authorizedProjects)) {
-            continue;
-          }
+          const fileResult = readAuthorizedFileSync(absPath, authorizedProjects);
+          if (fileResult.error || fileResult.content === null) continue;
 
-          const content = fs.readFileSync(fd, "utf-8");
+          const content = fileResult.content;
 
           const lines = content.split("\n");
           const start = (node.line || 1) - 1;
@@ -2935,11 +2931,6 @@ def register(ctx):
           tokenized.push({ node, tokens, source: body.substring(0, 300) });
         } catch {
           /* skip */
-        } finally {
-          if (fd !== null) {
-            fs.closeSync(fd);
-            fd = null;
-          }
         }
       }
 
