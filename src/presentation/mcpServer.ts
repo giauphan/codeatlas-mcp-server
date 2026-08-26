@@ -110,6 +110,8 @@ enum FileReadErrorCode {
   ENOENT = "File not found",
   EACCES = "Permission denied",
   EISDIR = "Path is a directory",
+  EMFILE = "Too many open files",
+  EBUSY = "Resource busy or locked",
   UNAUTHORIZED = "Unauthorized file path",
   UNKNOWN = "Unknown error"
 }
@@ -121,6 +123,10 @@ function formatFileResultError(fileResult: { error?: string; errorCode?: string 
     return FileReadErrorCode.EACCES;
   } else if (fileResult.errorCode === 'EISDIR') {
     return FileReadErrorCode.EISDIR;
+  } else if (fileResult.errorCode === 'EMFILE') {
+    return FileReadErrorCode.EMFILE;
+  } else if (fileResult.errorCode === 'EBUSY') {
+    return FileReadErrorCode.EBUSY;
   } else if (fileResult.error === "Unauthorized file path") {
     return FileReadErrorCode.UNAUTHORIZED;
   }
