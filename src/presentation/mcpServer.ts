@@ -79,7 +79,7 @@ function readAuthorizedFileSync(absPath: string, authorizedProjects: { dir: stri
     const realPath = fs.realpathSync(absPath);
     if (!isPathInAuthorizedProjects(realPath, authorizedProjects)) {
       // Do not log the actual realPath in production to avoid leaking sensitive directory structure
-      console.warn(`[Security] Unauthorized file access attempt blocked for requested path: ${absPath}`);
+      console.warn(`[Security] Unauthorized file access attempt blocked for requested path: ${path.basename(absPath)}`);
       return { content: null, error: "Unauthorized file path" };
     }
     const content = fs.readFileSync(fd, "utf-8");
@@ -92,6 +92,19 @@ function readAuthorizedFileSync(absPath: string, authorizedProjects: { dir: stri
       try { fs.closeSync(fd); } catch { /* ignore */ }
     }
   }
+}
+
+function formatFileResultError(fileResult: { error?: string; errorCode?: string }): string {
+  if (fileResult.errorCode === 'ENOENT') {
+    return "File not found";
+  } else if (fileResult.errorCode === 'EACCES') {
+    return "Permission denied";
+  } else if (fileResult.errorCode === 'EISDIR') {
+    return "Path is a directory";
+  } else if (fileResult.error === "Unauthorized file path") {
+    return "Unauthorized file path";
+  }
+  return fileResult.error?.substring(0, 200) || "Unknown error";
 }
 
 export function registerTools(server: McpServer) {
@@ -2708,32 +2721,11 @@ def register(ctx):
 
         const fileResult = readAuthorizedFileSync(absPath, authorizedProjects);
         if (fileResult.error || fileResult.content === null) {
-          if (fileResult.errorCode === 'ENOENT') {
-            results.push({
-              symbol: node.label,
-              file: absPath,
-              error: "File not found"
-            });
-          } else if (fileResult.errorCode === 'EACCES') {
-            results.push({
-              symbol: node.label,
-              file: absPath,
-              error: "Permission denied"
-            });
-          } else if (fileResult.errorCode === 'EISDIR') {
-            results.push({
-              symbol: node.label,
-              file: absPath,
-              error: "Path is a directory"
-            });
-          } else {
-            console.warn(`[get_code_snippet] Unexpected error reading file ${absPath}: ${fileResult.error}`);
-            results.push({
-              symbol: node.label,
-              file: absPath,
-              error: fileResult.error?.substring(0, 200) || "Unknown error"
-            });
+          const errorMessage = formatFileResultError(fileResult);
+          if (errorMessage === "Unknown error" || errorMessage === fileResult.error?.substring(0, 200)) {
+            console.warn(`[get_code_snippet] Unexpected error reading file ${path.basename(absPath)}: ${fileResult.error}`);
           }
+          results.push({ symbol: node.label, file: absPath, error: errorMessage });
           continue;
         }
         const content = fileResult.content;
