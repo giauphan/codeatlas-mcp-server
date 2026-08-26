@@ -125,7 +125,7 @@ const fileErrorCodeMap: Record<string, string> = {
   EBUSY: FileReadErrorCode.EBUSY
 };
 
-function formatFileResultError(fileResult: { error?: string; errorCode?: string }): string {
+function formatFileResultError(fileResult: FileReadResult): string {
   if (fileResult.error === "Unauthorized file path") {
     return FileReadErrorCode.UNAUTHORIZED;
   }
