@@ -66,6 +66,8 @@ codeatlas-mcp-server/
 
    A release is automatically published to npm when a `feat:` or `fix:` commit is merged into `main`. Version bumping, git tagging, changelog generation, and npm publish are handled by semantic-release — no manual steps required.
 
+   See `.releaserc.json` for the full release configuration (plugins, branch rules, tag format).
+
 5. Open a Pull Request against `main`.
 
 ## Code Standards
