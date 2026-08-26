@@ -2999,8 +2999,8 @@ def register(ctx):
           // Tokenize: identifiers + keywords (skip whitespace, punctuation)
           const tokens = getTokensFromSource(body);
           tokenized.push({ node, tokens, source: body.substring(0, 300) });
-        } catch {
-          /* skip */
+        } catch (err: unknown) {
+          console.error(`[detect_code_similarities] Error analyzing function ${node.label} in ${node.filePath}:`, err);
         }
       }
 
