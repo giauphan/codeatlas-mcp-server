@@ -70,6 +70,10 @@ interface FileReadResult {
   errorCode?: string;
 }
 
+function isFileReadResultValid(result: FileReadResult): result is FileReadResult & { content: string } {
+  return !result.error && result.content !== null;
+}
+
 /**
  * Helper to safely read a file inside authorized projects asynchronously.
  * Prevents TOCTOU symlink races by resolving the real path first, validating it,
@@ -1825,7 +1829,7 @@ export function registerTools(server: McpServer) {
         if (results.length >= maxRes) break;
         try {
           const fileResult = await safeReadAuthorizedFile(filePath, authorizedProjects);
-          if (fileResult.error || fileResult.content === null) {
+          if (!isFileReadResultValid(fileResult)) {
             pushFileErrorResult(results, fileResult, { file: path.relative(loaded.projectDir, filePath) }, "code_search");
             continue;
           }
@@ -2767,7 +2771,7 @@ def register(ctx):
           : path.resolve(loaded.projectDir, node.filePath!);
 
         const fileResult = await safeReadAuthorizedFile(absPath, authorizedProjects);
-        if (fileResult.error || fileResult.content === null) {
+        if (!isFileReadResultValid(fileResult)) {
           pushFileErrorResult(results, fileResult, { symbol: node.label, file: path.relative(loaded.projectDir, absPath) }, "get_code_snippet");
           continue;
         }
@@ -2985,7 +2989,7 @@ def register(ctx):
         const absPath = path.isAbsolute(node.filePath!) ? node.filePath! : path.resolve(loaded.projectDir, node.filePath!);
         try {
           const fileResult = await safeReadAuthorizedFile(absPath, authorizedProjects);
-          if (fileResult.error || fileResult.content === null) {
+          if (!isFileReadResultValid(fileResult)) {
             pushFileErrorResult([], fileResult, {}, "detect_code_similarities"); // Just log warnings for code similarities, no direct results array for files
             continue;
           }
