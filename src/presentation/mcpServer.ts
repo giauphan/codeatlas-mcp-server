@@ -62,6 +62,8 @@ function createNodeIdSet<T extends { id: string }>(nodes: T[]): Set<string> {
 
 const SHELL_METACHAR_RE = /[&|;<>$`\\\n\r]/;
 
+const DEFAULT_MAX_FUNCTIONS_TO_COMPARE = 300; // Default limit for similarity logic
+
 interface FileReadResult {
   content: string | null;
   error?: string;
@@ -2954,7 +2956,6 @@ def register(ctx):
 
       const thresh = Math.max(0.2, Math.min(threshold ?? 0.6, 1.0));
       const maxPairs = limit || 20;
-      const MAX_FUNCTIONS_TO_COMPARE = 300; // Limit for performance
 
       const functions = loaded.analysis.graph.nodes.filter(
         n => (n.type === "function" || n.type === "class") && n.filePath && !n.id.startsWith("external:")
@@ -2980,7 +2981,7 @@ def register(ctx):
 
       const authorizedProjects = await discoverProjectsAsync(auth.uid);
 
-      for (const node of functions.slice(0, MAX_FUNCTIONS_TO_COMPARE)) {
+      for (const node of functions.slice(0, DEFAULT_MAX_FUNCTIONS_TO_COMPARE)) {
         const absPath = path.isAbsolute(node.filePath!) ? node.filePath! : path.resolve(loaded.projectDir, node.filePath!);
         try {
           const fileResult = await safeReadAuthorizedFile(absPath, authorizedProjects);
