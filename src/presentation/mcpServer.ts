@@ -74,10 +74,12 @@ const SHELL_METACHAR_RE = /[&|;<>$`\\\n\r]/;
 function readAuthorizedFileSync(absPath: string, authorizedProjects: { dir: string }[]): { content: string | null; error?: string; errorCode?: string } {
   let fd: number | null = null;
   try {
+    // Open the file descriptor in read-only mode to prevent TOCTOU substitution
     fd = fs.openSync(absPath, "r");
     const realPath = fs.realpathSync(absPath);
     if (!isPathInAuthorizedProjects(realPath, authorizedProjects)) {
-      console.warn(`Unauthorized file access attempt: ${realPath}`);
+      // Do not log the actual realPath in production to avoid leaking sensitive directory structure
+      console.warn(`[Security] Unauthorized file access attempt blocked for requested path: ${absPath}`);
       return { content: null, error: "Unauthorized file path" };
     }
     const content = fs.readFileSync(fd, "utf-8");
@@ -2707,14 +2709,30 @@ def register(ctx):
         const fileResult = readAuthorizedFileSync(absPath, authorizedProjects);
         if (fileResult.error || fileResult.content === null) {
           if (fileResult.errorCode === 'ENOENT') {
-            results.push({ symbol: node.label, file: absPath, error: "File not found" });
+            results.push({
+              symbol: node.label,
+              file: absPath,
+              error: "File not found"
+            });
           } else if (fileResult.errorCode === 'EACCES') {
-            results.push({ symbol: node.label, file: absPath, error: "Permission denied" });
+            results.push({
+              symbol: node.label,
+              file: absPath,
+              error: "Permission denied"
+            });
           } else if (fileResult.errorCode === 'EISDIR') {
-            results.push({ symbol: node.label, file: absPath, error: "Path is a directory" });
+            results.push({
+              symbol: node.label,
+              file: absPath,
+              error: "Path is a directory"
+            });
           } else {
             console.warn(`[get_code_snippet] Unexpected error reading file ${absPath}: ${fileResult.error}`);
-            results.push({ symbol: node.label, file: absPath, error: fileResult.error?.substring(0, 200) || "Unknown error" });
+            results.push({
+              symbol: node.label,
+              file: absPath,
+              error: fileResult.error?.substring(0, 200) || "Unknown error"
+            });
           }
           continue;
         }
