@@ -5,11 +5,12 @@ on:
     branches: [main]
   workflow_dispatch:
 
+defaults:
+  run:
+    shell: bash
+
 permissions:
   contents: write
-  issues: write
-  pull-requests: write
-  id-token: write
 
 concurrency:
   group: release-main
@@ -45,6 +46,9 @@ jobs:
     needs: ci
     runs-on: ubuntu-latest
     environment: npm
+    permissions:
+      contents: write
+      id-token: write
     outputs:
       version: ${{ steps.sr.outputs.version }}
     steps:
@@ -105,7 +109,7 @@ jobs:
           echo "Downloaded: $TARBALL"
           echo "tarball=$TARBALL" >> $GITHUB_OUTPUT
 
-          # Unpack for inspection
+          # List all published files
           tar -tzf "$TARBALL" | sort > /tmp/published-files.txt
           echo "=== Published files ==="
           cat /tmp/published-files.txt
@@ -139,18 +143,17 @@ jobs:
           fi
           echo "  ✓ Version matches"
 
-      - name: Install globally and verify CLI entry point
+      - name: Install globally and verify CLI entry points
         run: |
           PKG_VERSION=${{ needs.release.outputs.version }}
           echo "Installing codeatlas-mcp-server@$PKG_VERSION globally..."
 
           npm install -g codeatlas-mcp-server@$PKG_VERSION
 
-          # Verify the binary is installed and executable
+          # Verify all CLI binaries are installed and loadable
           for CMD in codeatlas codeatlas-mcp codeatlas-enterprise; do
             if command -v $CMD &>/dev/null; then
               echo "  ✓ $CMD found in PATH"
-              # Quick sanity: run with --help or --version (exit 0 or 1 is fine, just check it loads)
               $CMD --help 2>&1 | head -3 || true
             else
               echo "  ✗ MISSING: $CMD not found in PATH"

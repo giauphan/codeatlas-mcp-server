@@ -57,6 +57,15 @@ codeatlas-mcp-server/
    docs: update MCP tools table
    ```
 
+   Commit message format: `<type>(<scope>): <description>`
+
+   - `feat:` — new feature (triggers MINOR version bump, e.g. 3.1.0 → 3.2.0)
+   - `fix:` — bug fix (triggers PATCH version bump, e.g. 3.1.0 → 3.1.1)
+   - `feat!:` or `BREAKING CHANGE:` — breaking change (triggers MAJOR bump, e.g. 3.1.0 → 4.0.0)
+   - `docs:`, `chore:`, `refactor:`, `test:` — no version bump (no release)
+
+   A release is automatically published to npm when a `feat:` or `fix:` commit is merged into `main`. Version bumping, git tagging, changelog generation, and npm publish are handled by semantic-release — no manual steps required.
+
 5. Open a Pull Request against `main`.
 
 ## Code Standards
