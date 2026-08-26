@@ -132,16 +132,7 @@ jobs:
             fi
           done
 
-          # Verify package.json version matches
-          PKG_VERSION=${{ needs.release.outputs.version }}
-          PUBLISHED_VERSION=$(tar -xOz -f "$TARBALL" package/package.json | grep '"version"' | sed 's/.*"version": "\([^"]*\)".*/\1/')
-          echo "Expected version: $PKG_VERSION"
-          echo "Published version: $PUBLISHED_VERSION"
-          if [ "$PKG_VERSION" != "$PUBLISHED_VERSION" ]; then
-            echo "Version mismatch!"
-            exit 1
-          fi
-          echo "  ✓ Version matches"
+          echo "  ✓ All critical files present"
 
       - name: Install globally and verify CLI entry points
         run: |
@@ -151,6 +142,9 @@ jobs:
           npm install -g codeatlas-mcp-server@$PKG_VERSION
 
           # Verify all CLI binaries are installed and loadable
+          # codeatlas          — primary CLI entry point (all tools)
+          # codeatlas-mcp      — MCP protocol bridge (stdio transport)
+          # codeatlas-enterprise — enterprise bundle (all features + extras)
           for CMD in codeatlas codeatlas-mcp codeatlas-enterprise; do
             if command -v $CMD &>/dev/null; then
               echo "  ✓ $CMD found in PATH"

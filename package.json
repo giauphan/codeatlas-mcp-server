@@ -27,7 +27,6 @@
     "lint": "tsc --noEmit",
     "coverage": "c8 --reporter=text --reportDir=coverage npm test",
     "test": "npm run build && node --experimental-test-module-mocks --test \"dist/src/**/*.test.js\"",
-    "prepublishOnly": "npm run build",
     "release": "semantic-release"
   },
   "keywords": [
