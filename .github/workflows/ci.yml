@@ -33,6 +33,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
+          # Keep Node 20 for lint — TypeScript type-checking has no Node version requirement.
           node-version: 20
           cache: npm
 
@@ -53,7 +54,8 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          # Node 22 matches the test job — no harm in keeping build on the same runtime.
+          node-version: 22
           cache: npm
 
       - name: Install dependencies
@@ -83,7 +85,8 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          # Module mocking and test glob support require Node.js 22+.
+          node-version: 22
           cache: npm
 
       - name: Install dependencies
