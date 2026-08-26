@@ -68,7 +68,12 @@ jobs:
 
       - name: Release and publish
         id: sr
-        run: npm run release
+        run: |
+          npm run release
+          # semantic-release bumps package.json in-place — read the new version directly
+          VERSION=$(node -e "console.log(require('./package.json').version)")
+          echo "Released version: $VERSION"
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
@@ -114,7 +119,6 @@ jobs:
           for FILE in \
             "package/dist/index.js" \
             "package/README.md" \
-            "package/package.json" \
             "package/package.json"; do
             if tar -tzf "$TARBALL" | grep -q "^$FILE$"; then
               echo "  ✓ $FILE"
