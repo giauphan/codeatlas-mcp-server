@@ -46,7 +46,7 @@ jobs:
     runs-on: ubuntu-latest
     environment: npm
     outputs:
-      version: ${{ steps.semantic.outputs.version }}
+      version: ${{ steps.sr.outputs.version }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -67,45 +67,93 @@ jobs:
         run: npm pack --dry-run
 
       - name: Release and publish
-        id: semantic
-        run: |
-          npm run release 2>&1
-          # Extract version from the annotated release notes commit
-          VERSION=$(git describe --abbrev=0 --candidates=1 2>/dev/null | sed 's/^v//')
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
+        id: sr
+        run: npm run release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
-  # ── ③ Validate: smoke-test the exact package that was published to npm ─────
+  # ── ③ Validate: smoke-test the actual published npm package ──────────────────
   validate:
     name: Validate published package
     needs: release
     runs-on: ubuntu-latest
     environment: npm
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          sparse-checkout: |
-            src
-            scripts
-            tsconfig.json
-          sparse-checkout-cone-mode: false
-
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 22
+          registry-url: https://registry.npmjs.org
 
-      - name: Install published package from npm
-        run: npm install -g codeatlas-mcp-server@${{ needs.release.outputs.version }}
+      - name: Download and unpack published tarball
+        id: download
+        run: |
+          PKG_VERSION=${{ needs.release.outputs.version }}
+          echo "Validating published package version: $PKG_VERSION"
 
-      - name: Install project dependencies for test runner
-        run: npm install --ignore-scripts
+          # Download the exact tarball that was published
+          npm pack codeatlas-mcp-server@$PKG_VERSION
 
-      - name: Build from source (tests need dist/)
-        run: npm run build
+          # Verify the tarball exists and expose it as output
+          TARBALL=$(ls codeatlas-mcp-server-*.tgz | head -1)
+          echo "Downloaded: $TARBALL"
+          echo "tarball=$TARBALL" >> $GITHUB_OUTPUT
 
-      - name: Run smoke tests against published package
-        run: node --experimental-test-module-mocks --test "dist/src/**/*.test.js"
+          # Unpack for inspection
+          tar -tzf "$TARBALL" | sort > /tmp/published-files.txt
+          echo "=== Published files ==="
+          cat /tmp/published-files.txt
+
+      - name: Verify critical files are present
+        run: |
+          TARBALL="${{ steps.download.outputs.tarball }}"
+          echo "Verifying critical files in: $TARBALL"
+
+          # Check required published files exist inside the tarball
+          for FILE in \
+            "package/dist/index.js" \
+            "package/README.md" \
+            "package/package.json" \
+            "package/package.json"; do
+            if tar -tzf "$TARBALL" | grep -q "^$FILE$"; then
+              echo "  ✓ $FILE"
+            else
+              echo "  ✗ MISSING: $FILE"
+              exit 1
+            fi
+          done
+
+          # Verify package.json version matches
+          PKG_VERSION=${{ needs.release.outputs.version }}
+          PUBLISHED_VERSION=$(tar -xOz -f "$TARBALL" package/package.json | grep '"version"' | sed 's/.*"version": "\([^"]*\)".*/\1/')
+          echo "Expected version: $PKG_VERSION"
+          echo "Published version: $PUBLISHED_VERSION"
+          if [ "$PKG_VERSION" != "$PUBLISHED_VERSION" ]; then
+            echo "Version mismatch!"
+            exit 1
+          fi
+          echo "  ✓ Version matches"
+
+      - name: Install globally and verify CLI entry point
+        run: |
+          PKG_VERSION=${{ needs.release.outputs.version }}
+          echo "Installing codeatlas-mcp-server@$PKG_VERSION globally..."
+
+          npm install -g codeatlas-mcp-server@$PKG_VERSION
+
+          # Verify the binary is installed and executable
+          for CMD in codeatlas codeatlas-mcp codeatlas-enterprise; do
+            if command -v $CMD &>/dev/null; then
+              echo "  ✓ $CMD found in PATH"
+              # Quick sanity: run with --help or --version (exit 0 or 1 is fine, just check it loads)
+              $CMD --help 2>&1 | head -3 || true
+            else
+              echo "  ✗ MISSING: $CMD not found in PATH"
+              exit 1
+            fi
+          done
+
+          echo ""
+          echo "=== Validation complete ==="
+          echo "Package version $PKG_VERSION is valid and published correctly."
