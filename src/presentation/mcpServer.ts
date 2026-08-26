@@ -89,6 +89,19 @@ function readAuthorizedFileSync(absPath: string, authorizedProjects: { dir: stri
   }
 }
 
+function formatFileResultError(fileResult: { error?: string; errorCode?: string }): string {
+  if (fileResult.errorCode === 'ENOENT') {
+    return "File not found";
+  } else if (fileResult.errorCode === 'EACCES') {
+    return "Permission denied";
+  } else if (fileResult.errorCode === 'EISDIR') {
+    return "Path is a directory";
+  } else if (fileResult.error === "Unauthorized file path") {
+    return "Unauthorized file path";
+  }
+  return fileResult.error?.substring(0, 200) || "Unknown error";
+}
+
 export function registerTools(server: McpServer) {
   // Tool -1: Analyze a project
   server.tool(
@@ -1751,6 +1764,7 @@ export function registerTools(server: McpServer) {
         walkDir(loaded.projectDir, 0);
       } catch { /* fallback */ }
 
+      // Cache authorized projects to avoid repeated async calls in highly concurrent settings
       const authorizedProjects = await discoverProjectsAsync(auth.uid);
 
       const results: Array<{ file: string; line: number; content: string; contextBefore: string[]; contextAfter: string[] }> = [];
@@ -1759,7 +1773,10 @@ export function registerTools(server: McpServer) {
         try {
           const fileResult = readAuthorizedFileSync(filePath, authorizedProjects);
           if (fileResult.error || fileResult.content === null) {
-            if (fileResult.errorCode !== 'ENOENT') {
+            const errorMessage = formatFileResultError(fileResult);
+            if (errorMessage === "Unknown error" || errorMessage === fileResult.error?.substring(0, 200)) {
+               // Mask full file path from logs unless it's a critical operational error.
+               // We only log the base name to prevent accidental leakage of sensitive directory structures.
                console.warn(`[code_search] Unexpected error reading file ${path.basename(filePath)}: ${fileResult.error}`);
             }
             continue;
@@ -2900,6 +2917,7 @@ def register(ctx):
 
       const thresh = Math.max(0.2, Math.min(threshold ?? 0.6, 1.0));
       const maxPairs = limit || 20;
+      const MAX_FUNCTIONS_TO_COMPARE = 300; // Limit for performance
 
       const functions = loaded.analysis.graph.nodes.filter(
         n => (n.type === "function" || n.type === "class") && n.filePath && !n.id.startsWith("external:")
@@ -2925,12 +2943,13 @@ def register(ctx):
 
       const authorizedProjects = await discoverProjectsAsync(auth.uid);
 
-      for (const node of functions.slice(0, 300)) { // Limit to 300 for perf
+      for (const node of functions.slice(0, MAX_FUNCTIONS_TO_COMPARE)) {
         const absPath = path.isAbsolute(node.filePath!) ? node.filePath! : path.resolve(loaded.projectDir, node.filePath!);
         try {
           const fileResult = readAuthorizedFileSync(absPath, authorizedProjects);
           if (fileResult.error || fileResult.content === null) {
-            if (fileResult.errorCode !== 'ENOENT') {
+            const errorMessage = formatFileResultError(fileResult);
+            if (errorMessage === "Unknown error" || errorMessage === fileResult.error?.substring(0, 200)) {
                console.warn(`[detect_code_similarities] Unexpected error reading file ${path.basename(absPath)}: ${fileResult.error}`);
             }
             continue;
