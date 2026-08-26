@@ -117,19 +117,22 @@ enum FileReadErrorCode {
 }
 
 function formatFileResultError(fileResult: { error?: string; errorCode?: string }): string {
-  if (fileResult.errorCode === 'ENOENT') {
-    return FileReadErrorCode.ENOENT;
-  } else if (fileResult.errorCode === 'EACCES') {
-    return FileReadErrorCode.EACCES;
-  } else if (fileResult.errorCode === 'EISDIR') {
-    return FileReadErrorCode.EISDIR;
-  } else if (fileResult.errorCode === 'EMFILE') {
-    return FileReadErrorCode.EMFILE;
-  } else if (fileResult.errorCode === 'EBUSY') {
-    return FileReadErrorCode.EBUSY;
-  } else if (fileResult.error === "Unauthorized file path") {
+  if (fileResult.error === "Unauthorized file path") {
     return FileReadErrorCode.UNAUTHORIZED;
   }
+
+  const errorMap: Record<string, string> = {
+    ENOENT: FileReadErrorCode.ENOENT,
+    EACCES: FileReadErrorCode.EACCES,
+    EISDIR: FileReadErrorCode.EISDIR,
+    EMFILE: FileReadErrorCode.EMFILE,
+    EBUSY: FileReadErrorCode.EBUSY
+  };
+
+  if (fileResult.errorCode && errorMap[fileResult.errorCode]) {
+    return errorMap[fileResult.errorCode];
+  }
+
   return fileResult.error?.substring(0, 200) || FileReadErrorCode.UNKNOWN;
 }
 
