@@ -1730,10 +1730,22 @@ export function registerTools(server: McpServer) {
       for (const filePath of allFiles) {
         if (results.length >= maxRes) break;
         try {
-          const realPath = fs.realpathSync(filePath);
-          if (!isPathInAuthorizedProjects(realPath, authorizedProjects)) continue;
-
-          const content = await fs.promises.readFile(realPath, "utf-8");
+          let fh;
+          let content: string;
+          try {
+            // Open a file handle to prevent symlink substitution after realpath resolution
+            fh = await fs.promises.open(filePath, "r");
+            const fdRealPath = await fs.promises.realpath(filePath);
+            if (!isPathInAuthorizedProjects(fdRealPath, authorizedProjects)) {
+               await fh.close();
+               continue;
+            }
+            content = await fh.readFile("utf-8");
+            await fh.close();
+          } catch {
+            if (fh) await fh.close();
+            continue;
+          }
 
           // Fast path to skip files that definitely don't contain the query
           // This avoids expensive .split('\n') and per-line iterations for most files
@@ -2671,14 +2683,20 @@ def register(ctx):
           : path.resolve(loaded.projectDir, node.filePath!);
 
         let content: string;
+        let fd: number | null = null;
         try {
+          fd = fs.openSync(absPath, "r");
           const realPath = fs.realpathSync(absPath);
           if (!isPathInAuthorizedProjects(realPath, authorizedProjects)) {
+            fs.closeSync(fd);
             results.push({ symbol: node.label, file: absPath, error: "Unauthorized file path" });
             continue;
           }
-          content = fs.readFileSync(realPath, "utf-8");
+          content = fs.readFileSync(fd, "utf-8");
+          fs.closeSync(fd);
+          fd = null;
         } catch (err: any) {
+          if (fd !== null) fs.closeSync(fd);
           if (err.code === 'ENOENT') {
             results.push({ symbol: node.label, file: absPath, error: "File not found" });
           } else {
@@ -2896,11 +2914,19 @@ def register(ctx):
 
       for (const node of functions.slice(0, 300)) { // Limit to 300 for perf
         const absPath = path.isAbsolute(node.filePath!) ? node.filePath! : path.resolve(loaded.projectDir, node.filePath!);
+        let fd: number | null = null;
         try {
+          fd = fs.openSync(absPath, "r");
           const realPath = fs.realpathSync(absPath);
-          if (!isPathInAuthorizedProjects(realPath, authorizedProjects)) continue;
+          if (!isPathInAuthorizedProjects(realPath, authorizedProjects)) {
+            fs.closeSync(fd);
+            continue;
+          }
 
-          const content = fs.readFileSync(realPath, "utf-8");
+          const content = fs.readFileSync(fd, "utf-8");
+          fs.closeSync(fd);
+          fd = null;
+
           const lines = content.split("\n");
           const start = (node.line || 1) - 1;
 
