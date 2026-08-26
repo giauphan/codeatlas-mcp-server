@@ -127,7 +127,7 @@ describe("CodeAnalyzer allFiles Set implementation", () => {
     const analyzer = new CodeAnalyzer(INCREMENTAL_TEST_DIR);
     await analyzer.analyzeProject();
 
-    const newFilePath = path.join(INCREMENTAL_TEST_DIR, "c.ts");
+    const newFilePath = path.resolve(INCREMENTAL_TEST_DIR, "c.ts");
     fs.writeFileSync(newFilePath, "export const c = 3;");
 
     const result = await analyzer.analyzeFileIncremental(newFilePath);
