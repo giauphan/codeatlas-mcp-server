@@ -81,6 +81,10 @@ function isFileReadResultValid(result: FileReadResult): result is FileReadResult
  * Uses async operations to prevent blocking the Node.js event loop.
  */
 async function safeReadAuthorizedFile(absPath: string, authorizedProjects: { dir: string }[]): Promise<FileReadResult> {
+  if (!absPath || typeof absPath !== "string") {
+    return { content: null, error: "Invalid file path" };
+  }
+
   let fh: fs.promises.FileHandle | null = null;
   try {
     // Resolve the real path first to expand symlinks and get the canonical path
