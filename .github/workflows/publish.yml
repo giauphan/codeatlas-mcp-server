@@ -16,10 +16,37 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # ── ① CI: lint + test on current (unbumped) code ───────────────────────────
+  ci:
+    name: CI (lint + test)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: TypeScript type check
+        run: npm run lint
+
+      - name: Run tests
+        run: npm test
+
+  # ── ② Release: semantic-release bumps version + publishes to npm ──────────
   release:
-    name: Verify, release, and publish
+    name: Release and publish
+    needs: ci
     runs-on: ubuntu-latest
     environment: npm
+    outputs:
+      version: ${{ steps.semantic.outputs.version }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -36,17 +63,49 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Run lint
-        run: npm run lint
-
-      - name: Run tests
-        run: npm test
-
       - name: Validate npm package contents
         run: npm pack --dry-run
 
       - name: Release and publish
-        run: npm run release
+        id: semantic
+        run: |
+          npm run release 2>&1
+          # Extract version from the annotated release notes commit
+          VERSION=$(git describe --abbrev=0 --candidates=1 2>/dev/null | sed 's/^v//')
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+  # ── ③ Validate: smoke-test the exact package that was published to npm ─────
+  validate:
+    name: Validate published package
+    needs: release
+    runs-on: ubuntu-latest
+    environment: npm
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            src
+            scripts
+            tsconfig.json
+          sparse-checkout-cone-mode: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install published package from npm
+        run: npm install -g codeatlas-mcp-server@${{ needs.release.outputs.version }}
+
+      - name: Install project dependencies for test runner
+        run: npm install --ignore-scripts
+
+      - name: Build from source (tests need dist/)
+        run: npm run build
+
+      - name: Run smoke tests against published package
+        run: node --experimental-test-module-mocks --test "dist/src/**/*.test.js"
