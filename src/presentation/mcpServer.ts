@@ -125,6 +125,18 @@ const fileErrorCodeMap: Record<string, string> = {
   EBUSY: FileReadErrorCode.EBUSY
 };
 
+function pushFileErrorResult(results: any[], fileResult: FileReadResult, meta: any = {}, logPrefix: string = "") {
+  const errorMessage = formatFileResultError(fileResult);
+  if (results) {
+    results.push({ ...meta, error: errorMessage });
+  }
+
+  // Log unexpected or unmapped errors (masking full paths for security)
+  if (errorMessage === FileReadErrorCode.UNKNOWN || errorMessage.startsWith("UnmappedError(")) {
+    console.warn(`[${logPrefix}] Unexpected file error: ${fileResult.error}`);
+  }
+}
+
 function formatFileResultError(fileResult: FileReadResult): string {
   if (fileResult.error === "Unauthorized file path") {
     return FileReadErrorCode.UNAUTHORIZED;
@@ -1812,12 +1824,7 @@ export function registerTools(server: McpServer) {
         try {
           const fileResult = await safeReadAuthorizedFile(filePath, authorizedProjects);
           if (fileResult.error || fileResult.content === null) {
-            const errorMessage = formatFileResultError(fileResult);
-            if (errorMessage === "Unknown error" || errorMessage === fileResult.error?.substring(0, 200)) {
-               // Mask full file path from logs unless it's a critical operational error.
-               // We only log the base name to prevent accidental leakage of sensitive directory structures.
-               console.warn(`[code_search] Unexpected error reading file ${path.basename(filePath)}: ${fileResult.error}`);
-            }
+            pushFileErrorResult(results, fileResult, { file: path.relative(loaded.projectDir, filePath) }, "code_search");
             continue;
           }
           const content = fileResult.content;
@@ -2759,16 +2766,7 @@ def register(ctx):
 
         const fileResult = await safeReadAuthorizedFile(absPath, authorizedProjects);
         if (fileResult.error || fileResult.content === null) {
-          if (fileResult.errorCode === 'ENOENT') {
-            results.push({ symbol: node.label, file: absPath, error: "File not found" });
-          } else if (fileResult.errorCode === 'EACCES') {
-            results.push({ symbol: node.label, file: absPath, error: "Permission denied" });
-          } else if (fileResult.errorCode === 'EISDIR') {
-            results.push({ symbol: node.label, file: absPath, error: "Path is a directory" });
-          } else {
-            console.warn(`[get_code_snippet] Unexpected error reading file ${path.basename(absPath)}: ${fileResult.error}`);
-            results.push({ symbol: node.label, file: absPath, error: fileResult.error?.substring(0, 200) || "Unknown error" });
-          }
+          pushFileErrorResult(results, fileResult, { symbol: node.label, file: path.relative(loaded.projectDir, absPath) }, "get_code_snippet");
           continue;
         }
         const content = fileResult.content;
@@ -2987,10 +2985,7 @@ def register(ctx):
         try {
           const fileResult = await safeReadAuthorizedFile(absPath, authorizedProjects);
           if (fileResult.error || fileResult.content === null) {
-            const errorMessage = formatFileResultError(fileResult);
-            if (errorMessage === "Unknown error" || errorMessage === fileResult.error?.substring(0, 200)) {
-               console.warn(`[detect_code_similarities] Unexpected error reading file ${path.basename(absPath)}: ${fileResult.error}`);
-            }
+            pushFileErrorResult([], fileResult, {}, "detect_code_similarities"); // Just log warnings for code similarities, no direct results array for files
             continue;
           }
 
