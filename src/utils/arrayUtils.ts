@@ -1,5 +1,8 @@
 /**
  * Finds the closest preceding class by line number using binary search.
+ * Searches for the class with the highest line number that is strictly less
+ * than `funcLine`. Assumes `reversedClasses` is sorted in descending order
+ * based on line numbers.
  * @param reversedClasses An array of classes that MUST be sorted descending by line number.
  * @param funcLine The line number of the function to compare against.
  */
@@ -12,7 +15,7 @@ export function binarySearchClosestPrecedingClass(
   reversedClasses: ClassReference[],
   funcLine: number
 ): ClassReference | undefined {
-  if (!reversedClasses || reversedClasses.length === 0) return undefined;
+  if (!Array.isArray(reversedClasses) || reversedClasses.length === 0) return undefined;
 
   let startIdx = 0;
   let endIdx = reversedClasses.length - 1;

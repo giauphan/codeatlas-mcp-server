@@ -2312,16 +2312,17 @@ export function registerTools(server: McpServer) {
             // This loop iterates over the remaining lines in the block, skipping empty lines,
             // and limits the collected files to a maximum of 15 items.
             ci.files = [];
+            const MAX_FILES = 15;
             for (let i = fi + 1; i < ls.length; i++) {
               if (ls[i].trim()) {
                 ci.files.push(ls[i]);
-                if (ci.files.length >= 15) break;
+                if (ci.files.length >= MAX_FILES) break;
               }
             }
           }
           result.recentCommits.push(ci);
         }
-      } catch (err: any) { result.error = err.message?.substring(0, 300); }
+      } catch (err: any) { result.error = err.message?.substring(0, 300) + (err.message?.length > 300 ? '... (truncated)' : ''); }
 
       return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
     }
