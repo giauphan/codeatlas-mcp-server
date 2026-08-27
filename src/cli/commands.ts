@@ -2,16 +2,14 @@
  * CodeAtlas CLI — Setup, Doctor, and Init commands
  * 
  * Usage:
- *   codeatlas-mcp init           # Interactive setup wizard
- *   codeatlas-mcp setup          # Same as init
- *   codeatlas-mcp doctor         # Health check & diagnostics
+ *   codeatlas-enterprise init     # Interactive setup wizard
+ *   codeatlas-enterprise setup    # Same as init
+ *   codeatlas-enterprise doctor   # Health check & diagnostics
  */
 
 import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
-import { spawnSync } from "child_process";
-import { fileURLToPath } from "url";
 import { getHermesConfigPath, getHermesPluginDir } from "../utils/pathUtils.js";
 import * as readline from "readline";
 
@@ -181,71 +179,12 @@ export async function cmdDoctor(): Promise<void> {
   console.log("=".repeat(50));
 }
 
-/* ── Update command ────────────────────────────────────────────── */
-
-export async function cmdUpdate(): Promise<void> {
-  console.log();
-  console.log(bold("╔══════════════════════════════════════════════════╗"));
-  console.log(bold("║   CodeAtlas Update Checker                      ║"));
-  console.log(bold("╚══════════════════════════════════════════════════╝"));
-
-  // Read current version from package.json
-  // Use process.cwd() reliably since CWD is the project root when running from source.
-  // When installed globally, cwd is typically the user's home or current dir.
-  const cwd = process.cwd();
-  const pkgPaths = [
-    path.join(cwd, "package.json"),
-    path.join(os.homedir(), ".nvm/versions/node/" + process.version.split(".")[0].replace("v", "") + ".0", "lib/node_modules/codeatlas-mcp-server/package.json"),
-    path.join(os.homedir(), "lib/node_modules/codeatlas-mcp-server/package.json"),
-  ];
-  let currentVersion = "unknown";
-  for (const pkgPath of pkgPaths) {
-    try {
-      if (fs.existsSync(pkgPath)) {
-        const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf-8"));
-        if (pkg.version) { currentVersion = pkg.version; break; }
-      }
-    } catch { /* try next */ }
-  }
-  console.log(`  Current version: ${bold(currentVersion)}`);
-
-  // Fetch latest version from npm
-  console.log(`  Checking npm for latest version...`);
-  const npmResult = spawnSync("npm", ["view", "codeatlas-mcp-server", "version"], {
-    encoding: "utf-8",
-    timeout: 15000,
-  });
-
-  if (npmResult.status !== 0) {
-    console.log(`  ${fail()} Failed to reach npm registry: ${npmResult.stderr || "network error"}`);
-    process.exit(1);
-  }
-
-  const latestVersion = npmResult.stdout.trim();
-
-  if (currentVersion === latestVersion) {
-    console.log(`  ${ok()} Already on the latest version: ${bold(latestVersion)}`);
-    process.exit(0);
-  }
-
-  console.log(`  Latest version:   ${bold(latestVersion)}`);
-  console.log(`  ${warn()} Update available`);
-  console.log();
-  console.log(`  Run to upgrade:`);
-  console.log(`    ${bold("npm install -g codeatlas-mcp-server")}`);
-  console.log();
-  console.log(`  Or from source:`);
-  console.log(`    ${bold("git pull && npm run build && npm install -g .")}`);
-  console.log();
-  console.log(`  After upgrading, restart any running MCP clients.`);
-}
-
 /* ── Main CLI router ────────────────────────────────────────────── */
 
 export function isCLICommand(argv: string[]): boolean {
   const cmd = argv[2];
   if (!cmd) return false;
-  return ["init", "setup", "doctor", "install-hooks", "update", "--help", "-h"].includes(cmd);
+  return ["init", "setup", "doctor", "--help", "-h"].includes(cmd);
 }
 
 export async function runCLI(): Promise<void> {
@@ -270,29 +209,15 @@ export async function runCLI(): Promise<void> {
     } else {
       await cmdSetup();
     }
-  } else if (cmd === "install-hooks") {
-    const dryRun = process.argv.includes("--dry-run");
-    const script = new URL("./hooks/install-brain-hooks.sh", import.meta.url);
-    const dryArgs = dryRun ? ["--dry-run"] : [];
-    if (!fs.existsSync(script)) {
-      console.error("Error: install-brain-hooks.sh missing from package. Rebuild with 'npm run build' or reinstall.");
-      process.exit(1);
-    }
-    const r = spawnSync("bash", [fileURLToPath(script), ...dryArgs], { stdio: "inherit" });
-    process.exit(r.status ?? 1);
-  } else if (cmd === "update") {
-    await cmdUpdate();
   } else if (cmd === "--help" || cmd === "-h") {
     console.log(`
-Usage: codeatlas-mcp <command>
+Usage: codeatlas-enterprise <command>
 
 Commands:
   init           Interactive Second Brain setup wizard
   setup          Same as init
   setup claude   Install Claude hooks and configs
-  install-hooks  Install/update Second Brain hooks in ~/.claude
   doctor         Health check & diagnostics
-  update         Check for updates and upgrade from npm
 
 Without a command, runs the MCP server.
 `);

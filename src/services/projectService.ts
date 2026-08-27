@@ -347,6 +347,7 @@ export function getOpenIdeForDir(dir: string): string | null {
     if (!fs.existsSync('/proc')) return null;
     const files = fs.readdirSync('/proc');
     // Safety: only scan up to 500 process entries to prevent abuse
+    // Optimized filtering with an early exit to avoid scanning and evaluating unnecessary entries in large directories.
     const pidEntries: string[] = [];
     const pidRegex = /^\d+$/;
     for (const f of files) {
