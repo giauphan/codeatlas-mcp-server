@@ -13,7 +13,6 @@ import * as os from "os";
 const homeDir = os.homedir();
 const logDir = path.join(homeDir, ".codeatlas");
 const logFilePath = path.join(logDir, "mcp.log");
-const legacyPidFilePath = path.join(logDir, "mcp.pid");
 
 try {
   if (!fs.existsSync(logDir)) {
@@ -23,14 +22,16 @@ try {
   // Ignore directory creation errors
 }
 
-// Versions before 3.1.1 used a global PID lock, which is incompatible with
-// stdio MCP because each client must be able to launch its own server process.
-// Remove any leftover lock file now that it is no longer used.
+// Transitional cleanup: remove the PID lock written by versions < 3.1.1.
+// That lock made later stdio MCP clients exit before initializing, so it is no
+// longer written. Safe to delete this block once 3.1.x is no longer in use.
+const legacyPidFilePath = path.join(logDir, "mcp.pid");
 try {
   fs.unlinkSync(legacyPidFilePath);
 } catch (err: any) {
+  // A missing file is the normal case for new installs.
   if (err?.code !== "ENOENT") {
-    // Ignore cleanup errors; the server does not depend on this legacy file.
+    console.error(`[Cleanup] ⚠️ Could not remove legacy PID file ${legacyPidFilePath}: ${err?.message ?? err}`);
   }
 }
 
