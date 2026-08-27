@@ -31,4 +31,46 @@ describe('binarySearchClosestPrecedingClass', () => {
     const result = binarySearchClosestPrecedingClass([], 50);
     assert.strictEqual(result, undefined);
   });
+
+  it('should throw an error in dev mode if array contains invalid elements and DEBUG is true', () => {
+    const originalEnv = process.env.NODE_ENV;
+    const originalDebug = process.env.DEBUG;
+    process.env.NODE_ENV = 'development';
+    process.env.DEBUG = 'true';
+
+    const invalidClasses: any[] = [
+      { name: 'ClassC', line: 100 },
+      null,
+      { name: 'ClassA', line: 10 }
+    ];
+
+    assert.throws(
+      () => binarySearchClosestPrecedingClass(invalidClasses, 50),
+      /\[arrayUtils\] Assertion failed: element at index 1 is null or has no valid line number/
+    );
+
+    process.env.NODE_ENV = originalEnv;
+    process.env.DEBUG = originalDebug;
+  });
+
+  it('should throw an error in dev mode if array is not sorted descending and DEBUG is true', () => {
+    const originalEnv = process.env.NODE_ENV;
+    const originalDebug = process.env.DEBUG;
+    process.env.NODE_ENV = 'development';
+    process.env.DEBUG = 'true';
+
+    const unsortedClasses = [
+      { name: 'ClassC', line: 100 },
+      { name: 'ClassA', line: 10 },
+      { name: 'ClassB', line: 50 }
+    ];
+
+    assert.throws(
+      () => binarySearchClosestPrecedingClass(unsortedClasses, 50),
+      /\[arrayUtils\] Assertion failed: reversedClasses is not sorted descending at index 1/
+    );
+
+    process.env.NODE_ENV = originalEnv;
+    process.env.DEBUG = originalDebug;
+  });
 });

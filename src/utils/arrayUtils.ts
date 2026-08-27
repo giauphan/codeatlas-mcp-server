@@ -14,10 +14,14 @@ export function binarySearchClosestPrecedingClass(
 ): ClassReference | undefined {
   if (!reversedClasses || reversedClasses.length === 0) return undefined;
 
-  // Dev Assertion: Ensure the array is properly sorted descending by line number in development.
-  if (process.env.NODE_ENV !== 'production' && reversedClasses.length > 1) {
+  // Dev Assertion: Ensure the array is properly sorted descending by line number.
+  // Opt-in via DEBUG flag to avoid slowing down larger dev builds.
+  if (process.env.NODE_ENV !== 'production' && process.env.DEBUG === 'true' && reversedClasses.length > 1) {
     for (let i = 0; i < reversedClasses.length - 1; i++) {
-      if (reversedClasses[i].line < reversedClasses[i + 1].line) {
+      if (!reversedClasses[i] || typeof reversedClasses[i].line !== 'number') {
+         throw new Error(`[arrayUtils] Assertion failed: element at index ${i} is null or has no valid line number`);
+      }
+      if (reversedClasses[i + 1] && reversedClasses[i].line < reversedClasses[i + 1].line) {
         throw new Error(`[arrayUtils] Assertion failed: reversedClasses is not sorted descending at index ${i}`);
       }
     }
