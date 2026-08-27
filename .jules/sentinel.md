@@ -31,13 +31,3 @@
 **Vulnerability:** Git commands invoked via `child_process.spawnSync` can be susceptible to argument injection if arguments are not fully trusted, even when `shell: false` is used. Git accepts global flags like `-c`, `--exec-path`, `--pager`, `--config-env`, and others that can lead to arbitrary code execution if an attacker manages to inject them.
 **Learning:** Always validate and explicitly allowlist or denylist arguments passed to external binaries like `git`, particularly those that might be influenced by external input. Explicit sanitization ensures that no unexpected or dangerous flags are processed.
 **Prevention:** Implement an explicit sanitization step (e.g., filtering out strings starting with `-c`, `--exec-path`, `--pager`, etc.) before passing the argument array to `spawnSync` when wrapping tools like `git`.
-## 2026-08-23 - Prevent Brittle Secret Cleanup via Warning Status
-
-**Vulnerability:**
-Attempting to programmatically remove API keys from YAML configuration files using regular expressions or direct string manipulation is brittle. If the regex fails due to edge cases (e.g., whitespace, line endings, structural variations), the secret could be leaked or the configuration file could be corrupted.
-
-**Learning:**
-Without a robust parser (like a YAML parser), it is unsafe to modify configuration files to scrub credentials. Direct text manipulation for security boundaries is error-prone.
-
-**Prevention:**
-Instead of attempting a risky automatic cleanup, the system should strictly read the configuration file, detect the presence of the legacy secret, and return a specific warning status (e.g., `already_configured_legacy_key_warning`). This safely offloads the cleanup responsibility to the user without risking data corruption or accidental exposure.
