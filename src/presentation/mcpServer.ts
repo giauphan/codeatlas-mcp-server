@@ -2322,7 +2322,11 @@ export function registerTools(server: McpServer) {
         if (err instanceof Error) {
           result.error = err.message.length > 300 ? `${err.message.substring(0, 300)}... (truncated)` : err.message;
         } else {
-          result.error = "Unknown error occurred";
+          try {
+            result.error = `Unknown error occurred: ${JSON.stringify(err)}`;
+          } catch {
+            result.error = "Unknown error occurred and could not be serialized";
+          }
         }
       }
 

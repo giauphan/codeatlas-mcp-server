@@ -707,7 +707,7 @@ export class CodeAnalyzer {
         // Functions without an explicit parent class are assigned to the closest
         // preceding class by line number. This handles PHP/Python file-scoped functions.
         const parentClass = binarySearchClosestPrecedingClass(
-          reversedClasses as ClassReference[],
+          reversedClasses as unknown as ClassReference[],
           func.line
         );
         if (parentClass) {
