@@ -44,13 +44,20 @@ function createNodeMap<T extends { id: string }>(nodes: T[]): Map<string, T> {
 
 /**
  * Extracts nodes corresponding to the IDs in the `visited` set from `nodeMap`.
- * Filters results by an optional predicate.
+ *
+ * @param visited Set of visited node IDs.
+ * @param nodeMap Map containing the actual GraphNode objects.
+ * @param predicate Optional filtering function for additional node-specific conditions.
  */
-function getTraceNodes(visited: Set<string>, nodeMap: Map<string, GraphNode>, predicate?: (node: GraphNode) => boolean): GraphNode[] {
+function getTraceNodes(visited: Set<string>, nodeMap: Map<string, GraphNode>, predicate: (node: GraphNode) => boolean = () => true): GraphNode[] {
   const traceNodes: GraphNode[] = [];
   for (const id of visited) {
     const node = nodeMap.get(id);
-    if (node && (!predicate || predicate(node))) {
+    if (!node) {
+      console.warn(`Node ID missing in nodeMap: ${id}`);
+      continue;
+    }
+    if (predicate(node)) {
       traceNodes.push(node);
     }
   }
@@ -1286,8 +1293,7 @@ export function registerTools(server: McpServer) {
         if (nextFrontier.size === 0) break;
       }
 
-      const ALLOWED_NODE_TYPES = new Set(["function", "class"]);
-      let traceNodes = getTraceNodes(visited, nodeMap, (node) => ALLOWED_NODE_TYPES.has(node.type));
+      let traceNodes = getTraceNodes(visited, nodeMap, (node) => node.type === "function" || node.type === "class");
 
       if (traceNodes.length > maxN) {
         const callConnections = new Map<string, number>();
