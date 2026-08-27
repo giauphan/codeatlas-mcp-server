@@ -5,6 +5,7 @@ import ignore from 'ignore';
 import { GraphData, GraphNode, GraphLink, AnalysisResult, AIInsight, AnalysisManifest, FolderInfo, ChunkData, CrossChunkLinks } from './types.js';
 import { PythonParser } from './pythonParser.js';
 import { PhpParser } from './phpParser.js';
+import { binarySearchClosestPrecedingClass } from '../utils/arrayUtils.js';
 
 export class CodeAnalyzer {
   private workspaceRoot: string;
@@ -705,19 +706,7 @@ export class CodeAnalyzer {
       if (func.indent && func.indent > 0 && reversedClasses?.length > 0) {
         // Functions without an explicit parent class are assigned to the closest
         // preceding class by line number. This handles PHP/Python file-scoped functions.
-        // Optimization: Use binary search since reversedClasses is sorted descending by line
-        let startIdx = 0;
-        let endIdx = reversedClasses.length - 1;
-        let parentClass = undefined;
-        while (startIdx <= endIdx) {
-          const middleIdx = (startIdx + endIdx) >>> 1;
-          if (reversedClasses[middleIdx] && typeof reversedClasses[middleIdx].line === 'number' && reversedClasses[middleIdx].line < func.line) {
-            parentClass = reversedClasses[middleIdx];
-            endIdx = middleIdx - 1; // Try to find a closer one (larger line number, smaller index)
-          } else {
-            startIdx = middleIdx + 1;
-          }
-        }
+        const parentClass = binarySearchClosestPrecedingClass(reversedClasses as { name: string; line: number }[], func.line);
         if (parentClass) {
           linkSourceId = `class:${moduleId}:${parentClass.name}`;
         }
