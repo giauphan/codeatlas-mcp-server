@@ -72,3 +72,7 @@
 ## 2024-05-15 - Optimizing subset filtering in graph trace arrays
 **Learning:** In operations like BFS/DFS traces where a small `visited` set is populated from a massive overall graph (e.g., `nodes.length > 100k`), using `nodes.filter(n => visited.has(n.id))` creates an O(N) bottleneck since it scans the entire graph array.
 **Action:** Replace the O(N) array filter by iterating over the smaller `visited` set (O(V)) and performing O(1) lookups in a precomputed Map (e.g., `nodeMap.get(id)`). This drops the complexity from O(N) to O(V), offering massive speedups for local feature traces on large projects.
+
+## 2024-05-15 - Graph Trace Array Filtering Refactoring
+**Learning:** O(V) filtering logic inside graph traces can be deduplicated into a reusable helper function.
+**Action:** Created `getTraceNodes` to perform the filtering and map lookups. Used an explicit return type instead of relying on `typeof nodes` array type inference, and used `Set` logic with early exits for fast O(1) predicate filtering.

@@ -20,7 +20,7 @@ import {
 import { saveDreamMemory, queryDreamMemories, DreamMemoryResult } from "../services/dreamingService.js";
 import { CodeAnalyzer } from "../analyzer/parser.js";
 import { SecurityScanner } from "../securityScanner.js";
-import { GraphLink } from "../analyzer/types.js";
+import { GraphLink, GraphNode } from "../analyzer/types.js";
 import {
   listADRs, getADR, saveADR, deleteADR,
   ADR
@@ -40,6 +40,21 @@ function createNodeMap<T extends { id: string }>(nodes: T[]): Map<string, T> {
     map.set(nodes[i].id, nodes[i]);
   }
   return map;
+}
+
+/**
+ * Extracts nodes corresponding to the IDs in the `visited` set from `nodeMap`.
+ * Filters results by an optional predicate.
+ */
+function getTraceNodes(visited: Set<string>, nodeMap: Map<string, GraphNode>, predicate?: (node: GraphNode) => boolean): GraphNode[] {
+  const traceNodes: GraphNode[] = [];
+  for (const id of visited) {
+    const node = nodeMap.get(id);
+    if (node && (!predicate || predicate(node))) {
+      traceNodes.push(node);
+    }
+  }
+  return traceNodes;
 }
 
 // ⚡ Bolt Optimization: Avoid intermediate array allocations for id -> label mapping
@@ -1108,12 +1123,7 @@ export function registerTools(server: McpServer) {
         frontier = nextFrontier;
       }
 
-      // Optimize: Replace O(N) array filter with O(V) set iteration
-      const traceNodes: typeof nodes = [];
-      for (const id of visited) {
-        const node = nodeMap.get(id);
-        if (node) traceNodes.push(node);
-      }
+      const traceNodes = getTraceNodes(visited, nodeMap);
       const traceLinks = links.filter((l) => visited.has(l.source) && visited.has(l.target));
 
       const byFile = new Map<string, Array<{ name: string; type: string; isSeed: boolean; line: number | null }>>();
@@ -1276,14 +1286,8 @@ export function registerTools(server: McpServer) {
         if (nextFrontier.size === 0) break;
       }
 
-      // Optimize: Replace O(N) array filter with O(V) set iteration
-      let traceNodes: typeof nodes = [];
-      for (const id of visited) {
-        const node = nodeMap.get(id);
-        if (node && (node.type === "function" || node.type === "class")) {
-          traceNodes.push(node);
-        }
-      }
+      const ALLOWED_NODE_TYPES = new Set(["function", "class"]);
+      let traceNodes = getTraceNodes(visited, nodeMap, (node) => ALLOWED_NODE_TYPES.has(node.type));
 
       if (traceNodes.length > maxN) {
         const callConnections = new Map<string, number>();
