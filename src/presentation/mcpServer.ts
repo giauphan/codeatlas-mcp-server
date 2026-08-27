@@ -3,7 +3,7 @@ import { z } from "zod";
 import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
-import { getHomePath, getHermesConfigPath, getHermesPluginDir, getClaudeConfigPath } from "../utils/pathUtils.js";
+import { getHomePath, getHermesConfigPath, getHermesPluginDir, getClaudeConfigPath, safeWriteFileSync } from "../utils/pathUtils.js";
 import { jaccardSimilarity } from "../utils/mathUtils.js";
 import { checkAuth, logActivity } from "../services/authService.js";
 import {
@@ -3052,12 +3052,7 @@ def register(ctx):
 
           const outPath = path.join(resolvedArtifactDir, "artifact-summary.json");
           // Prevent symlink following on the output file itself
-          const fd = fs.openSync(outPath, fs.constants.O_CREAT | fs.constants.O_WRONLY | fs.constants.O_TRUNC | fs.constants.O_NOFOLLOW, 0o644);
-          try {
-            fs.writeFileSync(fd, JSON.stringify(summary, null, 2));
-          } finally {
-            fs.closeSync(fd);
-          }
+          safeWriteFileSync(outPath, JSON.stringify(summary, null, 2));
           const size = fs.statSync(outPath).size;
 
           return { content: [{ type: "text" as const, text: JSON.stringify({
@@ -3079,12 +3074,7 @@ def register(ctx):
 
         const outPath = path.join(resolvedArtifactDir, "artifact.json");
         // Prevent symlink following on the output file itself
-        const fd = fs.openSync(outPath, fs.constants.O_CREAT | fs.constants.O_WRONLY | fs.constants.O_TRUNC | fs.constants.O_NOFOLLOW, 0o644);
-        try {
-          fs.writeFileSync(fd, JSON.stringify(artifact, null, 2));
-        } finally {
-          fs.closeSync(fd);
-        }
+        safeWriteFileSync(outPath, JSON.stringify(artifact, null, 2));
         const size = fs.statSync(outPath).size;
 
         // Also update .gitignore to track it
