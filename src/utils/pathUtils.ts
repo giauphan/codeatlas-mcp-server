@@ -18,8 +18,15 @@ export function getClaudeConfigPath(): string {
   return path.join(getHomePath(), ".claude", "claude.json");
 }
 
-export function safeWriteFileSync(filePath: string, content: string): void {
-  const fd = fs.openSync(filePath, fs.constants.O_CREAT | fs.constants.O_WRONLY | fs.constants.O_TRUNC | fs.constants.O_NOFOLLOW, 0o644);
+export function safeWriteFileSync(filePath: string, content: string, mode: number = 0o600): void {
+  const fd = fs.openSync(
+    filePath,
+    fs.constants.O_CREAT |   // Create file if it doesn't exist
+    fs.constants.O_WRONLY |  // Open for writing
+    fs.constants.O_TRUNC |   // Truncate file content if it exists
+    fs.constants.O_NOFOLLOW, // Prevent symlink following
+    mode
+  );
   try {
     fs.writeFileSync(fd, content);
   } finally {
