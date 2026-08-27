@@ -95,15 +95,15 @@ export class CodeAnalyzer {
    */
   private allFiles: Set<string> = new Set<string>();
 
-  private logInfo(message: string) {
+  private reportInfo(message: string) {
     console.info(message);
   }
 
-  private logError(message: string) {
+  private reportError(message: string) {
     console.error(message);
   }
 
-  private logWarn(message: string, stack?: string) {
+  private reportWarning(message: string, stack?: string) {
     if (stack) {
       console.warn(message, stack);
     } else {
@@ -111,21 +111,21 @@ export class CodeAnalyzer {
     }
   }
 
-  private logFileError(err: unknown, absPath: string) {
+  private handleFileError(err: unknown, absPath: string) {
     const error = err as NodeJS.ErrnoException;
     // Scrub absolute path to only log the basename for security purposes
     const safeName = path.basename(absPath);
     if (error && error.code === 'ENOENT') {
-      this.logInfo(`[CodeAnalyzer] File not found (likely deleted): ${safeName}`);
+      this.reportInfo(`[CodeAnalyzer] File not found (likely deleted): ${safeName}`);
     } else if (error && error.code === 'EACCES') {
-      this.logError(`[CodeAnalyzer][Security][FileAccess] Access denied to file: ${safeName}`);
+      this.reportError(`[CodeAnalyzer][Security][FileAccess] Access denied to file: ${safeName}`);
     } else {
       const message = (error && error.message) || (error && error.code) || 'Unknown error';
       if (process.env.DEBUG === 'true') {
         const workspaceEscaped = this.workspaceRoot ? this.workspaceRoot.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') : '';
-        this.logWarn(`[CodeAnalyzer] Unexpected error accessing file ${safeName}: ${message}`, error?.stack && workspaceEscaped ? error.stack.replace(new RegExp(workspaceEscaped, 'g'), '[WORKSPACE]') : error?.stack);
+        this.reportWarning(`[CodeAnalyzer] Unexpected error accessing file ${safeName}: ${message}`, error?.stack && workspaceEscaped ? error.stack.replace(new RegExp(workspaceEscaped, 'g'), '[WORKSPACE]') : error?.stack);
       } else {
-        this.logWarn(`[CodeAnalyzer] Unexpected error accessing file ${safeName}: ${message}`);
+        this.reportWarning(`[CodeAnalyzer] Unexpected error accessing file ${safeName}: ${message}`);
       }
     }
   }
@@ -207,7 +207,7 @@ export class CodeAnalyzer {
         this.allFiles.delete(absPath);
       }
     } catch (err: unknown) {
-      this.logFileError(err, absPath);
+      this.handleFileError(err, absPath);
       this.allFiles.delete(absPath);
     }
 
