@@ -13,8 +13,17 @@ type StartedServer = {
 };
 
 function startServer(homeDir: string, projectDir: string): StartedServer {
+  const childCoverageDir = path.join(homeDir, "v8-coverage");
+  mkdirSync(childCoverageDir, { recursive: true });
   const child = spawn(process.execPath, [path.resolve("dist/index.js")], {
-    env: { ...process.env, HOME: homeDir, CODEATLAS_PROJECT_DIR: projectDir },
+    // This black-box child must not add the entire server startup path to c8's
+    // parent-process coverage report.
+    env: {
+      ...process.env,
+      HOME: homeDir,
+      CODEATLAS_PROJECT_DIR: projectDir,
+      NODE_V8_COVERAGE: childCoverageDir,
+    },
     stdio: ["pipe", "pipe", "pipe"],
   });
 
