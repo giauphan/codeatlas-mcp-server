@@ -704,9 +704,20 @@ export class CodeAnalyzer {
       let linkSourceId = moduleId;
       if (func.indent && func.indent > 0) {
         // Functions without an explicit parent class are assigned to the closest
-  // preceding class by line number. This handles PHP/Python file-scoped functions.
-        const parentClass = reversedClasses
-          .find(cls => cls.line < func.line);
+        // preceding class by line number. This handles PHP/Python file-scoped functions.
+        // ⚡ Bolt Optimization: Use binary search since reversedClasses is sorted descending by line
+        let low = 0;
+        let high = reversedClasses.length - 1;
+        let parentClass = undefined;
+        while (low <= high) {
+          const mid = (low + high) >>> 1;
+          if (reversedClasses[mid].line < func.line) {
+            parentClass = reversedClasses[mid];
+            high = mid - 1; // Try to find a closer one (larger line number, smaller index)
+          } else {
+            low = mid + 1;
+          }
+        }
         if (parentClass) {
           linkSourceId = `class:${moduleId}:${parentClass.name}`;
         }
@@ -1298,14 +1309,19 @@ export class CodeAnalyzer {
     
     // Mock AI Insights generation based on simple heuristics
     
-    // 1. Large files / God objects
+    // ⚡ Bolt Optimization: Combine multiple O(E) links traversals into a single pass
     const moduleFunctionCounts = new Map<string, number>();
+    const moduleDependencies = new Map<string, number>();
+
     for (const l of graph.links) {
       if (l.type === 'contains' && l.target.startsWith('function')) {
         moduleFunctionCounts.set(l.source, (moduleFunctionCounts.get(l.source) || 0) + 1);
+      } else if (l.type === 'import' && l.source.startsWith('module:') && l.target.startsWith('module:')) {
+        moduleDependencies.set(l.source, (moduleDependencies.get(l.source) || 0) + 1);
       }
     }
 
+    // 1. Large files / God objects
     const affectedModules: string[] = [];
     for (const node of this.nodes.values()) {
       if (node.type === 'module' && (moduleFunctionCounts.get(node.id) || 0) > 10) {
@@ -1325,13 +1341,6 @@ export class CodeAnalyzer {
     }
 
     // 2. High coupling
-    const moduleDependencies = new Map<string, number>();
-    for (const l of graph.links) {
-      if (l.type === 'import' && l.source.startsWith('module:') && l.target.startsWith('module:')) {
-        moduleDependencies.set(l.source, (moduleDependencies.get(l.source) || 0) + 1);
-      }
-    }
-
     const highlyCoupled: string[] = [];
     for (const [id, count] of moduleDependencies.entries()) {
       if (count > 15) highlyCoupled.push(id);

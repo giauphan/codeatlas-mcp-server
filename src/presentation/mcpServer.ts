@@ -2300,7 +2300,17 @@ export function registerTools(server: McpServer) {
           const ls = block.trim().split("\n"); if (ls.length < 4) continue;
           const ci: any = { hash: ls[0]?.substring(0, 12), author: ls[1], date: ls[2], message: ls[3] };
           const fi = ls.findIndex((x: string) => x === "FILES:");
-          if (fi !== -1) ci.files = ls.slice(fi + 1).filter((x: string) => x.trim()).slice(0, 15);
+          if (fi !== -1) {
+            // ⚡ Bolt Optimization: Replace multiple array allocations (.slice().filter().slice()) with a single loop
+            ci.files = [];
+            for (let i = fi + 1; i < ls.length; i++) {
+              const file = ls[i].trim();
+              if (file) {
+                ci.files.push(file);
+                if (ci.files.length >= 15) break;
+              }
+            }
+          }
           result.recentCommits.push(ci);
         }
       } catch (err: any) { result.error = err.message?.substring(0, 300); }
