@@ -143,7 +143,7 @@ export class CodeAnalyzer {
     }
     
     // The files array is generated from getFiles traversing unique directories recursively,
-    // so duplicates are naturally prevented. No need to double-wrap map inside another duplicate prevention pass.
+    // so duplicates are naturally prevented. The map resolves paths, and the Set enforces uniqueness across edge cases (e.g. symlinks).
     this.allFiles = new Set(files.map(f => path.resolve(f)));
     const total = files.length;
 
