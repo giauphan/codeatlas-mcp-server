@@ -13,6 +13,7 @@ import * as os from "os";
 const homeDir = os.homedir();
 const logDir = path.join(homeDir, ".codeatlas");
 const logFilePath = path.join(logDir, "mcp.log");
+const legacyPidFilePath = path.join(logDir, "mcp.pid");
 
 try {
   if (!fs.existsSync(logDir)) {
@@ -20,6 +21,17 @@ try {
   }
 } catch (err) {
   // Ignore directory creation errors
+}
+
+// Versions before 3.1.1 used a global PID lock, which is incompatible with
+// stdio MCP because each client must be able to launch its own server process.
+// Remove any leftover lock file now that it is no longer used.
+try {
+  fs.unlinkSync(legacyPidFilePath);
+} catch (err: any) {
+  if (err?.code !== "ENOENT") {
+    // Ignore cleanup errors; the server does not depend on this legacy file.
+  }
 }
 
 // ── CLI command routing ──────────────────────────────────────────────
@@ -32,8 +44,7 @@ if (isCLICommand(process.argv)) {
 }
 // ──────────────────────────────────────────────────────────────────────
 
-
-// Handle --version before PID guard
+// Handle --version before starting the MCP server.
 if (process.argv.includes('--version') || process.argv.includes('-v')) {
   // Try both relative locations (source: index.ts, dist: dist/index.js)
   let version = 'unknown';
