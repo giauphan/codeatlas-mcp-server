@@ -3052,7 +3052,12 @@ def register(ctx):
 
           const outPath = path.join(resolvedArtifactDir, "artifact-summary.json");
           // Prevent symlink following on the output file itself
-          fs.writeFileSync(outPath, JSON.stringify(summary, null, 2), { flag: "w" });
+          const fd = fs.openSync(outPath, fs.constants.O_CREAT | fs.constants.O_WRONLY | fs.constants.O_TRUNC | fs.constants.O_NOFOLLOW, 0o644);
+          try {
+            fs.writeFileSync(fd, JSON.stringify(summary, null, 2));
+          } finally {
+            fs.closeSync(fd);
+          }
           const size = fs.statSync(outPath).size;
 
           return { content: [{ type: "text" as const, text: JSON.stringify({
@@ -3074,7 +3079,12 @@ def register(ctx):
 
         const outPath = path.join(resolvedArtifactDir, "artifact.json");
         // Prevent symlink following on the output file itself
-        fs.writeFileSync(outPath, JSON.stringify(artifact, null, 2), { flag: "w" });
+        const fd = fs.openSync(outPath, fs.constants.O_CREAT | fs.constants.O_WRONLY | fs.constants.O_TRUNC | fs.constants.O_NOFOLLOW, 0o644);
+        try {
+          fs.writeFileSync(fd, JSON.stringify(artifact, null, 2));
+        } finally {
+          fs.closeSync(fd);
+        }
         const size = fs.statSync(outPath).size;
 
         // Also update .gitignore to track it
