@@ -164,6 +164,30 @@ describe("CodeAnalyzer allFiles Set implementation", () => {
     fs.rmSync(TEST_DEL_DIR, { recursive: true, force: true });
   });
 
+  it("should reliably handle errors during file analysis gracefully", async () => {
+    // Setup fresh environment
+    const TEST_ERR_DIR = path.resolve("./temp_err_test");
+    if (fs.existsSync(TEST_ERR_DIR)) {
+      fs.rmSync(TEST_ERR_DIR, { recursive: true, force: true });
+    }
+    fs.mkdirSync(TEST_ERR_DIR);
+    const errFilePath = path.join(TEST_ERR_DIR, "err.ts");
+    fs.writeFileSync(errFilePath, "export const a = 1;");
+
+    const analyzer = new CodeAnalyzer(TEST_ERR_DIR);
+    await analyzer.analyzeProject();
+
+    // Simulate failure by modifying permissions if possible or mock fs inside to throw, but here we just manually simulate the ENOENT via analyzing non-existent file
+    const missingFilePath = path.join(TEST_ERR_DIR, "missing.ts");
+    const result = await analyzer.analyzeFileIncremental(missingFilePath);
+    const allFiles = (analyzer as any).allFiles as Set<string>;
+
+    assert.strictEqual(allFiles.has(missingFilePath), false);
+    assert.strictEqual(allFiles.size, 1);
+
+    fs.rmSync(TEST_ERR_DIR, { recursive: true, force: true });
+  });
+
   it("should maintain unique files when re-analyzing an existing file", async () => {
     // Setup fresh environment
     const TEST_UNIQ_DIR = path.resolve("./temp_uniq_test_2");
