@@ -95,6 +95,12 @@ export class CodeAnalyzer {
    */
   private allFiles: Set<string> = new Set<string>();
 
+  /**
+   * Tracks files that encountered transient IO errors (e.g. EACCES locks)
+   * so they can be identified and potentially re-queued by the caller.
+   */
+  public transientErrors: Set<string> = new Set<string>();
+
   private reportInfo(message: string) {
     console.info(message);
   }
@@ -118,8 +124,10 @@ export class CodeAnalyzer {
     if (error && error.code === 'ENOENT') {
       this.reportInfo(`[CodeAnalyzer] File not found (likely deleted): ${safeName}`);
     } else if (error && error.code === 'EACCES') {
+      this.transientErrors.add(absPath);
       this.reportError(`[CodeAnalyzer][Security][FileAccess] Access denied to file: ${safeName}`);
     } else {
+      this.transientErrors.add(absPath);
       const message = (error && error.message) || (error && error.code) || 'Unknown error';
       if (process.env.DEBUG === 'true') {
         const workspaceEscaped = this.workspaceRoot ? this.workspaceRoot.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') : '';
@@ -209,7 +217,6 @@ export class CodeAnalyzer {
 
     // 3. Re-analyze only if file exists and is NOT ignored
     try {
-      await fs.promises.stat(absPath);
       if (!this.isIgnored(absPath, false)) {
         const success = this.analyzeFile(absPath);
         if (success) {
