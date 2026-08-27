@@ -5,7 +5,7 @@ import ignore from 'ignore';
 import { GraphData, GraphNode, GraphLink, AnalysisResult, AIInsight, AnalysisManifest, FolderInfo, ChunkData, CrossChunkLinks } from './types.js';
 import { PythonParser } from './pythonParser.js';
 import { PhpParser } from './phpParser.js';
-import { binarySearchClosestPrecedingClass } from '../utils/arrayUtils.js';
+import { binarySearchClosestPrecedingClass, ClassReference } from '../utils/arrayUtils.js';
 
 export class CodeAnalyzer {
   private workspaceRoot: string;
@@ -709,7 +709,7 @@ export class CodeAnalyzer {
         // Ensure reversedClasses is valid before processing
         if (Array.isArray(reversedClasses)) {
           const parentClass = binarySearchClosestPrecedingClass(
-            reversedClasses as { name: string; line: number }[],
+            reversedClasses as ClassReference[],
             func.line
           );
           if (parentClass) {

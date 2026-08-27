@@ -73,7 +73,6 @@ describe('binarySearchClosestPrecedingClass', () => {
     process.env.NODE_ENV = originalEnv;
     process.env.DEBUG = originalDebug;
   });
-});
 
   it('should return gracefully without crashing if an unsorted array is passed in production', () => {
     const originalEnv = process.env.NODE_ENV;
@@ -98,3 +97,4 @@ describe('binarySearchClosestPrecedingClass', () => {
 
     process.env.NODE_ENV = originalEnv;
   });
+});
