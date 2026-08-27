@@ -223,11 +223,14 @@ export class CodeAnalyzer {
       }
     } catch (err: unknown) {
       const error = err as NodeJS.ErrnoException;
-      if (!error || error.code !== 'ENOENT') {
+      if (error && error.code === 'ENOENT') {
+        // File was explicitly deleted or is entirely missing, remove from tracking
+        this.allFiles.delete(absPath);
+      } else {
+        // Transient IO error or permissions issue - log it but keep it tracked
+        // so it can be re-analyzed later when available, rather than silently dropping it
         this.handleFileError(err, absPath);
       }
-      // Regardless of failure (ENOENT or otherwise), remove the file from active tracking
-      this.allFiles.delete(absPath);
     }
 
     return this.buildAnalysisResult();
