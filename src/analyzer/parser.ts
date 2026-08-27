@@ -142,6 +142,8 @@ export class CodeAnalyzer {
       files = files.slice(0, this.maxFiles);
     }
     
+    // The files array is generated from getFiles traversing unique directories recursively,
+    // so duplicates are naturally prevented. No need to double-wrap map inside another duplicate prevention pass.
     this.allFiles = new Set(files.map(f => path.resolve(f)));
     const total = files.length;
 
