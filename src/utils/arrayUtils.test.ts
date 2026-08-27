@@ -32,60 +32,6 @@ describe('binarySearchClosestPrecedingClass', () => {
     assert.strictEqual(result, undefined);
   });
 
-  it('should warn in dev mode if array contains invalid elements and DEBUG is true', () => {
-    const originalEnv = process.env.NODE_ENV;
-    const originalDebug = process.env.DEBUG;
-    process.env.NODE_ENV = 'development';
-    process.env.DEBUG = 'true';
-
-    let warningLogged = false;
-    const originalWarn = console.warn;
-    console.warn = (msg) => {
-      if (msg.includes('null or has no valid line number')) warningLogged = true;
-    };
-
-    const invalidClasses: any[] = [
-      { name: 'ClassC', line: 100 },
-      null,
-      { name: 'ClassA', line: 10 }
-    ];
-
-    binarySearchClosestPrecedingClass(invalidClasses, 50);
-
-    assert.strictEqual(warningLogged, true);
-
-    console.warn = originalWarn;
-    process.env.NODE_ENV = originalEnv;
-    process.env.DEBUG = originalDebug;
-  });
-
-  it('should warn in dev mode if array is not sorted descending and DEBUG is true', () => {
-    const originalEnv = process.env.NODE_ENV;
-    const originalDebug = process.env.DEBUG;
-    process.env.NODE_ENV = 'development';
-    process.env.DEBUG = 'true';
-
-    let warningLogged = false;
-    const originalWarn = console.warn;
-    console.warn = (msg) => {
-      if (msg.includes('not sorted descending')) warningLogged = true;
-    };
-
-    const unsortedClasses = [
-      { name: 'ClassC', line: 100 },
-      { name: 'ClassA', line: 10 },
-      { name: 'ClassB', line: 50 }
-    ];
-
-    binarySearchClosestPrecedingClass(unsortedClasses, 50);
-
-    assert.strictEqual(warningLogged, true);
-
-    console.warn = originalWarn;
-    process.env.NODE_ENV = originalEnv;
-    process.env.DEBUG = originalDebug;
-  });
-
   it('should return gracefully without crashing if an unsorted array is passed in production', () => {
     const originalEnv = process.env.NODE_ENV;
     process.env.NODE_ENV = 'production';

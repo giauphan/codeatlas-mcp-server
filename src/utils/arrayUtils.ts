@@ -14,19 +14,6 @@ export function binarySearchClosestPrecedingClass(
 ): ClassReference | undefined {
   if (!reversedClasses || reversedClasses.length === 0) return undefined;
 
-  // Dev Assertion: Ensure the array is properly sorted descending by line number.
-  // Opt-in via DEBUG flag to avoid slowing down larger dev builds.
-  if (process.env.NODE_ENV !== 'production' && process.env.DEBUG === 'true' && reversedClasses.length > 1) {
-    for (let i = 0; i < reversedClasses.length - 1; i++) {
-      if (!reversedClasses[i] || typeof reversedClasses[i].line !== 'number') {
-         console.warn(`[arrayUtils] Assertion failed: element at index ${i} is null or has no valid line number`);
-      }
-      else if (reversedClasses[i + 1] && reversedClasses[i + 1].line && reversedClasses[i].line < reversedClasses[i + 1].line) {
-        console.warn(`[arrayUtils] Assertion failed: reversedClasses is not sorted descending at index ${i}`);
-      }
-    }
-  }
-
   let startIdx = 0;
   let endIdx = reversedClasses.length - 1;
   let parentClass = undefined;

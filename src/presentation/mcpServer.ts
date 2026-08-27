@@ -2309,6 +2309,8 @@ export function registerTools(server: McpServer) {
           if (fi !== -1) {
             // Optimization: Replace multiple array allocations (.slice().filter().slice()) with a single loop
             // to drastically reduce Garbage Collection overhead when processing large git logs.
+            // This loop iterates over the remaining lines in the block, skipping empty lines,
+            // and limits the collected files to a maximum of 15 items.
             ci.files = [];
             for (let i = fi + 1; i < ls.length; i++) {
               if (ls[i].trim()) {
