@@ -94,6 +94,21 @@ export class CodeAnalyzer {
    * The Set structure also inherently prevents duplicates, eliminating the need for manual uniqueness checks.
    */
   private allFiles: Set<string> = new Set<string>();
+
+  private logFileError(err: any, absPath: string) {
+    if (err.code === 'ENOENT') {
+      console.info(`[CodeAnalyzer] File not found (likely deleted): ${absPath}`);
+    } else if (err.code === 'EACCES') {
+      console.error(`[CodeAnalyzer] Access denied to file: ${absPath}`);
+    } else {
+      const message = err.message || err.code || 'Unknown error';
+      if (process.env.DEBUG === 'true') {
+        console.warn(`[CodeAnalyzer] Unexpected error accessing file ${absPath}: ${message}`, err.stack);
+      } else {
+        console.warn(`[CodeAnalyzer] Unexpected error accessing file ${absPath}: ${message}`);
+      }
+    }
+  }
   private totalSkippedCount = 0;
 
   public async analyzeProject(onProgress?: (percent: number, done: number, total: number, currentFile?: string) => void): Promise<AnalysisResult> {
@@ -172,17 +187,7 @@ export class CodeAnalyzer {
         this.allFiles.delete(absPath);
       }
     } catch (err: any) {
-      if (err.code === 'ENOENT') {
-        console.info(`[CodeAnalyzer] File not found (likely deleted): ${absPath}`);
-      } else if (err.code === 'EACCES') {
-        console.error(`[CodeAnalyzer] Access denied to file: ${absPath}`);
-      } else {
-        if (process.env.DEBUG === 'true') {
-          console.warn(`[CodeAnalyzer] Unexpected error accessing file:`, err.message || err.code || 'Unknown error', err.stack);
-        } else {
-          console.warn(`[CodeAnalyzer] Unexpected error accessing file:`, err.message || err.code || 'Unknown error');
-        }
-      }
+      this.logFileError(err, absPath);
       this.allFiles.delete(absPath);
     }
 
