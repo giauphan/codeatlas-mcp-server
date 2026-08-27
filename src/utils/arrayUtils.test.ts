@@ -74,3 +74,27 @@ describe('binarySearchClosestPrecedingClass', () => {
     process.env.DEBUG = originalDebug;
   });
 });
+
+  it('should return gracefully without crashing if an unsorted array is passed in production', () => {
+    const originalEnv = process.env.NODE_ENV;
+    process.env.NODE_ENV = 'production';
+
+    const unsortedClasses = [
+      { name: 'ClassC', line: 100 },
+      { name: 'ClassA', line: 10 },
+      { name: 'ClassB', line: 50 }
+    ];
+
+    // In production, the dev-only assertions do not run. It should silently fail to find the correct element
+    // and/or return a best-effort element without crashing the server.
+    let didCrash = false;
+    try {
+      binarySearchClosestPrecedingClass(unsortedClasses, 75);
+    } catch (e) {
+      didCrash = true;
+    }
+
+    assert.strictEqual(didCrash, false, 'Function crashed on unsorted input in production');
+
+    process.env.NODE_ENV = originalEnv;
+  });

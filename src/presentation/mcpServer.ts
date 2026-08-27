@@ -2298,7 +2298,12 @@ export function registerTools(server: McpServer) {
         result.recentCommits = [];
         for (const block of logRaw.split("COMMIT\n").filter(Boolean)) {
           const ls = block.trim().split("\n"); if (ls.length < 4) continue;
-          const ci: any = { hash: ls[0]?.substring(0, 12), author: ls[1], date: ls[2], message: ls[3] };
+          const ci: { hash: string; author: string; date: string; message: string; files?: string[] } = {
+            hash: ls[0]?.substring(0, 12) || "",
+            author: ls[1] || "",
+            date: ls[2] || "",
+            message: ls[3] || ""
+          };
           const fi = ls.findIndex((x: string) => x === "FILES:");
           if (fi !== -1) {
             // Optimization: Replace multiple array allocations (.slice().filter().slice()) with a single loop

@@ -706,9 +706,15 @@ export class CodeAnalyzer {
       if (func.indent && func.indent > 0 && reversedClasses?.length > 0) {
         // Functions without an explicit parent class are assigned to the closest
         // preceding class by line number. This handles PHP/Python file-scoped functions.
-        const parentClass = binarySearchClosestPrecedingClass(reversedClasses as { name: string; line: number }[], func.line);
-        if (parentClass) {
-          linkSourceId = `class:${moduleId}:${parentClass.name}`;
+        // Ensure reversedClasses is valid before processing
+        if (Array.isArray(reversedClasses)) {
+          const parentClass = binarySearchClosestPrecedingClass(
+            reversedClasses as { name: string; line: number }[],
+            func.line
+          );
+          if (parentClass) {
+            linkSourceId = `class:${moduleId}:${parentClass.name}`;
+          }
         }
       }
 
