@@ -86,7 +86,71 @@ export class CodeAnalyzer {
     return this.getIgnoreFilter().ignores(normalizedPath);
   }
 
-  private allFiles: string[] = [];
+  /**
+   * Tracks all analyzed file paths.
+   * Using Set to optimize addition, deletion, and lookup operations. Reduces O(N) operations
+   * (e.g., .includes or .indexOf) to O(1) for large datasets. This is particularly impactful for environments
+   * handling large datasets, where frequent mutations or membership checks may cause major performance costs.
+   * The Set structure also inherently prevents duplicates, eliminating the need for manual uniqueness checks.
+   */
+  private allFiles: Set<string> = new Set<string>();
+
+  /**
+   * Tracks files that encountered transient IO errors (e.g. EACCES locks)
+   * so they can be identified and potentially re-queued by the caller.
+   */
+  public transientErrors: Set<string> = new Set<string>();
+
+  private reportInfo(message: string) {
+    console.info(message);
+  }
+
+  private reportError(message: string) {
+    console.error(message);
+  }
+
+  private reportWarning(message: string, stack?: string) {
+    if (stack) {
+      console.warn(message, stack);
+    } else {
+      console.warn(message);
+    }
+  }
+
+  /**
+   * Sanitizes paths for logging by replacing the workspace root with a placeholder
+   * and normalizing directory separators.
+   */
+  private sanitizePath(absPath: string): string {
+    if (!this.workspaceRoot) return absPath.replace(/\\/g, '/');
+
+    // We cannot use string replace with regex characters dynamically without escaping,
+    // but a safer approach is substring if it starts with the root.
+    if (absPath.startsWith(this.workspaceRoot)) {
+      return '[WORKSPACE]' + absPath.substring(this.workspaceRoot.length).replace(/\\/g, '/');
+    }
+    return absPath.replace(/\\/g, '/');
+  }
+
+  private handleFileError(err: unknown, absPath: string) {
+    const error = err as NodeJS.ErrnoException;
+    // Scrub absolute path using the unified sanitization logic
+    const safeName = this.sanitizePath(absPath);
+    if (error && error.code === 'ENOENT') {
+      this.reportInfo(`[CodeAnalyzer] File not found (likely deleted): ${safeName}`);
+    } else if (error && error.code === 'EACCES') {
+      this.transientErrors.add(absPath);
+      this.reportError(`[CodeAnalyzer][Security][FileAccess] Access denied to file: ${safeName}`);
+    } else {
+      this.transientErrors.add(absPath);
+      const message = (error && error.message) || (error && error.code) || 'Unknown error';
+      if (process.env.DEBUG === 'true') {
+        this.reportWarning(`[CodeAnalyzer] Unexpected error accessing file ${safeName}: ${message}`, error?.stack ? this.sanitizePath(error.stack) : undefined);
+      } else {
+        this.reportWarning(`[CodeAnalyzer] Unexpected error accessing file ${safeName}: ${message}`);
+      }
+    }
+  }
   private totalSkippedCount = 0;
 
   public async analyzeProject(onProgress?: (percent: number, done: number, total: number, currentFile?: string) => void): Promise<AnalysisResult> {
@@ -100,7 +164,9 @@ export class CodeAnalyzer {
       files = files.slice(0, this.maxFiles);
     }
     
-    this.allFiles = [...files];
+    // The files array is generated from getFiles traversing unique directories recursively,
+    // so duplicates are naturally prevented. The map resolves paths, and the Set enforces uniqueness across edge cases (e.g. symlinks).
+    this.allFiles = new Set(files.map(f => path.resolve(f)));
     const total = files.length;
 
     // Log the files to be indexed
@@ -130,6 +196,14 @@ export class CodeAnalyzer {
     return this.buildAnalysisResult();
   }
 
+  /**
+   * Returns a copy of the uniquely tracked files as an array.
+   * Note: As it is derived from a Set, duplicates are inherently avoided.
+   */
+  public get allFilesArray(): string[] {
+    return Array.from(this.allFiles);
+  }
+
   public async analyzeFileIncremental(filePath: string): Promise<AnalysisResult> {
     this.dirCache.clear();
     const absPath = path.resolve(filePath);
@@ -157,17 +231,28 @@ export class CodeAnalyzer {
 
     // 3. Re-analyze only if file exists and is NOT ignored
     try {
-      if (fs.existsSync(absPath) && !this.isIgnored(absPath, false)) {
-        this.analyzeFile(absPath);
-        if (!this.allFiles.includes(absPath)) {
-          this.allFiles.push(absPath);
+      await fs.promises.stat(absPath);
+      if (!this.isIgnored(absPath, false)) {
+        const success = this.analyzeFile(absPath);
+        if (success) {
+          this.allFiles.add(absPath);
+        } else {
+          this.totalSkippedCount++;
         }
       } else {
-        // File was deleted or is ignored
-        this.allFiles = this.allFiles.filter(f => f !== absPath);
+        // File is ignored
+        this.allFiles.delete(absPath);
       }
-    } catch {
-      this.allFiles = this.allFiles.filter(f => f !== absPath);
+    } catch (err: unknown) {
+      const error = err as NodeJS.ErrnoException;
+      if (error && error.code === 'ENOENT') {
+        // File was explicitly deleted or is entirely missing, remove from tracking
+        this.allFiles.delete(absPath);
+      } else {
+        // Transient IO error or permissions issue - log it but keep it tracked
+        // so it can be re-analyzed later when available, rather than silently dropping it
+        this.handleFileError(err, absPath);
+      }
     }
 
     return this.buildAnalysisResult();
@@ -231,7 +316,7 @@ export class CodeAnalyzer {
       graph,
       insights,
       entityCounts: counts,
-      totalFilesAnalyzed: this.allFiles.length - this.totalSkippedCount,
+      totalFilesAnalyzed: this.allFiles.size - this.totalSkippedCount,
       totalFilesSkipped: this.totalSkippedCount
     };
   }
@@ -1213,11 +1298,17 @@ export class CodeAnalyzer {
     
     // Mock AI Insights generation based on simple heuristics
     
-    // 1. Large files / God objects
+    // 1. Large files / God objects & High coupling (Combined O(E) traversal)
+    // ⚡ Bolt Optimization: Combine multiple O(E) double link traversal operations into a single O(E) pass
     const moduleFunctionCounts = new Map<string, number>();
+    const moduleDependencies = new Map<string, number>();
+
     for (const l of graph.links) {
       if (l.type === 'contains' && l.target.startsWith('function')) {
         moduleFunctionCounts.set(l.source, (moduleFunctionCounts.get(l.source) || 0) + 1);
+      }
+      if (l.type === 'import' && l.source.startsWith('module:') && l.target.startsWith('module:')) {
+        moduleDependencies.set(l.source, (moduleDependencies.get(l.source) || 0) + 1);
       }
     }
 
@@ -1239,14 +1330,7 @@ export class CodeAnalyzer {
       });
     }
 
-    // 2. High coupling
-    const moduleDependencies = new Map<string, number>();
-    for (const l of graph.links) {
-      if (l.type === 'import' && l.source.startsWith('module:') && l.target.startsWith('module:')) {
-        moduleDependencies.set(l.source, (moduleDependencies.get(l.source) || 0) + 1);
-      }
-    }
-
+    // Process High coupling using previously combined O(E) loop data
     const highlyCoupled: string[] = [];
     for (const [id, count] of moduleDependencies.entries()) {
       if (count > 15) highlyCoupled.push(id);

@@ -45,38 +45,140 @@ AI IDE → MCP stdio/SSE → Parser (AST) → Dependency Graph → Code Search
 
 ## 🔧 Quick Start
 
-### 1. Install
+### Install from npm
+
+```bash
+npm install -g codeatlas-mcp-server
+codeatlas-mcp --help
+```
+
+Use it directly from an AI client with `npx`:
+
+```bash
+npx -y codeatlas-mcp-server
+```
+
+### Install from source
+
 ```bash
 # Clone the repo
 git clone https://github.com/giauphan/codeatlas-mcp-server.git
 cd codeatlas-mcp-server
-
-# Install dependencies (requires Node.js 20+)
 pnpm install
-```
-
-### 2. Configure
-```bash
-# Copy env template
-cp .env.example .env
-
-# Edit .env (Oracle DB optional for persistent memory)
-# Set CODEATLAS_API_URL and CODEATLAS_API_KEY if using cloud
-```
-
-### 3. Build
-```bash
 pnpm run build
 ```
 
-### 4. Run
+### Configure optional cloud memory
+
+```bash
+export CODEATLAS_API_URL="http://localhost:3381"
+export CODEATLAS_API_KEY="your_api_key_here"
+```
+
+### Run
+
 ```bash
 # Local-only mode (no cloud)
-pnpm start
+codeatlas-mcp
 
-# With cloud connection (requires codeatlas-platform running)
-CODEATLAS_API_URL=http://localhost:8080 CODEATLAS_API_KEY=your_api_key_here pnpm start
+# From a source checkout
+pnpm start
 ```
+
+### Add to an AI agent (CLI)
+
+**Claude Code** (`claude mcp add`):
+
+```bash
+# stdio server from npm, user scope (available in every project)
+claude mcp add codeatlas -s user -- npx -y codeatlas-mcp-server
+
+# with optional cloud memory
+claude mcp add codeatlas -s user \
+  --env CODEATLAS_API_URL=http://localhost:3381 \
+  --env CODEATLAS_API_KEY=your_api_key_here \
+  -- npx -y codeatlas-mcp-server
+
+# from a source checkout
+claude mcp add codeatlas -- node /absolute/path/to/codeatlas-mcp-server/dist/index.js
+
+claude mcp list          # verify connection
+claude mcp remove codeatlas
+```
+
+Scopes: `-s local` (default, current project only), `-s project` (shared via `.mcp.json`), `-s user` (all projects).
+
+**Codex CLI** (`codex mcp add`):
+
+```bash
+codex mcp add codeatlas -- npx -y codeatlas-mcp-server
+codex mcp list
+```
+
+Or edit `~/.codex/config.toml`:
+
+```toml
+[mcp_servers.codeatlas]
+command = "npx"
+args = ["-y", "codeatlas-mcp-server"]
+
+[mcp_servers.codeatlas.env]
+CODEATLAS_API_URL = "http://localhost:3381"
+CODEATLAS_API_KEY = "your_api_key_here"
+```
+
+Secrets go in env vars or `~/.codeatlas/.env`, never in CLI args — command lines are visible to other users via `ps aux`.
+
+### Add to Zed
+
+#### Local MCP server (recommended)
+
+CodeAtlas MCP runs over stdio. In Zed, open **Settings → AI → MCP Servers → Add Server → Add Local Server**, or add this to `settings.json`:
+
+```json
+{
+  "context_servers": {
+    "codeatlas-mcp": {
+      "command": "npx",
+      "args": ["-y", "codeatlas-mcp-server"],
+      "env": {
+        "CODEATLAS_API_URL": "http://localhost:3381",
+        "CODEATLAS_API_KEY": "your_api_key_here"
+      }
+    }
+  }
+}
+```
+
+Open the Zed Agent Panel and enable `codeatlas-mcp` under context servers.
+
+#### Remote MCP server
+
+Use **Add Remote Server** only when your CodeAtlas deployment exposes an HTTP MCP endpoint:
+
+| Field | Value |
+|---|---|
+| **Server Name** | `codeatlas-mcp` |
+| **URL** | Deployed HTTP MCP endpoint |
+| **Timeout** | `60` seconds |
+| **Headers** | `Authorization: Bearer your_api_key_here` when required |
+
+`http://localhost:3381` is the CodeAtlas Platform backend URL (set via `CODEATLAS_API_URL`), not this package's MCP endpoint. Do not enter it as a remote MCP URL unless your platform explicitly exposes MCP there.
+
+Verify after setup:
+
+```bash
+codeatlas-mcp doctor
+```
+
+### Install Claude Code Second Brain hooks
+
+```bash
+codeatlas-mcp install-hooks --dry-run
+codeatlas-mcp install-hooks
+```
+
+See [Second Brain Hooks Setup](./docs/HOOKS_SETUP.md) for requirements, verification, and uninstall/rollback.
 
 ---
 
@@ -126,6 +228,7 @@ Add to `settings.json`:
 | [Development Guide](./docs/DEVELOPMENT.md) | Full environment setup, commands, and troubleshooting. |
 | [Deployment Guide](./docs/DEPLOYMENT.md) | PM2, systemd, Nginx TLS, and healthchecks. |
 | [API Examples](./docs/API_EXAMPLES.md) | Auth, dream memory, and MCP config examples. |
+| [Second Brain Hooks Setup](./docs/HOOKS_SETUP.md) | Install, configure, verify, and uninstall Claude Code memory hooks. |
 
 ---
 
@@ -150,10 +253,11 @@ MIT © [Giau Phan](mailto:giauphan012@gmail.com)
 
 ## ⚠️ Known Limitations
 
-- **Oracle DB Required for Persistent Memory**: Local-only mode works without Oracle, but dream memory persistence requires it.
-- **Cloud Dream Query Filters**: When querying memories with `scope`, `tags`, or `memory_type` filters, the backend performs vector hybrid search on the query text plus SQL filtering on the other parameters. The `tags` parameter is passed as a JSON string to the upstream API. The `related_ids` parameter is also supported for filtering by related memory IDs.
-- **Multi-Tenant Not Supported**: Only single-tenant mode available.
-- **Security**: No built-in rate limiting; use a reverse proxy (Nginx) in production.
+- **Optional persistence service**: Local code analysis, AST parsing, dependency graphs, and code search run without a database. Dream memory, genome, and immune-system features require a reachable CodeAtlas Platform instance.
+- **SQLite + vector-search storage**: CodeAtlas Platform persists memories and vectors locally with SQLite and vector search. Oracle and a hosted cloud service are not required.
+- **Dream query filters**: `scope`, `tags`, `memory_type`, and `related_ids` are forwarded to the configured platform instance. `tags` is encoded as a JSON string; supported filters depend on the installed platform version.
+- **Multi-tenant mode**: Single-tenant mode is the supported configuration.
+- **Production security**: This package does not provide HTTP rate limiting. When exposing the platform remotely, put it behind an authenticated reverse proxy with TLS and rate limiting.
 
 ---
 

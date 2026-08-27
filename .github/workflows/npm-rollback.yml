@@ -1,0 +1,61 @@
+name: Rollback npm latest tag
+
+on:
+  workflow_dispatch:
+    inputs:
+      stable_version:
+        description: Known-good version to promote to latest, for example 1.2.9
+        required: true
+        type: string
+      bad_version:
+        description: Optional bad version to deprecate, for example 1.3.0
+        required: false
+        type: string
+      deprecate_message:
+        description: Message used when deprecating the bad version
+        required: false
+        default: "This release was rolled back. Please install the latest version."
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: npm-rollback
+  cancel-in-progress: false
+
+jobs:
+  rollback:
+    name: Move npm latest to stable version
+    runs-on: ubuntu-latest
+    environment: npm
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          registry-url: https://registry.npmjs.org
+
+      - name: Verify target version exists on npm
+        run: npm view codeatlas-mcp-server@${{ inputs.stable_version }} version
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Promote stable version to latest
+        run: npm dist-tag add codeatlas-mcp-server@${{ inputs.stable_version }} latest
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Deprecate bad version
+        if: ${{ inputs.bad_version != '' }}
+        run: npm deprecate codeatlas-mcp-server@${{ inputs.bad_version }} "${{ inputs.deprecate_message }}"
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Show current npm dist-tags
+        run: npm dist-tag ls codeatlas-mcp-server
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
