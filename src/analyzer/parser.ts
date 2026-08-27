@@ -705,17 +705,17 @@ export class CodeAnalyzer {
       if (func.indent && func.indent > 0 && reversedClasses?.length > 0) {
         // Functions without an explicit parent class are assigned to the closest
         // preceding class by line number. This handles PHP/Python file-scoped functions.
-        // ⚡ Bolt Optimization: Use binary search since reversedClasses is sorted descending by line
-        let low = 0;
-        let high = reversedClasses.length - 1;
+        // Optimization: Use binary search since reversedClasses is sorted descending by line
+        let startIdx = 0;
+        let endIdx = reversedClasses.length - 1;
         let parentClass = undefined;
-        while (low <= high) {
-          const mid = (low + high) >>> 1;
-          if (reversedClasses[mid].line < func.line) {
-            parentClass = reversedClasses[mid];
-            high = mid - 1; // Try to find a closer one (larger line number, smaller index)
+        while (startIdx <= endIdx) {
+          const middleIdx = (startIdx + endIdx) >>> 1;
+          if (reversedClasses[middleIdx] && typeof reversedClasses[middleIdx].line === 'number' && reversedClasses[middleIdx].line < func.line) {
+            parentClass = reversedClasses[middleIdx];
+            endIdx = middleIdx - 1; // Try to find a closer one (larger line number, smaller index)
           } else {
-            low = mid + 1;
+            startIdx = middleIdx + 1;
           }
         }
         if (parentClass) {
@@ -1309,7 +1309,7 @@ export class CodeAnalyzer {
     
     // Mock AI Insights generation based on simple heuristics
     
-    // ⚡ Bolt Optimization: Combine multiple O(E) links traversals into a single pass
+    // Optimization: Combine multiple O(E) links traversals into a single pass
     const moduleFunctionCounts = new Map<string, number>();
     const moduleDependencies = new Map<string, number>();
 

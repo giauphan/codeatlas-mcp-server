@@ -2301,7 +2301,7 @@ export function registerTools(server: McpServer) {
           const ci: any = { hash: ls[0]?.substring(0, 12), author: ls[1], date: ls[2], message: ls[3] };
           const fi = ls.findIndex((x: string) => x === "FILES:");
           if (fi !== -1) {
-            // ⚡ Bolt Optimization: Replace multiple array allocations (.slice().filter().slice()) with a single loop
+            // Optimization: Replace multiple array allocations (.slice().filter().slice()) with a single loop
             ci.files = [];
             for (let i = fi + 1; i < ls.length; i++) {
               if (ls[i].trim()) {
