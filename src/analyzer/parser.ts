@@ -166,12 +166,12 @@ export class CodeAnalyzer {
         this.allFiles.delete(absPath);
       }
     } catch (err: any) {
-      this.allFiles.delete(absPath);
       if (err.code === 'ENOENT') {
         console.info(`[CodeAnalyzer] File not found (likely deleted): ${absPath}`);
       } else {
         console.warn(`[CodeAnalyzer] Unexpected error accessing file ${absPath}:`, err.stack || err.message || err);
       }
+      this.allFiles.delete(absPath);
     }
 
     return this.buildAnalysisResult();
