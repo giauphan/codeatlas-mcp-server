@@ -54,7 +54,10 @@ function getTraceNodes(visited: Set<string>, nodeMap: Map<string, GraphNode>, pr
   for (const id of visited) {
     const node = nodeMap.get(id);
     if (!node) {
-      console.warn(`[getTraceNodes] Node ID missing in nodeMap: ${id}`);
+      // Only log missing nodes in non-production environments to prevent log spam
+      if (process.env.NODE_ENV !== 'production') {
+        console.warn(`[getTraceNodes] Node ID missing in nodeMap: ${id}`);
+      }
       continue;
     }
     if (predicate(node)) {
