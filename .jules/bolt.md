@@ -69,10 +69,6 @@
 ## 2026-08-19 - [Performance improvement] Optimized O(N) array filtering with string allocations when full traversal is necessary
 **Learning:** In the `manage_skills` query action, checking for case-insensitive matches using `s.description.toLowerCase().includes(q)` combined with chained `.filter().slice().map()` created massive garbage collection pressure by constantly allocating new temporary string, arrays, and objects for every element. Even when full array traversal is strictly required (e.g. to return the total `matchCount`), we can still dramatically reduce memory bloat.
 **Action:** When filtering through large string fields inside an array where full traversal is needed to count matches, avoid `.toLowerCase().includes()`. Instead, use a precompiled regular expression (`new RegExp(escapeRegExp(q), 'i')`) and `regex.test()`. Combine the filtering, counting, slicing, and mapping logic into a single `for...of` loop to completely eliminate intermediate array allocations.
-## 2024-05-15 - Optimizing subset filtering in graph trace arrays
-**Learning:** In operations like BFS/DFS traces where a small `visited` set is populated from a massive overall graph (e.g., `nodes.length > 100k`), using `nodes.filter(n => visited.has(n.id))` creates an O(N) bottleneck since it scans the entire graph array.
-**Action:** Replace the O(N) array filter by iterating over the smaller `visited` set (O(V)) and performing O(1) lookups in a precomputed Map (e.g., `nodeMap.get(id)`). This drops the complexity from O(N) to O(V), offering massive speedups for local feature traces on large projects.
-
-## 2024-05-15 - Graph Trace Array Filtering Refactoring
-**Learning:** O(V) filtering logic inside graph traces can be deduplicated into a reusable helper function.
-**Action:** Created `getTraceNodes` to perform the filtering and map lookups. Used an explicit return type instead of relying on `typeof nodes` array type inference, and used `Set` logic with early exits for fast O(1) predicate filtering.
+## 2024-05-15 - Optimizing and refactoring subset filtering in graph traces
+**Learning:** In operations like BFS/DFS traces where a small `visited` set is populated from a massive overall graph (e.g., `nodes.length > 100k`), using `nodes.filter(n => visited.has(n.id))` creates an O(N) bottleneck. Additionally, this filtering logic is often duplicated across different trace implementations.
+**Action:** Created a reusable `getTraceNodes` helper function to replace the O(N) array filter. It iterates over the smaller `visited` set (O(V)) and performs O(1) lookups in a precomputed Map, dropping complexity to O(V). It also includes an optional typed `predicate` (with a default fallback) for additional filtering and a warning log for missing map entries.

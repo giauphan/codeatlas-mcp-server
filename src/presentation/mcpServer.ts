@@ -54,7 +54,7 @@ function getTraceNodes(visited: Set<string>, nodeMap: Map<string, GraphNode>, pr
   for (const id of visited) {
     const node = nodeMap.get(id);
     if (!node) {
-      console.warn(`Node ID missing in nodeMap: ${id}`);
+      console.warn(`[getTraceNodes] Node ID missing in nodeMap: ${id}`);
       continue;
     }
     if (predicate(node)) {
