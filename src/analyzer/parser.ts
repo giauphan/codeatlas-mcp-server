@@ -86,7 +86,7 @@ export class CodeAnalyzer {
     return this.getIgnoreFilter().ignores(normalizedPath);
   }
 
-  // Using Set to optimize addition, deletion, and lookup operations for file paths. Reduces O(N) operations (e.g., .includes or .indexOf) to O(1) for large datasets.
+  // Using Set to optimize addition, deletion, and lookup operations for file paths. Reduces O(N) operations (e.g., .includes or .indexOf) to O(1) for large datasets. This is particularly impactful for environments handling large datasets, where frequent mutations or membership checks may cause major performance costs.
   private allFiles: Set<string> = new Set();
   private totalSkippedCount = 0;
 
@@ -167,7 +167,9 @@ export class CodeAnalyzer {
       }
     } catch (err: any) {
       this.allFiles.delete(absPath);
-      if (err.code !== 'ENOENT') {
+      if (err.code === 'ENOENT') {
+        console.info(`[CodeAnalyzer] File not found (likely deleted): ${absPath}`);
+      } else {
         console.warn(`[CodeAnalyzer] Unexpected error accessing file ${absPath}:`, err.stack || err.message || err);
       }
     }
