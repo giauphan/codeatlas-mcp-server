@@ -2307,10 +2307,6 @@ export function registerTools(server: McpServer) {
           };
           const fi = ls.findIndex((x: string) => x === "FILES:");
           if (fi !== -1) {
-            // Optimization: Replace multiple array allocations (.slice().filter().slice()) with a single loop
-            // to drastically reduce Garbage Collection overhead when processing large git logs.
-            // This loop iterates over the remaining lines in the block, skipping empty lines,
-            // and limits the collected files to a maximum of 15 items.
             ci.files = [];
             const MAX_FILES = 15;
             for (let i = fi + 1; i < ls.length; i++) {
@@ -2322,7 +2318,13 @@ export function registerTools(server: McpServer) {
           }
           result.recentCommits.push(ci);
         }
-      } catch (err: any) { result.error = err.message?.substring(0, 300) + (err.message?.length > 300 ? '... (truncated)' : ''); }
+      } catch (err: unknown) {
+        if (err instanceof Error) {
+          result.error = err.message.length > 300 ? `${err.message.substring(0, 300)}... (truncated)` : err.message;
+        } else {
+          result.error = "Unknown error occurred";
+        }
+      }
 
       return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
     }
