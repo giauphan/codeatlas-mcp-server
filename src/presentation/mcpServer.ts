@@ -2294,6 +2294,7 @@ export function registerTools(server: McpServer) {
           const [behind, ahead] = execGit(["rev-list", "--left-right", "--count", "HEAD...@{upstream}"]).trim().split("\t").map(Number);
           result.ahead = ahead || 0; result.behind = behind || 0;
         } catch { result.ahead = null; result.behind = null; }
+        // logRaw format per commit: COMMIT\n<hash>\n<author>\n<date>\n<message>\nFILES:\n<file1>\n<file2>...
         const logRaw = execGit(["log", `-${maxC}`, "--format=COMMIT%n%H%n%an%n%ai%n%s%nFILES:", "--name-only"], 1024 * 1024);
         result.recentCommits = [];
         for (const block of logRaw.split("COMMIT\n").filter(Boolean)) {
