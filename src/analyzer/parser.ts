@@ -160,9 +160,7 @@ export class CodeAnalyzer {
     try {
       if (fs.existsSync(absPath) && !this.isIgnored(absPath, false)) {
         this.analyzeFile(absPath);
-        if (!this.allFiles.has(absPath)) {
-          this.allFiles.add(absPath);
-        }
+        this.allFiles.add(absPath);
       } else {
         // File was deleted or is ignored
         this.allFiles.delete(absPath);
@@ -170,6 +168,8 @@ export class CodeAnalyzer {
     } catch (err: any) {
       if (err.code === 'ENOENT') {
         console.info(`[CodeAnalyzer] File not found (likely deleted): ${absPath}`);
+      } else if (err.code === 'EACCES') {
+        console.error(`[CodeAnalyzer] Access denied to file: ${absPath}`);
       } else {
         console.warn(`[CodeAnalyzer] Unexpected error accessing file:`, err.message || err.code || 'Unknown error', err.stack);
       }
