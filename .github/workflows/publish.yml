@@ -80,11 +80,22 @@ jobs:
       - name: Release and publish
         id: sr
         run: |
+          # A successful semantic-release command does not necessarily mean that
+          # a release was made. For example, docs-only or non-conventional commits
+          # produce no npm package and no git tag.
+          BEFORE_TAGS=$(git tag --list 'v*' | sort)
           npm run release
-          # semantic-release bumps package.json in-place — read the new version directly
-          VERSION=$(node -e "console.log(require('./package.json').version)")
+          AFTER_TAGS=$(git tag --list 'v*' | sort)
+          VERSION=$(comm -13 <(printf '%s\n' "$BEFORE_TAGS") <(printf '%s\n' "$AFTER_TAGS") \
+            | sed -n 's/^v//p' | sort -V | tail -n 1)
+
+          if [ -z "$VERSION" ]; then
+            echo "No new release was created; skipping published-package validation."
+            exit 0
+          fi
+
           echo "Released version: $VERSION"
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
@@ -93,6 +104,7 @@ jobs:
   validate:
     name: Validate published package
     needs: release
+    if: needs.release.outputs.version != ''
     runs-on: ubuntu-latest
     environment: npm
     steps:
@@ -108,13 +120,24 @@ jobs:
           PKG_VERSION=${{ needs.release.outputs.version }}
           echo "Validating published package version: $PKG_VERSION"
 
-          # Download the exact tarball that was published
-          npm pack codeatlas-mcp-server@$PKG_VERSION
+          # The npm registry can lag a few seconds behind a publish, so retry
+          # the download before giving up to avoid a spurious ETARGET failure.
+          for ATTEMPT in 1 2 3 4 5; do
+            if npm pack "codeatlas-mcp-server@$PKG_VERSION"; then
+              break
+            fi
+            if [ "$ATTEMPT" -eq 5 ]; then
+              echo "::error::codeatlas-mcp-server@$PKG_VERSION not available on npm after 5 attempts"
+              exit 1
+            fi
+            echo "Version not on registry yet; retrying in 15s (attempt $ATTEMPT/5)..."
+            sleep 15
+          done
 
           # Verify the tarball exists and expose it as output
           TARBALL=$(ls codeatlas-mcp-server-*.tgz | head -1)
           echo "Downloaded: $TARBALL"
-          echo "tarball=$TARBALL" >> $GITHUB_OUTPUT
+          echo "tarball=$TARBALL" >> "$GITHUB_OUTPUT"
 
           # List all published files
           tar -tzf "$TARBALL" | sort > /tmp/published-files.txt
@@ -131,7 +154,7 @@ jobs:
             "package/dist/index.js" \
             "package/README.md" \
             "package/package.json"; do
-            if tar -tzf "$TARBALL" | grep -q "^$FILE$"; then
+            if grep -Fxq -- "$FILE" /tmp/published-files.txt; then
               echo "  ✓ $FILE"
             else
               echo "  ✗ MISSING: $FILE"
