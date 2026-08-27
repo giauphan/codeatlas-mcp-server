@@ -122,7 +122,7 @@ export class CodeAnalyzer {
     } else {
       const message = (error && error.message) || (error && error.code) || 'Unknown error';
       if (process.env.DEBUG === 'true') {
-        this.logWarn(`[CodeAnalyzer] Unexpected error accessing file ${safeName}: ${message}`, error?.stack);
+        this.logWarn(`[CodeAnalyzer] Unexpected error accessing file ${safeName}: ${message}`, error?.stack ? error.stack.replace(new RegExp(this.workspaceRoot, 'g'), '[WORKSPACE]') : undefined);
       } else {
         this.logWarn(`[CodeAnalyzer] Unexpected error accessing file ${safeName}: ${message}`);
       }
