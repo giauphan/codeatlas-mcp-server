@@ -221,6 +221,11 @@ export class CodeAnalyzer {
         const success = this.analyzeFile(absPath);
         if (success) {
           this.allFiles.add(absPath);
+        } else if (!fs.existsSync(absPath)) {
+          // analyzeFile() handles read errors internally and only reports a boolean,
+          // so a missing file surfaces here as a failure rather than an ENOENT throw.
+          // Treat it as a deletion and stop tracking it instead of counting it as skipped.
+          this.allFiles.delete(absPath);
         } else {
           this.totalSkippedCount++;
         }
