@@ -122,8 +122,8 @@ export class CodeAnalyzer {
     } else {
       const message = (error && error.message) || (error && error.code) || 'Unknown error';
       if (process.env.DEBUG === 'true') {
-        const workspaceEscaped = this.workspaceRoot.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        this.logWarn(`[CodeAnalyzer] Unexpected error accessing file ${safeName}: ${message}`, error?.stack ? error.stack.replace(new RegExp(workspaceEscaped, 'g'), '[WORKSPACE]') : undefined);
+        const workspaceEscaped = this.workspaceRoot ? this.workspaceRoot.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') : '';
+        this.logWarn(`[CodeAnalyzer] Unexpected error accessing file ${safeName}: ${message}`, error?.stack && workspaceEscaped ? error.stack.replace(new RegExp(workspaceEscaped, 'g'), '[WORKSPACE]') : error?.stack);
       } else {
         this.logWarn(`[CodeAnalyzer] Unexpected error accessing file ${safeName}: ${message}`);
       }
