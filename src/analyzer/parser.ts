@@ -95,17 +95,34 @@ export class CodeAnalyzer {
    */
   private allFiles: Set<string> = new Set<string>();
 
-  private logFileError(err: NodeJS.ErrnoException, absPath: string) {
-    if (err.code === 'ENOENT') {
-      console.info(`[CodeAnalyzer] File not found (likely deleted): ${absPath}`);
-    } else if (err.code === 'EACCES') {
-      console.error(`[CodeAnalyzer] Access denied to file: ${absPath}`);
+  private logInfo(message: string) {
+    console.info(message);
+  }
+
+  private logError(message: string) {
+    console.error(message);
+  }
+
+  private logWarn(message: string, stack?: string) {
+    if (stack) {
+      console.warn(message, stack);
     } else {
-      const message = err.message || err.code || 'Unknown error';
+      console.warn(message);
+    }
+  }
+
+  private logFileError(err: unknown, absPath: string) {
+    const error = err as NodeJS.ErrnoException;
+    if (error && error.code === 'ENOENT') {
+      this.logInfo(`[CodeAnalyzer] File not found (likely deleted): ${absPath}`);
+    } else if (error && error.code === 'EACCES') {
+      this.logError(`[CodeAnalyzer] Access denied to file: ${absPath}`);
+    } else {
+      const message = (error && error.message) || (error && error.code) || 'Unknown error';
       if (process.env.DEBUG === 'true') {
-        console.warn(`[CodeAnalyzer] Unexpected error accessing file ${absPath}: ${message}`, err.stack);
+        this.logWarn(`[CodeAnalyzer] Unexpected error accessing file ${absPath}: ${message}`, error?.stack);
       } else {
-        console.warn(`[CodeAnalyzer] Unexpected error accessing file ${absPath}: ${message}`);
+        this.logWarn(`[CodeAnalyzer] Unexpected error accessing file ${absPath}: ${message}`);
       }
     }
   }
@@ -186,7 +203,7 @@ export class CodeAnalyzer {
         // File was deleted or is ignored
         this.allFiles.delete(absPath);
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       this.logFileError(err, absPath);
       this.allFiles.delete(absPath);
     }
