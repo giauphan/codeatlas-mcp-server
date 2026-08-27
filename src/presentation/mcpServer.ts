@@ -87,6 +87,10 @@ function createNodeIdSet<T extends { id: string }>(nodes: T[]): Set<string> {
 
 const SHELL_METACHAR_RE = /[&|;<>$`\\\n\r]/;
 
+// Upper bound on how many function/class nodes detect_code_similarities will read and
+// tokenize, keeping the pairwise comparison loop bounded on large graphs.
+const MAX_FUNCTIONS_TO_COMPARE = 300;
+
 export function registerTools(server: McpServer) {
   // Tool -1: Analyze a project
   server.tool(
@@ -2896,9 +2900,17 @@ def register(ctx):
       const thresh = Math.max(0.2, Math.min(threshold ?? 0.6, 1.0));
       const maxPairs = limit || 20;
 
-      const functions = loaded.analysis.graph.nodes.filter(
-        n => (n.type === "function" || n.type === "class") && n.filePath && !n.id.startsWith("external:")
-      );
+      // ⚡ Bolt Optimization: Single O(N) pass with an early exit at the comparison cap,
+      // replacing .filter() over every node followed by .slice(0, 300). Note the cap is the
+      // candidate pool size (not maxPairs) — shrinking the pool to maxPairs would hide most
+      // similar pairs, since pairs are formed by comparing candidates against each other.
+      const functions: typeof loaded.analysis.graph.nodes = [];
+      for (const n of loaded.analysis.graph.nodes) {
+        if ((n.type === "function" || n.type === "class") && n.filePath && !n.id.startsWith("external:")) {
+          functions.push(n);
+          if (functions.length >= MAX_FUNCTIONS_TO_COMPARE) break;
+        }
+      }
 
       if (functions.length < 2) return { content: [{ type: "text" as const, text: JSON.stringify({ message: "Need at least 2 functions to compare", count: functions.length }) }] };
 
@@ -2918,7 +2930,7 @@ def register(ctx):
         return tokens;
       }
 
-      for (const node of functions.slice(0, 300)) { // Limit to 300 for perf
+      for (const node of functions) {
         const absPath = path.isAbsolute(node.filePath!) ? node.filePath! : path.resolve(loaded.projectDir, node.filePath!);
         try {
           if (!fs.existsSync(absPath)) continue;
