@@ -163,6 +163,10 @@ function formatFileResultError(fileResult: FileReadResult): string {
   return fileResult.error?.substring(0, 200) ?? FileReadErrorCode.UNKNOWN;
 }
 
+function isFileNotFound(err: unknown): boolean {
+  return err instanceof Error && 'code' in err && (err as NodeJS.ErrnoException).code === 'ENOENT';
+}
+
 export function registerTools(server: McpServer) {
   // Tool -1: Analyze a project
   server.tool(
@@ -1173,6 +1177,13 @@ export function registerTools(server: McpServer) {
       }
 
       if (seedNodes.size === 0) {
+        const suggestions: string[] = [];
+        for (const n of nodes) {
+          if (n.type === "module" && n.filePath) {
+            suggestions.push(n.label);
+            if (suggestions.length >= 10) break;
+          }
+        }
         return {
           content: [
             {
@@ -1181,10 +1192,7 @@ export function registerTools(server: McpServer) {
                 keyword,
                 matchCount: 0,
                 message: `No entities found matching '${keyword}'. Try a broader keyword.`,
-                suggestions: nodes
-                  .filter((n) => n.type === "module" && n.filePath)
-                  .map((n) => n.label)
-                  .slice(0, 10),
+                suggestions,
               }, null, 2),
             },
           ],
@@ -2081,7 +2089,7 @@ export function registerTools(server: McpServer) {
         if (n?.filePath) {
           const absPath = path.isAbsolute(n.filePath) ? n.filePath : path.resolve(loaded.projectDir, n.filePath);
           try {
-            const entries = fs.readdirSync(path.dirname(absPath));
+            const entries = await fs.promises.readdir(path.dirname(absPath));
             const base = path.basename(absPath).replace(path.extname(absPath), "");
             // ⚡ Bolt Optimization: Use precompiled regex to avoid memory-intensive .toLowerCase() string allocations in tight loops
             const baseRegex = new RegExp(base.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), "i");
@@ -2832,8 +2840,12 @@ def register(ctx):
             lines: endLine - startLine + 1,
             snippet,
           });
-        } catch (err: any) {
-          results.push({ symbol: node.label, file: absPath, error: err.message?.substring(0, 200) });
+        } catch (err: unknown) {
+          if (isFileNotFound(err)) {
+            results.push({ symbol: node.label, file: absPath, error: "File not found" });
+          } else {
+            results.push({ symbol: node.label, file: absPath, error: err instanceof Error ? err.message.substring(0, 200) : String(err).substring(0, 200) });
+          }
         }
       }
 
@@ -2854,22 +2866,36 @@ def register(ctx):
       const loaded = await loadAnalysisAsync(project);
       if (!loaded) return { content: [{ type: "text" as const, text: "No analysis found. Run 'analyze' first." }] };
 
-      const nodes = loaded.analysis.graph.nodes.filter(n => !n.id.startsWith("external:"));
+      // Consolidate multiple O(N) passes to gather metrics and reduce allocations
+      const allNodes = loaded.analysis.graph.nodes;
       const links = loaded.analysis.graph.links;
 
       // Entity type distribution
       const typeCounts: Record<string, number> = {};
-      for (const n of nodes) typeCounts[n.type] = (typeCounts[n.type] || 0) + 1;
-
-      // File distribution
       const fileEntityCount = new Map<string, number>();
       const fileTypeMap = new Map<string, Set<string>>();
-      for (const n of nodes) {
-        if (!n.filePath) continue;
-        const fp = path.isAbsolute(n.filePath) ? path.relative(loaded.projectDir, n.filePath) : n.filePath;
-        fileEntityCount.set(fp, (fileEntityCount.get(fp) || 0) + 1);
-        if (!fileTypeMap.has(fp)) fileTypeMap.set(fp, new Set());
-        fileTypeMap.get(fp)!.add(n.type);
+      let entitiesWithFilePath = 0;
+      let entityCount = 0;
+
+      for (const n of allNodes) {
+        // Externals are explicitly excluded from aggregate metrics and coverage
+        // as they represent dependencies, not internal project source code.
+        if (n.id.startsWith("external:")) continue;
+        entityCount++;
+
+        typeCounts[n.type] = (typeCounts[n.type] || 0) + 1;
+
+        if (n.filePath) {
+          entitiesWithFilePath++;
+
+          const fp = path.isAbsolute(n.filePath) ? path.relative(loaded.projectDir, n.filePath) : n.filePath;
+          fileEntityCount.set(fp, (fileEntityCount.get(fp) || 0) + 1);
+
+          if (!fileTypeMap.has(fp)) {
+            fileTypeMap.set(fp, new Set());
+          }
+          fileTypeMap.get(fp)!.add(n.type);
+        }
       }
 
       const topFiles = Array.from(fileEntityCount.entries())
@@ -2885,17 +2911,18 @@ def register(ctx):
       }
 
       // Coverage quality score
-      const withFilePath = nodes.filter(n => n.filePath).length;
-      const coveragePct = nodes.length > 0 ? Math.round((withFilePath / nodes.length) * 100) : 0;
+      const coveragePct = entityCount > 0 ? Math.round((entitiesWithFilePath / entityCount) * 100) : 0;
 
-      // ⚡ Bolt Optimization: Use a precomputed Set for O(1) link lookups instead of O(N*L) Array.some()
+      // Use a Set for O(1) link lookups instead of O(N*L) Array.some()
       const linkedNodeIds = new Set<string>();
       for (const l of links) {
         linkedNodeIds.add(l.source);
         linkedNodeIds.add(l.target);
       }
       let orphanNodes = 0;
-      for (const n of nodes) {
+      for (const n of allNodes) {
+        // Exclude external nodes from orphan count to match coverage semantics
+        if (n.id.startsWith("external:")) continue;
         if (n.type !== "variable" && !linkedNodeIds.has(n.id)) {
           orphanNodes++;
         }
@@ -2925,7 +2952,7 @@ def register(ctx):
       const result = {
         project: loaded.projectName,
         summary: {
-          totalEntities: nodes.length,
+          totalEntities: entityCount,
           totalRelationships: links.length,
           uniqueFiles: fileEntityCount.size,
           coveragePercent: coveragePct,
@@ -2992,14 +3019,12 @@ def register(ctx):
       for (const node of functions.slice(0, DEFAULT_MAX_FUNCTIONS_TO_COMPARE)) {
         const absPath = path.isAbsolute(node.filePath!) ? node.filePath! : path.resolve(loaded.projectDir, node.filePath!);
         try {
-          const fileResult = await safeReadAuthorizedFile(absPath, authorizedProjects);
-          if (!isFileReadResultValid(fileResult)) {
-            pushFileErrorResult([], fileResult, {}, "detect_code_similarities"); // Just log warnings for code similarities, no direct results array for files
-            continue;
-          }
-
-          const content = fileResult.content;
-
+        const fileResult = await safeReadAuthorizedFile(absPath, authorizedProjects);
+        if (!isFileReadResultValid(fileResult)) {
+          pushFileErrorResult([], fileResult, {}, "detect_code_similarities"); // Just log warnings for code similarities, no direct results array for files
+          continue;
+        }
+        const content = fileResult.content;
           const lines = content.split("\n");
           const start = (node.line || 1) - 1;
 
@@ -3010,6 +3035,7 @@ def register(ctx):
           const tokens = getTokensFromSource(body);
           tokenized.push({ node, tokens, source: body.substring(0, 300) });
         } catch (err: unknown) {
+          if (isFileNotFound(err)) continue;
           console.error(`[detect_code_similarities] Error analyzing function ${node.label} in ${node.filePath}:`, err);
         }
       }

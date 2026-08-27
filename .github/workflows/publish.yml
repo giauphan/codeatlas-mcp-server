@@ -1,0 +1,167 @@
+name: Release and publish npm package
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+defaults:
+  run:
+    shell: bash
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-main
+  cancel-in-progress: false
+
+jobs:
+  # ── ① CI: lint + test on current (unbumped) code ───────────────────────────
+  ci:
+    name: CI (lint + test)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: TypeScript type check
+        run: npm run lint
+
+      - name: Run tests
+        run: npm test
+
+  # ── ② Release: semantic-release bumps version + publishes to npm ──────────────
+  # Note: semantic-release internally runs npm install and build as part of its
+  # publish process. We run npm pack --dry-run here as a fast pre-publish check.
+  release:
+    name: Release and publish
+    needs: ci
+    runs-on: ubuntu-latest
+    environment: npm
+    permissions:
+      contents: write
+    outputs:
+      version: ${{ steps.sr.outputs.version }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          registry-url: https://registry.npmjs.org
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Validate npm package contents
+        run: npm pack --dry-run
+
+      - name: Release and publish
+        id: sr
+        run: |
+          npm run release
+          # semantic-release bumps package.json in-place — read the new version directly
+          VERSION=$(node -e "console.log(require('./package.json').version)")
+          echo "Released version: $VERSION"
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+  # ── ③ Validate: smoke-test the actual published npm package ──────────────────
+  validate:
+    name: Validate published package
+    needs: release
+    runs-on: ubuntu-latest
+    environment: npm
+    steps:
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+
+      - name: Download and unpack published tarball
+        id: download
+        run: |
+          PKG_VERSION=${{ needs.release.outputs.version }}
+          echo "Validating published package version: $PKG_VERSION"
+
+          # Download the exact tarball that was published
+          npm pack codeatlas-mcp-server@$PKG_VERSION
+
+          # Verify the tarball exists and expose it as output
+          TARBALL=$(ls codeatlas-mcp-server-*.tgz | head -1)
+          echo "Downloaded: $TARBALL"
+          echo "tarball=$TARBALL" >> $GITHUB_OUTPUT
+
+          # List all published files
+          tar -tzf "$TARBALL" | sort > /tmp/published-files.txt
+          echo "=== Published files ==="
+          cat /tmp/published-files.txt
+
+      - name: Verify critical files are present
+        run: |
+          TARBALL="${{ steps.download.outputs.tarball }}"
+          echo "Verifying critical files in: $TARBALL"
+
+          # Check required published files exist inside the tarball
+          for FILE in \
+            "package/dist/index.js" \
+            "package/README.md" \
+            "package/package.json"; do
+            if tar -tzf "$TARBALL" | grep -q "^$FILE$"; then
+              echo "  ✓ $FILE"
+            else
+              echo "  ✗ MISSING: $FILE"
+              exit 1
+            fi
+          done
+
+          echo "  ✓ All critical files present"
+
+      - name: Install globally and verify CLI entry points
+        run: |
+          PKG_VERSION=${{ needs.release.outputs.version }}
+          echo "Installing codeatlas-mcp-server@$PKG_VERSION globally..."
+
+          npm install -g codeatlas-mcp-server@$PKG_VERSION
+
+          # Verify all CLI binaries are installed and loadable
+          # codeatlas          — primary CLI entry point (all tools)
+          # codeatlas-mcp      — MCP protocol bridge (stdio transport)
+          # codeatlas-enterprise — enterprise bundle (all features + extras)
+          for CMD in codeatlas codeatlas-mcp codeatlas-enterprise; do
+            if command -v $CMD &>/dev/null; then
+              echo "  ✓ $CMD found in PATH"
+              $CMD --help 2>&1 | head -3 || true
+            else
+              echo "  ✗ MISSING: $CMD not found in PATH"
+              exit 1
+            fi
+          done
+
+          echo ""
+          echo "=== Validation complete ==="
+          echo "Package version $PKG_VERSION is valid and published correctly."
