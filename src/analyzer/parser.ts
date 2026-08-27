@@ -702,7 +702,7 @@ export class CodeAnalyzer {
       });
 
       let linkSourceId = moduleId;
-      if (func.indent && func.indent > 0 && reversedClasses.length > 0) {
+      if (func.indent && func.indent > 0 && reversedClasses?.length > 0) {
         // Functions without an explicit parent class are assigned to the closest
         // preceding class by line number. This handles PHP/Python file-scoped functions.
         // ⚡ Bolt Optimization: Use binary search since reversedClasses is sorted descending by line

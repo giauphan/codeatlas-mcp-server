@@ -2304,9 +2304,8 @@ export function registerTools(server: McpServer) {
             // ⚡ Bolt Optimization: Replace multiple array allocations (.slice().filter().slice()) with a single loop
             ci.files = [];
             for (let i = fi + 1; i < ls.length; i++) {
-              const file = ls[i].trim();
-              if (file) {
-                ci.files.push(file);
+              if (ls[i].trim()) {
+                ci.files.push(ls[i]);
                 if (ci.files.length >= 15) break;
               }
             }
