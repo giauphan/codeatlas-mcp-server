@@ -62,6 +62,107 @@ function createNodeIdSet<T extends { id: string }>(nodes: T[]): Set<string> {
 
 const SHELL_METACHAR_RE = /[&|;<>$`\\\n\r]/;
 
+const DEFAULT_MAX_FUNCTIONS_TO_COMPARE = 300; // Default limit for similarity logic
+
+interface FileReadResult {
+  content: string | null;
+  error?: string;
+  errorCode?: string;
+}
+
+function isFileReadResultValid(result: FileReadResult): result is FileReadResult & { content: string } {
+  return !result.error && result.content !== null;
+}
+
+/**
+ * Helper to safely read a file inside authorized projects asynchronously.
+ * Prevents TOCTOU symlink races by resolving the real path first, validating it,
+ * and then opening the validated path with O_NOFOLLOW to ensure it hasn't been swapped.
+ * Uses async operations to prevent blocking the Node.js event loop.
+ */
+async function safeReadAuthorizedFile(absPath: string, authorizedProjects: { dir: string }[]): Promise<FileReadResult> {
+  if (!absPath || typeof absPath !== "string") {
+    return { content: null, error: "Invalid file path" };
+  }
+
+  let fh: fs.promises.FileHandle | null = null;
+  try {
+    // Resolve the real path first to expand symlinks and get the canonical path
+    const realPath = await fs.promises.realpath(absPath);
+    if (!isPathInAuthorizedProjects(realPath, authorizedProjects)) {
+      // Do not log the actual realPath in production to avoid leaking sensitive directory structure
+      // Including a generic contextual marker helps maintainers correlate blocked access logs without leaking paths.
+      console.warn(`[Security][FileAccess] Unauthorized file access attempt blocked for requested path: ${path.basename(absPath)}`);
+      return { content: null, error: "Unauthorized file path" };
+    }
+
+    // Open the validated real path with O_NOFOLLOW to ensure it hasn't been swapped back to a symlink
+    fh = await fs.promises.open(realPath, fs.constants.O_RDONLY | fs.constants.O_NOFOLLOW);
+    const content = await fh.readFile("utf-8");
+    return { content };
+  } catch (err) {
+    const error = err as NodeJS.ErrnoException;
+    return { content: null, error: error.message, errorCode: error.code };
+  } finally {
+    if (fh !== null) {
+      try {
+        await fh.close();
+      } catch (closeErr) {
+        if (process.env.DEBUG === "true") {
+          console.error(`[Security] Warning: Failed to close file handle for path: ${path.basename(absPath)}. Error:`, closeErr);
+        }
+      }
+    }
+  }
+}
+
+enum FileReadErrorCode {
+  ENOENT = "File not found",
+  EACCES = "Permission denied",
+  EISDIR = "Path is a directory",
+  EMFILE = "Too many open files",
+  EBUSY = "Resource busy or locked",
+  UNAUTHORIZED = "Unauthorized file path",
+  UNKNOWN = "Unknown error"
+}
+
+// Initialize errorMap outside the function to avoid recreation on every function call
+const fileErrorCodeMap: Record<string, string> = {
+  ENOENT: FileReadErrorCode.ENOENT,
+  EACCES: FileReadErrorCode.EACCES,
+  EISDIR: FileReadErrorCode.EISDIR,
+  EMFILE: FileReadErrorCode.EMFILE,
+  EBUSY: FileReadErrorCode.EBUSY
+};
+
+function pushFileErrorResult(results: any[], fileResult: FileReadResult, meta: any = {}, logPrefix: string = "") {
+  const errorMessage = formatFileResultError(fileResult);
+  if (results) {
+    results.push({ ...meta, error: errorMessage });
+  }
+
+  // Log unexpected or unmapped errors (masking full paths for security)
+  if (errorMessage === FileReadErrorCode.UNKNOWN || errorMessage.startsWith("UnmappedError(")) {
+    console.warn(`[${logPrefix}] Unexpected file error: ${fileResult.error}`);
+  }
+}
+
+function formatFileResultError(fileResult: FileReadResult): string {
+  if (fileResult.error === "Unauthorized file path") {
+    return FileReadErrorCode.UNAUTHORIZED;
+  }
+
+  if (fileResult.errorCode && fileErrorCodeMap[fileResult.errorCode]) {
+    return fileErrorCodeMap[fileResult.errorCode];
+  }
+
+  if (fileResult.errorCode) {
+    return `UnmappedError(${fileResult.errorCode}): ${fileResult.error?.substring(0, 150) ?? 'No details'}`;
+  }
+
+  return fileResult.error?.substring(0, 200) ?? FileReadErrorCode.UNKNOWN;
+}
+
 function isFileNotFound(err: unknown): boolean {
   return err instanceof Error && 'code' in err && (err as NodeJS.ErrnoException).code === 'ENOENT';
 }
@@ -1732,11 +1833,19 @@ export function registerTools(server: McpServer) {
         walkDir(loaded.projectDir, 0);
       } catch { /* fallback */ }
 
+      // Cache authorized projects to avoid repeated async calls in highly concurrent settings
+      const authorizedProjects = await discoverProjectsAsync(auth.uid);
+
       const results: Array<{ file: string; line: number; content: string; contextBefore: string[]; contextAfter: string[] }> = [];
       for (const filePath of allFiles) {
         if (results.length >= maxRes) break;
         try {
-          const content = await fs.promises.readFile(filePath, "utf-8");
+          const fileResult = await safeReadAuthorizedFile(filePath, authorizedProjects);
+          if (!isFileReadResultValid(fileResult)) {
+            pushFileErrorResult(results, fileResult, { file: path.relative(loaded.projectDir, filePath) }, "code_search");
+            continue;
+          }
+          const content = fileResult.content;
 
           // Fast path to skip files that definitely don't contain the query
           // This avoids expensive .split('\n') and per-line iterations for most files
@@ -2666,13 +2775,21 @@ def register(ctx):
       const ctx = Math.min(contextLines ?? 5, 30);
       const results: any[] = [];
 
+      const authorizedProjects = await discoverProjectsAsync(auth.uid);
+
       for (const node of matches) {
         const absPath = path.isAbsolute(node.filePath!)
           ? node.filePath!
           : path.resolve(loaded.projectDir, node.filePath!);
 
+        const fileResult = await safeReadAuthorizedFile(absPath, authorizedProjects);
+        if (!isFileReadResultValid(fileResult)) {
+          pushFileErrorResult(results, fileResult, { symbol: node.label, file: path.relative(loaded.projectDir, absPath) }, "get_code_snippet");
+          continue;
+        }
+        const content = fileResult.content;
+
         try {
-          const content = await fs.promises.readFile(absPath, "utf-8");
           const lines = content.split("\n");
           const targetLine = (node.line || 1) - 1;
 
@@ -2897,10 +3014,17 @@ def register(ctx):
         return tokens;
       }
 
-      for (const node of functions.slice(0, 300)) { // Limit to 300 for perf
+      const authorizedProjects = await discoverProjectsAsync(auth.uid);
+
+      for (const node of functions.slice(0, DEFAULT_MAX_FUNCTIONS_TO_COMPARE)) {
         const absPath = path.isAbsolute(node.filePath!) ? node.filePath! : path.resolve(loaded.projectDir, node.filePath!);
         try {
-          const content = await fs.promises.readFile(absPath, "utf-8");
+        const fileResult = await safeReadAuthorizedFile(absPath, authorizedProjects);
+        if (!isFileReadResultValid(fileResult)) {
+          pushFileErrorResult([], fileResult, {}, "detect_code_similarities"); // Just log warnings for code similarities, no direct results array for files
+          continue;
+        }
+        const content = fileResult.content;
           const lines = content.split("\n");
           const start = (node.line || 1) - 1;
 
@@ -2912,7 +3036,7 @@ def register(ctx):
           tokenized.push({ node, tokens, source: body.substring(0, 300) });
         } catch (err: unknown) {
           if (isFileNotFound(err)) continue;
-          console.error(`[detect_code_similarities] Error reading ${absPath}:`, err);
+          console.error(`[detect_code_similarities] Error analyzing function ${node.label} in ${node.filePath}:`, err);
         }
       }
 
