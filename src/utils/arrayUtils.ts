@@ -22,6 +22,8 @@ export function binarySearchClosestPrecedingClass(
   let parentClass = undefined;
 
   while (startIdx <= endIdx) {
+    // Unsigned right shift (>>> 1) efficiently computes Math.floor((startIdx + endIdx) / 2)
+    // while protecting against potential 32-bit integer overflow.
     const middleIdx = (startIdx + endIdx) >>> 1;
     if (reversedClasses[middleIdx] && typeof reversedClasses[middleIdx].line === 'number' && reversedClasses[middleIdx].line < funcLine) {
       parentClass = reversedClasses[middleIdx];

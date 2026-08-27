@@ -78,3 +78,15 @@ describe('binarySearchClosestPrecedingClass', () => {
     assert.strictEqual(resultSmallest, undefined);
   });
 });
+
+  it('should test binary search edge case with an array of size 1', () => {
+    const singleElementArray = [{ name: 'ClassA', line: 50 }];
+
+    // Function is after the class
+    const resultAfter = binarySearchClosestPrecedingClass(singleElementArray, 100);
+    assert.strictEqual(resultAfter?.name, 'ClassA');
+
+    // Function is before the class
+    const resultBefore = binarySearchClosestPrecedingClass(singleElementArray, 10);
+    assert.strictEqual(resultBefore, undefined);
+  });
