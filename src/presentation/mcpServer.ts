@@ -2302,6 +2302,7 @@ export function registerTools(server: McpServer) {
           const fi = ls.findIndex((x: string) => x === "FILES:");
           if (fi !== -1) {
             // Optimization: Replace multiple array allocations (.slice().filter().slice()) with a single loop
+            // to drastically reduce Garbage Collection overhead when processing large git logs.
             ci.files = [];
             for (let i = fi + 1; i < ls.length; i++) {
               if (ls[i].trim()) {

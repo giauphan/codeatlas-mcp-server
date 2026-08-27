@@ -1,8 +1,22 @@
+/**
+ * Finds the closest preceding class by line number using binary search.
+ * @param reversedClasses An array of classes that MUST be sorted descending by line number.
+ * @param funcLine The line number of the function to compare against.
+ */
 export function binarySearchClosestPrecedingClass(
   reversedClasses: { name: string; line: number }[],
   funcLine: number
 ): { name: string; line: number } | undefined {
   if (!reversedClasses || reversedClasses.length === 0) return undefined;
+
+  // Dev Assertion: Ensure the array is properly sorted descending by line number in development.
+  if (process.env.NODE_ENV !== 'production' && reversedClasses.length > 1) {
+    for (let i = 0; i < reversedClasses.length - 1; i++) {
+      if (reversedClasses[i].line < reversedClasses[i + 1].line) {
+        console.warn(`[arrayUtils] Warning: reversedClasses is not sorted descending at index ${i}`);
+      }
+    }
+  }
 
   let startIdx = 0;
   let endIdx = reversedClasses.length - 1;
