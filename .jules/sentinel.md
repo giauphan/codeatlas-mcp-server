@@ -2,7 +2,6 @@
 **Vulnerability:** The `checkAuth` function used for authorization fell back to granting full privileges via a mock local user if no authentication context was found and `CODEATLAS_MULTI_TENANT` was not explicitly enabled.
 **Learning:** Returning mock authentication credentials as a default fallback allows attackers to easily bypass authentication simply by not providing any credentials.
 **Prevention:** Never use mock objects or fallback roles when authentication fails or is missing. Always throw an explicit unauthorized error.
-
 ## 2026-08-02 - [Authorization Bypass in Export Tool]
 **Vulnerability:** The `export_team_artifact` tool lacked authorization checks, potentially allowing arbitrary file creation inside unauthorized directories due to unvalidated `projectDir`.
 **Learning:** Any tool that performs file system operations (like writing export files) must validate the target directory against authorized workspace bounds, even if the directory appears to be loaded from internal state (`loadAnalysisAsync`), to prevent authorization bypasses.
@@ -32,27 +31,3 @@
 **Vulnerability:** Git commands invoked via `child_process.spawnSync` can be susceptible to argument injection if arguments are not fully trusted, even when `shell: false` is used. Git accepts global flags like `-c`, `--exec-path`, `--pager`, `--config-env`, and others that can lead to arbitrary code execution if an attacker manages to inject them.
 **Learning:** Always validate and explicitly allowlist or denylist arguments passed to external binaries like `git`, particularly those that might be influenced by external input. Explicit sanitization ensures that no unexpected or dangerous flags are processed.
 **Prevention:** Implement an explicit sanitization step (e.g., filtering out strings starting with `-c`, `--exec-path`, `--pager`, etc.) before passing the argument array to `spawnSync` when wrapping tools like `git`.
-
-## 2024-08-16 - [Path Traversal and TOCTOU in file reading]
-**Vulnerability:** Tools that read files from the filesystem (like `get_code_snippet` and `code_search`) failed to use `fs.realpathSync` combined with an authorization check (`isPathInAuthorizedProjects`) immediately before reading the file, leading to potential path traversal and TOCTOU symlink races. Additionally, reading operations were repeated without abstracting error handling, leading to maintainability issues and potential leaked file descriptors in case of unexpected errors during realpath checks.
-**Learning:** Using `path.resolve` or reading unverified file paths directly inside an authorized workspace allows an attacker to access arbitrary files via Path Traversal (`../`) or Time-of-Check to Time-of-Use (TOCTOU) symlink substitution if the filesystem changes between the `realpath` validation and the `readFile` call. Repeating this logic across multiple tools increases the risk of subtle bugs or omissions in resource cleanup (like missing `finally` blocks).
-**Prevention:** Consolidate path validation and file reading logic into a single robust helper function (e.g., `readAuthorizedFileSync`) that uses file descriptors (`fs.openSync`) to lock the target, performs `realpath` resolution on the descriptor, validates it against authorized boundaries, and reads directly from the descriptor, ensuring consistent `finally` blocks to prevent handle leaks.
-## 2025-02-28 - Secure File Reading Helper Refinements
-
-**Vulnerability:** Addressed several structural feedback points on the newly introduced `readAuthorizedFileAsync` helper, including loose typings, magic strings for error codes, and misplaced security comments that could confuse future maintainers.
-
-**Learning:**
-- TypeScript interfaces (like `FileReadResult`) improve type safety and maintainability when handling complex objects across module boundaries.
-- Using Enums for string constants (like `FileReadErrorCode`) prevents typos and standardizes error checking logic.
-- Misplaced comments in a diff can pollute the codebase if not properly pruned.
-- Contextual markers in logs (e.g., `[Security][FileAccess]`) allow safe debugging and monitoring without exposing actual payload values (like paths).
-
-**Prevention:**
-- Extract repeated return object structures into `interface` definitions early in development.
-- Abstract magic strings into enums immediately upon introducing standardized logic branches based on them.
-- Ensure log formats are structured and distinct before requesting code review.
-
-## 2025-02-28 - Abstract Security Patterns to Prevent Accidental Bypasses
-**Vulnerability:** While developing secure file-reading logic (e.g., mitigating TOCTOU symlink races), developers may copy-paste raw `fs.promises.realpath` and `O_NOFOLLOW` logic instead of using centralized utility functions, leading to incomplete implementations or regressions over time.
-**Learning:** Security fixes are fragile if they rely on developers perfectly replicating complex boilerplate (like descriptor handling or TOCTOU mitigations) in multiple places.
-**Prevention:** Developers should strictly prefer consolidated utilities (like `safeReadAuthorizedFile`) for all file I/O operations rather than duplicating logic manually. Security-critical utilities should be well-documented and treated as mandatory API boundaries within the application.
