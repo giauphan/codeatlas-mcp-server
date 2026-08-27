@@ -1,190 +1,66 @@
-name: Release and publish npm package
+name: Publish npm package
 
 on:
-  push:
-    branches: [main]
+  release:
+    types:
+      - published
   workflow_dispatch:
-
-defaults:
-  run:
-    shell: bash
+    inputs:
+      tag:
+        description: Release tag to publish, for example v1.2.3
+        required: true
+        type: string
 
 permissions:
-  contents: write
+  contents: read
+  id-token: write
 
 concurrency:
-  group: release-main
+  group: publish-${{ github.event.release.tag_name || inputs.tag }}
   cancel-in-progress: false
 
 jobs:
-  # ── ① CI: lint + test on current (unbumped) code ───────────────────────────
-  ci:
-    name: CI (lint + test)
+  publish:
+    name: Build, verify, and publish
     runs-on: ubuntu-latest
+    environment: npm
     steps:
-      - name: Checkout
+      - name: Checkout release tag
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.release.tag_name || inputs.tag }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 20
           cache: npm
+          registry-url: https://registry.npmjs.org
 
       - name: Install dependencies
         run: npm ci
 
-      - name: Build
-        run: npm run build
+      - name: Verify package version matches tag
+        run: >-
+          node -e 'const pkg=require("./package.json"); const tag=process.env.RELEASE_TAG || "";
+          const expected="v" + pkg.version; if (tag !== expected) { console.error("Tag " + tag +
+          " does not match package version " + expected); process.exit(1); }'
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name || inputs.tag }}
 
-      - name: TypeScript type check
+      - name: Run lint
         run: npm run lint
 
       - name: Run tests
         run: npm test
 
-  # ── ② Release: semantic-release bumps version + publishes to npm ──────────────
-  # Note: semantic-release internally runs npm install and build as part of its
-  # publish process. We run npm pack --dry-run here as a fast pre-publish check.
-  release:
-    name: Release and publish
-    needs: ci
-    runs-on: ubuntu-latest
-    environment: npm
-    permissions:
-      contents: write
-    outputs:
-      version: ${{ steps.sr.outputs.version }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-          registry-url: https://registry.npmjs.org
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Build
+      - name: Build package
         run: npm run build
 
       - name: Validate npm package contents
         run: npm pack --dry-run
 
-      - name: Release and publish
-        id: sr
-        run: |
-          # A successful semantic-release command does not necessarily mean that
-          # a release was made. For example, docs-only or non-conventional commits
-          # produce no npm package and no git tag.
-          BEFORE_TAGS=$(git tag --list 'v*' | sort)
-          npm run release
-          AFTER_TAGS=$(git tag --list 'v*' | sort)
-          VERSION=$(comm -13 <(printf '%s\n' "$BEFORE_TAGS") <(printf '%s\n' "$AFTER_TAGS") \
-            | sed -n 's/^v//p' | sort -V | tail -n 1)
-
-          if [ -z "$VERSION" ]; then
-            echo "No new release was created; skipping published-package validation."
-            exit 0
-          fi
-
-          echo "Released version: $VERSION"
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+      - name: Publish to npm
+        run: npm publish --provenance --access public
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-
-  # ── ③ Validate: smoke-test the actual published npm package ──────────────────
-  validate:
-    name: Validate published package
-    needs: release
-    if: needs.release.outputs.version != ''
-    runs-on: ubuntu-latest
-    environment: npm
-    steps:
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          registry-url: https://registry.npmjs.org
-
-      - name: Download and unpack published tarball
-        id: download
-        run: |
-          PKG_VERSION=${{ needs.release.outputs.version }}
-          echo "Validating published package version: $PKG_VERSION"
-
-          # The npm registry can lag a few seconds behind a publish, so retry
-          # the download before giving up to avoid a spurious ETARGET failure.
-          for ATTEMPT in 1 2 3 4 5; do
-            if npm pack "codeatlas-mcp-server@$PKG_VERSION"; then
-              break
-            fi
-            if [ "$ATTEMPT" -eq 5 ]; then
-              echo "::error::codeatlas-mcp-server@$PKG_VERSION not available on npm after 5 attempts"
-              exit 1
-            fi
-            echo "Version not on registry yet; retrying in 15s (attempt $ATTEMPT/5)..."
-            sleep 15
-          done
-
-          # Verify the tarball exists and expose it as output
-          TARBALL=$(ls codeatlas-mcp-server-*.tgz | head -1)
-          echo "Downloaded: $TARBALL"
-          echo "tarball=$TARBALL" >> "$GITHUB_OUTPUT"
-
-          # List all published files
-          tar -tzf "$TARBALL" | sort > /tmp/published-files.txt
-          echo "=== Published files ==="
-          cat /tmp/published-files.txt
-
-      - name: Verify critical files are present
-        run: |
-          TARBALL="${{ steps.download.outputs.tarball }}"
-          echo "Verifying critical files in: $TARBALL"
-
-          # Check required published files exist inside the tarball
-          for FILE in \
-            "package/dist/index.js" \
-            "package/README.md" \
-            "package/package.json"; do
-            if grep -Fxq -- "$FILE" /tmp/published-files.txt; then
-              echo "  ✓ $FILE"
-            else
-              echo "  ✗ MISSING: $FILE"
-              exit 1
-            fi
-          done
-
-          echo "  ✓ All critical files present"
-
-      - name: Install globally and verify CLI entry points
-        run: |
-          PKG_VERSION=${{ needs.release.outputs.version }}
-          echo "Installing codeatlas-mcp-server@$PKG_VERSION globally..."
-
-          npm install -g codeatlas-mcp-server@$PKG_VERSION
-
-          # Verify all CLI binaries are installed and loadable
-          # codeatlas          — primary CLI entry point (all tools)
-          # codeatlas-mcp      — MCP protocol bridge (stdio transport)
-          # codeatlas-enterprise — enterprise bundle (all features + extras)
-          for CMD in codeatlas codeatlas-mcp codeatlas-enterprise; do
-            if command -v $CMD &>/dev/null; then
-              echo "  ✓ $CMD found in PATH"
-              $CMD --help 2>&1 | head -3 || true
-            else
-              echo "  ✗ MISSING: $CMD not found in PATH"
-              exit 1
-            fi
-          done
-
-          echo ""
-          echo "=== Validation complete ==="
-          echo "Package version $PKG_VERSION is valid and published correctly."

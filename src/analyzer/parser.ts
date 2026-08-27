@@ -117,10 +117,25 @@ export class CodeAnalyzer {
     }
   }
 
+  /**
+   * Sanitizes paths for logging by replacing the workspace root with a placeholder
+   * and normalizing directory separators.
+   */
+  private sanitizePath(absPath: string): string {
+    if (!this.workspaceRoot) return absPath.replace(/\\/g, '/');
+
+    // We cannot use string replace with regex characters dynamically without escaping,
+    // but a safer approach is substring if it starts with the root.
+    if (absPath.startsWith(this.workspaceRoot)) {
+      return '[WORKSPACE]' + absPath.substring(this.workspaceRoot.length).replace(/\\/g, '/');
+    }
+    return absPath.replace(/\\/g, '/');
+  }
+
   private handleFileError(err: unknown, absPath: string) {
     const error = err as NodeJS.ErrnoException;
-    // Scrub absolute path to only log the basename for security purposes
-    const safeName = path.basename(absPath);
+    // Scrub absolute path using the unified sanitization logic
+    const safeName = this.sanitizePath(absPath);
     if (error && error.code === 'ENOENT') {
       this.reportInfo(`[CodeAnalyzer] File not found (likely deleted): ${safeName}`);
     } else if (error && error.code === 'EACCES') {
@@ -130,8 +145,7 @@ export class CodeAnalyzer {
       this.transientErrors.add(absPath);
       const message = (error && error.message) || (error && error.code) || 'Unknown error';
       if (process.env.DEBUG === 'true') {
-        const workspaceEscaped = this.workspaceRoot ? this.workspaceRoot.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') : '';
-        this.reportWarning(`[CodeAnalyzer] Unexpected error accessing file ${safeName}: ${message}`, error?.stack && workspaceEscaped ? error.stack.replace(new RegExp(workspaceEscaped, 'g'), '[WORKSPACE]') : error?.stack);
+        this.reportWarning(`[CodeAnalyzer] Unexpected error accessing file ${safeName}: ${message}`, error?.stack ? this.sanitizePath(error.stack) : undefined);
       } else {
         this.reportWarning(`[CodeAnalyzer] Unexpected error accessing file ${safeName}: ${message}`);
       }
@@ -217,15 +231,11 @@ export class CodeAnalyzer {
 
     // 3. Re-analyze only if file exists and is NOT ignored
     try {
+      await fs.promises.stat(absPath);
       if (!this.isIgnored(absPath, false)) {
         const success = this.analyzeFile(absPath);
         if (success) {
           this.allFiles.add(absPath);
-        } else if (!fs.existsSync(absPath)) {
-          // analyzeFile() handles read errors internally and only reports a boolean,
-          // so a missing file surfaces here as a failure rather than an ENOENT throw.
-          // Treat it as a deletion and stop tracking it instead of counting it as skipped.
-          this.allFiles.delete(absPath);
         } else {
           this.totalSkippedCount++;
         }
