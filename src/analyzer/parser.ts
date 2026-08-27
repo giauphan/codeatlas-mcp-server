@@ -172,6 +172,10 @@ export class CodeAnalyzer {
     return this.buildAnalysisResult();
   }
 
+  /**
+   * Returns a copy of the uniquely tracked files as an array.
+   * Note: As it is derived from a Set, duplicates are inherently avoided.
+   */
   public get allFilesArray(): string[] {
     return Array.from(this.allFiles);
   }
@@ -217,13 +221,11 @@ export class CodeAnalyzer {
       }
     } catch (err: unknown) {
       const error = err as NodeJS.ErrnoException;
-      if (error && error.code === 'ENOENT') {
-        // File was deleted
-        this.allFiles.delete(absPath);
-      } else {
+      if (!error || error.code !== 'ENOENT') {
         this.handleFileError(err, absPath);
-        this.allFiles.delete(absPath);
       }
+      // Regardless of failure (ENOENT or otherwise), remove the file from active tracking
+      this.allFiles.delete(absPath);
     }
 
     return this.buildAnalysisResult();
