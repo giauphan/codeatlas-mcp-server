@@ -95,7 +95,7 @@ export class CodeAnalyzer {
    */
   private allFiles: Set<string> = new Set<string>();
 
-  private logFileError(err: any, absPath: string) {
+  private logFileError(err: NodeJS.ErrnoException, absPath: string) {
     if (err.code === 'ENOENT') {
       console.info(`[CodeAnalyzer] File not found (likely deleted): ${absPath}`);
     } else if (err.code === 'EACCES') {
