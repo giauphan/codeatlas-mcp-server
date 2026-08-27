@@ -171,7 +171,11 @@ export class CodeAnalyzer {
       } else if (err.code === 'EACCES') {
         console.error(`[CodeAnalyzer] Access denied to file: ${absPath}`);
       } else {
-        console.warn(`[CodeAnalyzer] Unexpected error accessing file:`, err.message || err.code || 'Unknown error', err.stack);
+        if (process.env.DEBUG === 'true') {
+          console.warn(`[CodeAnalyzer] Unexpected error accessing file:`, err.message || err.code || 'Unknown error', err.stack);
+        } else {
+          console.warn(`[CodeAnalyzer] Unexpected error accessing file:`, err.message || err.code || 'Unknown error');
+        }
       }
       this.allFiles.delete(absPath);
     }
