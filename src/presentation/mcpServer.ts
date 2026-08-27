@@ -1108,7 +1108,12 @@ export function registerTools(server: McpServer) {
         frontier = nextFrontier;
       }
 
-      const traceNodes = nodes.filter((n) => visited.has(n.id));
+      // Optimize: Replace O(N) array filter with O(V) set iteration
+      const traceNodes: typeof nodes = [];
+      for (const id of visited) {
+        const node = nodeMap.get(id);
+        if (node) traceNodes.push(node);
+      }
       const traceLinks = links.filter((l) => visited.has(l.source) && visited.has(l.target));
 
       const byFile = new Map<string, Array<{ name: string; type: string; isSeed: boolean; line: number | null }>>();
@@ -1271,7 +1276,14 @@ export function registerTools(server: McpServer) {
         if (nextFrontier.size === 0) break;
       }
 
-      let traceNodes = nodes.filter((n) => visited.has(n.id) && (n.type === "function" || n.type === "class"));
+      // Optimize: Replace O(N) array filter with O(V) set iteration
+      let traceNodes: typeof nodes = [];
+      for (const id of visited) {
+        const node = nodeMap.get(id);
+        if (node && (node.type === "function" || node.type === "class")) {
+          traceNodes.push(node);
+        }
+      }
 
       if (traceNodes.length > maxN) {
         const callConnections = new Map<string, number>();
