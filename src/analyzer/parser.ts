@@ -113,16 +113,18 @@ export class CodeAnalyzer {
 
   private logFileError(err: unknown, absPath: string) {
     const error = err as NodeJS.ErrnoException;
+    // Scrub absolute path to only log the basename for security purposes
+    const safeName = path.basename(absPath);
     if (error && error.code === 'ENOENT') {
-      this.logInfo(`[CodeAnalyzer] File not found (likely deleted): ${absPath}`);
+      this.logInfo(`[CodeAnalyzer] File not found (likely deleted): ${safeName}`);
     } else if (error && error.code === 'EACCES') {
-      this.logError(`[CodeAnalyzer] Access denied to file: ${absPath}`);
+      this.logError(`[CodeAnalyzer][Security][FileAccess] Access denied to file: ${safeName}`);
     } else {
       const message = (error && error.message) || (error && error.code) || 'Unknown error';
       if (process.env.DEBUG === 'true') {
-        this.logWarn(`[CodeAnalyzer] Unexpected error accessing file ${absPath}: ${message}`, error?.stack);
+        this.logWarn(`[CodeAnalyzer] Unexpected error accessing file ${safeName}: ${message}`, error?.stack);
       } else {
-        this.logWarn(`[CodeAnalyzer] Unexpected error accessing file ${absPath}: ${message}`);
+        this.logWarn(`[CodeAnalyzer] Unexpected error accessing file ${safeName}: ${message}`);
       }
     }
   }
