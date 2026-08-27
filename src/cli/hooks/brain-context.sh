@@ -21,7 +21,20 @@ print(payload.get("cwd") or os.environ.get("CLAUDE_PROJECT_DIR") or os.getcwd())
 
 PROMPT="${HOOK_FIELDS[0]:-session context}"
 CWD="${HOOK_FIELDS[1]:-$(pwd)}"
-PROJECT="${CODEATLAS_PROJECT:-$(basename "$CWD")}"
+
+# Derive the project from the session's own directory. A globally exported
+# CODEATLAS_PROJECT would otherwise pin every repo to one project's memories.
+PROJECT="$(basename "$CWD")"
+case "$PROJECT" in
+  ""|home|root|ubuntu|tmp|config|etc|var) exit 0 ;;
+esac
+
+# Only retrieve history when the turn actually asks for it. Matching broad
+# development words made this fire on nearly every prompt.
+if [ "${#PROMPT}" -lt 20 ] || ! printf '%s' "$PROMPT" | grep -Eiq \
+  '(codeatlas|second brain|dream memor|genome|immune gene|past session|previous session|what did we|remember)'; then
+  exit 0
+fi
 
 DREAMS=$(curl --max-time 3 -sS --fail --get -H "x-api-key: $API_KEY" \
   --data-urlencode "query=$PROMPT" \
