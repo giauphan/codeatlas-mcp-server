@@ -47,7 +47,7 @@ function createNodeMap<T extends { id: string }>(nodes: T[]): Map<string, T> {
  *
  * @param visited Set of visited node IDs.
  * @param nodeMap Map containing the actual GraphNode objects.
- * @param predicate Optional filtering function for additional node-specific conditions.
+ * @param predicate Optional filtering function. Defaults to including all nodes.
  */
 function getTraceNodes(visited: Set<string>, nodeMap: Map<string, GraphNode>, predicate: (node: GraphNode) => boolean = () => true /* Default behavior is "include all nodes" */): GraphNode[] {
   const traceNodes: GraphNode[] = [];
