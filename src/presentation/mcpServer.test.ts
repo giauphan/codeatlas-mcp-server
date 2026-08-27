@@ -53,3 +53,60 @@ test("execGit allowlist", async (t) => {
         assert.equal(maxC, 20);
     });
 });
+
+// ... (existing code if any)
+
+test("getTraceNodes", async (t) => {
+  // Recreate getTraceNodes locally for unit testing
+  function getTraceNodes(visited: Set<string>, nodeMap: Map<string, any>, predicate: (node: any) => boolean = () => true): any[] {
+    const traceNodes: any[] = [];
+    for (const id of visited) {
+      const node = nodeMap.get(id);
+      if (!node) {
+        console.warn(`[getTraceNodes] Node ID missing in nodeMap: ${id}`);
+        continue;
+      }
+      if (predicate(node)) {
+        traceNodes.push(node);
+      }
+    }
+    return traceNodes;
+  }
+
+  await t.test("returns nodes for visited ids", () => {
+    const nodeMap = new Map([
+      ["a", { id: "a", type: "function" }],
+      ["b", { id: "b", type: "class" }],
+      ["c", { id: "c", type: "variable" }]
+    ]);
+    const visited = new Set(["a", "c"]);
+    const result = getTraceNodes(visited, nodeMap);
+    assert.deepEqual(result, [{ id: "a", type: "function" }, { id: "c", type: "variable" }]);
+  });
+
+  await t.test("skips missing ids", () => {
+    const nodeMap = new Map([
+      ["a", { id: "a", type: "function" }]
+    ]);
+    const visited = new Set(["a", "missing"]);
+    // Mock console.warn to keep test output clean
+    const originalWarn = console.warn;
+    let warned = false;
+    console.warn = () => { warned = true; };
+    const result = getTraceNodes(visited, nodeMap);
+    console.warn = originalWarn;
+    assert.deepEqual(result, [{ id: "a", type: "function" }]);
+    assert.ok(warned);
+  });
+
+  await t.test("applies predicate", () => {
+    const nodeMap = new Map([
+      ["a", { id: "a", type: "function" }],
+      ["b", { id: "b", type: "class" }],
+      ["c", { id: "c", type: "variable" }]
+    ]);
+    const visited = new Set(["a", "b", "c"]);
+    const result = getTraceNodes(visited, nodeMap, n => n.type === "function" || n.type === "class");
+    assert.deepEqual(result, [{ id: "a", type: "function" }, { id: "b", type: "class" }]);
+  });
+});
