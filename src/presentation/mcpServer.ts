@@ -2359,16 +2359,12 @@ export function registerTools(server: McpServer) {
         try {
           if (fs.existsSync(hermesCfg)) {
             let cfg = fs.readFileSync(hermesCfg, "utf-8");
-            // Cleanup any existing embedded API key
-            if (cfg.includes("CODEATLAS_API_KEY:")) {
-               cfg = cfg.replace(/[ \t]*CODEATLAS_API_KEY:.*(\r?\n|$)/g, "");
-               // Cleanup empty env block if it exists
-               cfg = cfg.replace(/[ \t]*env:[ \t]*(\r?\n)(?![ \t]+[A-Za-z0-9_]+:)/g, "");
-            }
-
             if (cfg.includes("codeatlas:")) {
-              fs.writeFileSync(hermesCfg, cfg); // Save cleanup
-              results.push({ client: "hermes", action: "mcp_config", status: "already_configured" });
+              let status = "already_configured";
+              if (cfg.includes("CODEATLAS_API_KEY:")) {
+                status = "already_configured_legacy_key_warning";
+              }
+              results.push({ client: "hermes", action: "mcp_config", status });
             } else if (cfg.includes("mcp_servers:")) {
               cfg = cfg.replace("mcp_servers:", () => "mcp_servers:\n" + mcpEntry);
               fs.writeFileSync(hermesCfg, cfg);
