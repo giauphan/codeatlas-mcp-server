@@ -86,7 +86,13 @@ export class CodeAnalyzer {
     return this.getIgnoreFilter().ignores(normalizedPath);
   }
 
-  // Using Set to optimize addition, deletion, and lookup operations for file paths. Reduces O(N) operations (e.g., .includes or .indexOf) to O(1) for large datasets. This is particularly impactful for environments handling large datasets, where frequent mutations or membership checks may cause major performance costs. The Set structure also inherently prevents duplicates, eliminating the need for manual uniqueness checks.
+  /**
+   * Tracks all analyzed file paths.
+   * Using Set to optimize addition, deletion, and lookup operations. Reduces O(N) operations
+   * (e.g., .includes or .indexOf) to O(1) for large datasets. This is particularly impactful for environments
+   * handling large datasets, where frequent mutations or membership checks may cause major performance costs.
+   * The Set structure also inherently prevents duplicates, eliminating the need for manual uniqueness checks.
+   */
   private allFiles: Set<string> = new Set<string>();
   private totalSkippedCount = 0;
 
