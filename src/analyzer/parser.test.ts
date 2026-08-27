@@ -95,6 +95,32 @@ build/
 });
 
 describe("CodeAnalyzer allFiles Set implementation", () => {
+  it("should accurately maintain totalFilesSkipped and not increment duplicate elements on errors", async () => {
+    const TEST_ERR_DIR = path.resolve("./temp_err_test_2");
+    if (fs.existsSync(TEST_ERR_DIR)) {
+      fs.rmSync(TEST_ERR_DIR, { recursive: true, force: true });
+    }
+    fs.mkdirSync(TEST_ERR_DIR);
+
+    // Simulate initial scan
+    const analyzer = new CodeAnalyzer(TEST_ERR_DIR);
+    await analyzer.analyzeProject();
+
+    // Mock private methods to simulate success/failure for parsing
+    const originalAnalyze = (analyzer as any).analyzeFile;
+
+    // Simulate analyze failure
+    (analyzer as any).analyzeFile = () => false;
+    const fakeFile = path.join(TEST_ERR_DIR, "bad.ts");
+    fs.writeFileSync(fakeFile, "bad content");
+
+    let result = await analyzer.analyzeFileIncremental(fakeFile);
+    assert.strictEqual(result.totalFilesAnalyzed, -1);
+    assert.strictEqual(result.totalFilesSkipped, 1);
+
+    (analyzer as any).analyzeFile = originalAnalyze;
+    fs.rmSync(TEST_ERR_DIR, { recursive: true, force: true });
+  });
   const INCREMENTAL_TEST_DIR = path.resolve("./temp_incremental_test");
 
   before(() => {

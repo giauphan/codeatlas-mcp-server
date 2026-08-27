@@ -172,6 +172,10 @@ export class CodeAnalyzer {
     return this.buildAnalysisResult();
   }
 
+  public get allFilesArray(): string[] {
+    return Array.from(this.allFiles);
+  }
+
   public async analyzeFileIncremental(filePath: string): Promise<AnalysisResult> {
     this.dirCache.clear();
     const absPath = path.resolve(filePath);
@@ -199,16 +203,27 @@ export class CodeAnalyzer {
 
     // 3. Re-analyze only if file exists and is NOT ignored
     try {
-      if (fs.existsSync(absPath) && !this.isIgnored(absPath, false)) {
-        this.analyzeFile(absPath);
-        this.allFiles.add(absPath);
+      await fs.promises.stat(absPath);
+      if (!this.isIgnored(absPath, false)) {
+        const success = this.analyzeFile(absPath);
+        if (success) {
+          this.allFiles.add(absPath);
+        } else {
+          this.totalSkippedCount++;
+        }
       } else {
-        // File was deleted or is ignored
+        // File is ignored
         this.allFiles.delete(absPath);
       }
     } catch (err: unknown) {
-      this.handleFileError(err, absPath);
-      this.allFiles.delete(absPath);
+      const error = err as NodeJS.ErrnoException;
+      if (error && error.code === 'ENOENT') {
+        // File was deleted
+        this.allFiles.delete(absPath);
+      } else {
+        this.handleFileError(err, absPath);
+        this.allFiles.delete(absPath);
+      }
     }
 
     return this.buildAnalysisResult();
