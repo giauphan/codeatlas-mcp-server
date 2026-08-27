@@ -168,7 +168,7 @@ export class CodeAnalyzer {
     } catch (err: any) {
       this.allFiles.delete(absPath);
       if (err.code !== 'ENOENT') {
-        console.warn(`[CodeAnalyzer] Unexpected error accessing file ${absPath}:`, err);
+        console.warn(`[CodeAnalyzer] Unexpected error accessing file ${absPath}:`, err.stack || err.message || err);
       }
     }
 
