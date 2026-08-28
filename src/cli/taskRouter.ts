@@ -58,7 +58,7 @@ function getListFromEnv(envVar: string | undefined, defaultValue: string[]): str
 
 function getSetFromEnv(envVar: string | undefined, defaultValue: Set<string>): Set<string> {
   if (envVar && typeof envVar === 'string') {
-    return new Set(envVar.split(',').map(s => s.trim()).filter(Boolean));
+    return new Set(envVar.split(',').map(s => s.trim().toLowerCase()).filter(Boolean));
   }
   return defaultValue;
 }

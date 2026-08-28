@@ -3281,7 +3281,7 @@ def register(ctx):
 
         if (!Array.isArray(skills) || skills.length === 0) {
            return { content: [{ type: "text" as const, text: JSON.stringify({
-            query: queryText || "(all)", count: 0, totalSkills: 0, results: [],
+            query: queryText || "(all)", count: 0, totalSkills: Array.isArray(skills) ? skills.length : 0, results: [],
            }, null, 2) }] };
         }
 
