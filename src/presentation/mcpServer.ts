@@ -3275,7 +3275,19 @@ def register(ctx):
         const q = query || "";
         const limitVal = limit || 20;
         let count = 0;
-        const results = [];
+        const results: any[] = [];
+
+        if (!skills?.length) {
+           return { content: [{ type: "text" as const, text: JSON.stringify({
+            query: q || "(all)", count: 0, totalSkills: 0, results: [],
+           }, null, 2) }] };
+        }
+
+        const pushResult = (s: any) => {
+          if (results.length < limitVal) {
+            results.push({ name: s.name, description: s.description, source: s.source });
+          }
+        };
 
         if (q) {
           // Escape regex characters and compile once
@@ -3284,16 +3296,13 @@ def register(ctx):
           for (const s of skills) {
             if (regex.test(s.name) || regex.test(s.description)) {
               count++;
-              if (results.length < limitVal) {
-                results.push({ name: s.name, description: s.description, source: s.source });
-              }
+              pushResult(s);
             }
           }
         } else {
           count = skills.length;
           for (let i = 0; i < Math.min(skills.length, limitVal); i++) {
-            const s = skills[i];
-            results.push({ name: s.name, description: s.description, source: s.source });
+            pushResult(skills[i]);
           }
         }
 
