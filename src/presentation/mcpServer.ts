@@ -20,7 +20,7 @@ import {
 import { saveDreamMemory, queryDreamMemories, DreamMemoryResult } from "../services/dreamingService.js";
 import { CodeAnalyzer } from "../analyzer/parser.js";
 import { SecurityScanner } from "../securityScanner.js";
-import { GraphLink } from "../analyzer/types.js";
+import { GraphLink, GraphNode } from "../analyzer/types.js";
 import {
   listADRs, getADR, saveADR, deleteADR,
   ADR
@@ -40,6 +40,31 @@ function createNodeMap<T extends { id: string }>(nodes: T[]): Map<string, T> {
     map.set(nodes[i].id, nodes[i]);
   }
   return map;
+}
+
+/**
+ * Extracts nodes corresponding to the IDs in the `visited` set from `nodeMap`.
+ *
+ * @param visited Set of visited node IDs.
+ * @param nodeMap Map containing the actual GraphNode objects.
+ * @param predicate Optional filtering function. Defaults to including all nodes.
+ */
+function getTraceNodes(visited: Set<string>, nodeMap: Map<string, GraphNode>, predicate: (node: GraphNode) => boolean = () => true /* Default behavior is "include all nodes" */): GraphNode[] {
+  const traceNodes: GraphNode[] = [];
+  for (const id of visited) {
+    const node = nodeMap.get(id);
+    if (!node) {
+      // Only log missing nodes in non-production environments to prevent log spam
+      if (process.env.NODE_ENV !== 'production') {
+        console.warn(`[getTraceNodes] Node ID missing in nodeMap: ${id}`);
+      }
+      continue;
+    }
+    if (predicate(node)) {
+      traceNodes.push(node);
+    }
+  }
+  return traceNodes;
 }
 
 // ⚡ Bolt Optimization: Avoid intermediate array allocations for id -> label mapping
@@ -1108,7 +1133,7 @@ export function registerTools(server: McpServer) {
         frontier = nextFrontier;
       }
 
-      const traceNodes = nodes.filter((n) => visited.has(n.id));
+      const traceNodes = getTraceNodes(visited, nodeMap);
       const traceLinks = links.filter((l) => visited.has(l.source) && visited.has(l.target));
 
       const byFile = new Map<string, Array<{ name: string; type: string; isSeed: boolean; line: number | null }>>();
@@ -1271,9 +1296,9 @@ export function registerTools(server: McpServer) {
         if (nextFrontier.size === 0) break;
       }
 
-      let traceNodes = nodes.filter((n) => visited.has(n.id) && (n.type === "function" || n.type === "class"));
+      let filteredTraceNodes = getTraceNodes(visited, nodeMap, (node) => node.type === "function" || node.type === "class");
 
-      if (traceNodes.length > maxN) {
+      if (filteredTraceNodes.length > maxN) {
         const callConnections = new Map<string, number>();
         for (const link of links) {
           if (link.type === "call") {
@@ -1281,15 +1306,15 @@ export function registerTools(server: McpServer) {
             callConnections.set(link.target, (callConnections.get(link.target) || 0) + 1);
           }
         }
-        traceNodes.sort((a, b) => {
+        filteredTraceNodes.sort((a, b) => {
           if (seedNodes.has(a.id) && !seedNodes.has(b.id)) return -1;
           if (!seedNodes.has(a.id) && seedNodes.has(b.id)) return 1;
           return (callConnections.get(b.id) || 0) - (callConnections.get(a.id) || 0);
         });
-        traceNodes = traceNodes.slice(0, maxN);
+        filteredTraceNodes = filteredTraceNodes.slice(0, maxN);
       }
 
-      const traceNodeIds = createNodeIdSet(traceNodes);
+      const traceNodeIds = createNodeIdSet(filteredTraceNodes);
       const linkSet = new Set<string>();
       const dedupLinks: GraphLink[] = [];
 
@@ -1310,7 +1335,7 @@ export function registerTools(server: McpServer) {
       for (const link of dedupLinks) {
         hasIncoming.add(link.target);
       }
-      const entryPoints = traceNodes.filter(
+      const entryPoints = filteredTraceNodes.filter(
         (n) => !hasIncoming.has(n.id) || seedNodes.has(n.id)
       );
 
@@ -1321,7 +1346,7 @@ export function registerTools(server: McpServer) {
         const seqLines: string[] = ["sequenceDiagram"];
         const participantMap = new Map<string, string>();
         let pCounter = 0;
-        for (const node of traceNodes) {
+        for (const node of filteredTraceNodes) {
           const pid = `P${pCounter++}`;
           participantMap.set(node.id, pid);
           const icon = node.type === "class" ? "🏗️" : "⚡";
@@ -1348,7 +1373,7 @@ export function registerTools(server: McpServer) {
 
         const mermaidIdMap = new Map<string, string>();
         let nCounter = 0;
-        for (const node of traceNodes) {
+        for (const node of filteredTraceNodes) {
           const mid = `f${nCounter++}`;
           mermaidIdMap.set(node.id, mid);
           const label = sanitizeLabel(node.label);
@@ -1401,7 +1426,7 @@ export function registerTools(server: McpServer) {
       }> = [];
 
       const inDegree = new Map<string, number>();
-      for (const node of traceNodes) {
+      for (const node of filteredTraceNodes) {
         inDegree.set(node.id, 0);
       }
       for (const link of dedupLinks) {
@@ -1466,7 +1491,7 @@ export function registerTools(server: McpServer) {
         }
       }
 
-      for (const node of traceNodes) {
+      for (const node of filteredTraceNodes) {
         if (!ordered.has(node.id)) {
           const callsTo = callsToMap.get(node.id) || [];
           const calledBy = calledByMap.get(node.id) || [];
@@ -1488,7 +1513,7 @@ export function registerTools(server: McpServer) {
         project: loaded.projectName,
         diagramType: dType,
         seedMatches: seedNodes.size,
-        nodesInDiagram: traceNodes.length,
+        nodesInDiagram: filteredTraceNodes.length,
         callRelationships: dedupLinks.length,
         entryPoints: entryPoints.map((n) => ({
           name: n.label,
@@ -1509,7 +1534,7 @@ export function registerTools(server: McpServer) {
           }
           return result;
         })(),
-        message: `Generated ${dType} diagram for '${keyword}': ${traceNodes.length} nodes, ${dedupLinks.length} call relationships. Entry points: ${entryPoints.map((n) => n.label).join(", ")}`,
+        message: `Generated ${dType} diagram for '${keyword}': ${filteredTraceNodes.length} nodes, ${dedupLinks.length} call relationships. Entry points: ${entryPoints.map((n) => n.label).join(", ")}`,
       };
 
       return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
