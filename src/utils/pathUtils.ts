@@ -18,7 +18,7 @@ export function getClaudeConfigPath(): string {
   return path.join(getHomePath(), ".claude", "claude.json");
 }
 
-export function safeWriteFileSync(filePath: string, content: string, mode: number = 0o600): void {
+export function writeFileSyncNoFollow(filePath: string, content: string, mode: number = 0o600): void {
   const fd = fs.openSync(
     filePath,
     fs.constants.O_CREAT |   // Create file if it doesn't exist
