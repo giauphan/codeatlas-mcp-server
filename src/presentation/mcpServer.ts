@@ -3273,12 +3273,11 @@ def register(ctx):
       }
 
       if (action === "query") {
-        // ⚡ Bolt Optimization: Optimized O(N) array filtering with string allocations when full traversal is necessary
         const queryText = query || "";
         const limitVal = limit || 20;
         let count = 0;
         let validSkillsCount = 0;
-        const results: any[] = [];
+        const results: Array<{ name: string; description: string; source: string }> = [];
 
         if (!Array.isArray(skills) || skills.length === 0) {
            return { content: [{ type: "text" as const, text: JSON.stringify({
@@ -3305,16 +3304,7 @@ def register(ctx):
               results.push({ name: s.name, description: s.description, source: s.source });
             }
           }
-          // Early exit logic: if there is no query, we just want the first `limit` items.
-          // However, we still need `count` to reflect the total number of skills.
-          if (!regex && results.length >= limitVal) {
-            // Because there can be malformed entries, early break no longer works for
-            // accurately determining total match counts, we must finish traversal
-            continue;
-          }
         }
-
-        if (!regex) count = validSkillsCount;
 
         return { content: [{ type: "text" as const, text: JSON.stringify({
           query: queryText || "(all)", count, totalSkills: validSkillsCount,
