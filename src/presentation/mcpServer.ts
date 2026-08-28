@@ -1137,7 +1137,7 @@ export function registerTools(server: McpServer) {
       const traceLinks = links.filter((l) => visited.has(l.source) && visited.has(l.target));
 
       const byFile = new Map<string, Array<{ name: string; type: string; isSeed: boolean; line: number | null }>>();
-      for (const node of filteredTraceNodes) {
+      for (const node of traceNodes) {
         const filePath = node.filePath || "external";
         if (!byFile.has(filePath)) byFile.set(filePath, []);
         byFile.get(filePath)!.push({
@@ -1373,7 +1373,7 @@ export function registerTools(server: McpServer) {
 
         const mermaidIdMap = new Map<string, string>();
         let nCounter = 0;
-        for (const node of traceNodes) {
+        for (const node of filteredTraceNodes) {
           const mid = `f${nCounter++}`;
           mermaidIdMap.set(node.id, mid);
           const label = sanitizeLabel(node.label);
@@ -1426,7 +1426,7 @@ export function registerTools(server: McpServer) {
       }> = [];
 
       const inDegree = new Map<string, number>();
-      for (const node of traceNodes) {
+      for (const node of filteredTraceNodes) {
         inDegree.set(node.id, 0);
       }
       for (const link of dedupLinks) {
@@ -1491,7 +1491,7 @@ export function registerTools(server: McpServer) {
         }
       }
 
-      for (const node of traceNodes) {
+      for (const node of filteredTraceNodes) {
         if (!ordered.has(node.id)) {
           const callsTo = callsToMap.get(node.id) || [];
           const calledBy = calledByMap.get(node.id) || [];
@@ -1513,7 +1513,7 @@ export function registerTools(server: McpServer) {
         project: loaded.projectName,
         diagramType: dType,
         seedMatches: seedNodes.size,
-        nodesInDiagram: traceNodes.length,
+        nodesInDiagram: filteredTraceNodes.length,
         callRelationships: dedupLinks.length,
         entryPoints: entryPoints.map((n) => ({
           name: n.label,
@@ -1534,7 +1534,7 @@ export function registerTools(server: McpServer) {
           }
           return result;
         })(),
-        message: `Generated ${dType} diagram for '${keyword}': ${traceNodes.length} nodes, ${dedupLinks.length} call relationships. Entry points: ${entryPoints.map((n) => n.label).join(", ")}`,
+        message: `Generated ${dType} diagram for '${keyword}': ${filteredTraceNodes.length} nodes, ${dedupLinks.length} call relationships. Entry points: ${entryPoints.map((n) => n.label).join(", ")}`,
       };
 
       return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
