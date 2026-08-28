@@ -18,6 +18,20 @@ export function getClaudeConfigPath(): string {
   return path.join(getHomePath(), ".claude", "claude.json");
 }
 
+export function getZedConfigDir(): string {
+  if (process.platform === "win32") {
+    return path.join(process.env.APPDATA || getHomePath(), "zed");
+  }
+  if (process.platform === "darwin") {
+    return path.join(getHomePath(), "Library", "Application Support", "Zed");
+  }
+  return path.join(getHomePath(), ".config", "zed");
+}
+
+export function getZedSettingsPath(): string {
+  return path.join(getZedConfigDir(), "settings.json");
+}
+
 export function writeFileSyncNoFollow(filePath: string, content: string, mode: number = 0o600): void {
   const fd = fs.openSync(
     filePath,

@@ -10,7 +10,7 @@
 import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
-import { getHermesConfigPath, getHermesPluginDir } from "../utils/pathUtils.js";
+import { getHermesConfigPath, getHermesPluginDir, getZedSettingsPath } from "../utils/pathUtils.js";
 import * as readline from "readline";
 
 export const API_URL = process.env.CODEATLAS_API_URL || "https://your-server.com";
@@ -79,7 +79,7 @@ import {
   stepVerifySync,
   stepHealthCheck
 } from "./steps.js";
-import { cmdSetupClaude } from "./setupClaude.js";
+import { cmdSetupClaude, cmdSetupZed } from "./setupClaude.js";
 
 /* ── CLI Commands ───────────────────────────────────────────────── */
 
@@ -137,6 +137,15 @@ export async function cmdDoctor(): Promise<void> {
       if (!fs.existsSync(cfg)) return { status: "warn", detail: "not found" };
       const c = fs.readFileSync(cfg, "utf-8");
       if (c.includes("codeatlas:")) return { status: "ok" };
+      return { status: "warn", detail: "codeatlas not configured" };
+    }],
+    ["MCP config (Zed)", async () => {
+      const cfg = getZedSettingsPath();
+      if (!fs.existsSync(cfg)) return { status: "warn", detail: "not found" };
+      try {
+        const c = JSON.parse(fs.readFileSync(cfg, "utf-8"));
+        if (c?.context_servers?.codeatlas) return { status: "ok" };
+      } catch { /* ignore parse errors */ }
       return { status: "warn", detail: "codeatlas not configured" };
     }],
     ["Auto plugin (Hermes)", async () => {
@@ -206,6 +215,8 @@ export async function runCLI(): Promise<void> {
         process.exit(1);
       }
       await cmdSetupClaude(value);
+    } else if (process.argv[3] === "zed") {
+      await cmdSetupZed();
     } else {
       await cmdSetup();
     }
@@ -217,6 +228,7 @@ Commands:
   init           Interactive Second Brain setup wizard
   setup          Same as init
   setup claude   Install Claude hooks and configs
+  setup zed      Register CodeAtlas as a Zed MCP context server
   doctor         Health check & diagnostics
 
 Without a command, runs the MCP server.

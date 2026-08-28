@@ -3,6 +3,7 @@ import * as path from "path";
 import * as os from "os";
 import { fileURLToPath } from "url";
 import { bold, ok, fail, warn } from "./commands.js";
+import { getZedSettingsPath, getZedConfigDir } from "../utils/pathUtils.js";
 
 function getSettingsPath(): string {
   const home = os.homedir();
@@ -145,4 +146,46 @@ export async function cmdSetupClaude(projectDir: string = process.cwd()): Promis
   console.log("=".repeat(50));
   console.log(`\n${bold("🎉 Claude integration setup complete!")}`);
   console.log(`  Restart Claude Code for hooks to take effect.\n`);
+}
+
+export async function cmdSetupZed(): Promise<void> {
+  console.log(`\n${bold("CodeAtlas Zed Integration Setup")}`);
+  console.log("=".repeat(50));
+
+  const settingsPath = getZedSettingsPath();
+  let settings: any = {};
+  if (fs.existsSync(settingsPath)) {
+    try {
+      settings = JSON.parse(fs.readFileSync(settingsPath, "utf-8"));
+    } catch (e: any) {
+      console.log(`  ${fail()} Could not parse existing ${settingsPath}: ${e.message}`);
+      return;
+    }
+  } else {
+    console.log(`  ${warn()} ${settingsPath} not found — will create it.`);
+  }
+
+  if (settings.context_servers && (typeof settings.context_servers !== "object" || Array.isArray(settings.context_servers))) {
+    console.log(`  ${fail()} settings.context_servers exists but is not an object. Aborting to avoid clobbering.`);
+    return;
+  }
+
+  const ctxServers = settings.context_servers = settings.context_servers || {};
+  const env: Record<string, string> = {};
+  if (process.env.CODEATLAS_API_KEY) env.CODEATLAS_API_KEY = process.env.CODEATLAS_API_KEY;
+  if (process.env.CODEATLAS_API_URL) env.CODEATLAS_API_URL = process.env.CODEATLAS_API_URL;
+  ctxServers.codeatlas = {
+    command: "npx",
+    args: ["-y", "codeatlas-mcp-server"],
+    env,
+  };
+
+  fs.mkdirSync(getZedConfigDir(), { recursive: true });
+  fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2));
+  console.log(`  ${ok()} Registered 'codeatlas' context server in ${settingsPath}`);
+
+  console.log("=".repeat(50));
+  console.log(`\n${bold("Zed integration setup complete!")}`);
+  console.log(`  Restart Zed for the context server to load.`);
+  console.log(`  Then ask the AI to use 'brain_context' to load Second Brain memory.\n`);
 }
