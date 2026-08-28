@@ -3277,32 +3277,25 @@ def register(ctx):
         let count = 0;
         const results: any[] = [];
 
-        if (!skills?.length) {
+        if (!Array.isArray(skills) || skills.length === 0) {
            return { content: [{ type: "text" as const, text: JSON.stringify({
             query: q || "(all)", count: 0, totalSkills: 0, results: [],
            }, null, 2) }] };
         }
 
-        const pushResult = (s: any) => {
-          if (results.length < limitVal) {
-            results.push({ name: s.name, description: s.description, source: s.source });
-          }
-        };
+        // Escape regex characters and compile once if there's a query
+        const regex = q ? new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i') : null;
 
-        if (q) {
-          // Escape regex characters and compile once
-          const escapedQ = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-          const regex = new RegExp(escapedQ, 'i');
-          for (const s of skills) {
-            if (regex.test(s.name) || regex.test(s.description)) {
-              count++;
-              pushResult(s);
+        for (const s of skills) {
+          if (!regex || regex.test(s.name) || regex.test(s.description)) {
+            count++;
+            if (results.length < limitVal) {
+              results.push({ name: s.name, description: s.description, source: s.source });
             }
           }
-        } else {
-          count = skills.length;
-          for (let i = 0; i < Math.min(skills.length, limitVal); i++) {
-            pushResult(skills[i]);
+          if (!regex && results.length >= limitVal) {
+            count = skills.length; // Ensure total count is correct when breaking early
+            break;
           }
         }
 
