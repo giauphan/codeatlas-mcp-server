@@ -141,6 +141,13 @@ This writes a `codeatlas` entry into Zed's `context_servers` (passing `CODEATLAS
 
 Then in Zed's Agent Panel, call the `brain_context` tool at the start of a task to inject Second Brain memory, and `save_dream_memory` after a task to persist learnings. `route_task` suggests a model/effort (advisory only — Zed does not auto-switch models). See [Zed Integration](./docs/ZED_INTEGRATION.md).
 
+### Task Router configuration
+
+The `route_task` tool uses standard presets to route tasks to models by complexity.
+You can override these presets via environment variables:
+
+`CODEATLAS_HIGH_COMPLEXITY`, `CODEATLAS_MEDIUM_COMPLEXITY`, `CODEATLAS_LOW_COMPLEXITY`, `CODEATLAS_MEDIUM_TASK_TYPES`, `CODEATLAS_LOW_TASK_TYPES` (comma-separated strings).
+
 ---
 
 ## 📚 Documentation
