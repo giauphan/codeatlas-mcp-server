@@ -1,0 +1,14 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "sourceMap": false
+  },
+  "exclude": [
+    "node_modules",
+    ".vscode-test",
+    "vite.config.ts",
+    "src/test/fixtures",
+    "**/*.test.ts",
+    "**/*.spec.ts"
+  ]
+}

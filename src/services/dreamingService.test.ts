@@ -45,11 +45,13 @@ describe("Dreaming Service - HTTPS Client", () => {
     apiKeyMock = "test-mock-key";
     requestMock = null;
     delete process.env.CODEATLAS_API_KEY;
+    process.env.CODEATLAS_API_URL = "https://127.0.0.1:9";
   });
 
   afterEach(() => {
     apiKeyMock = undefined;
     requestMock = null;
+    delete process.env.CODEATLAS_API_URL;
   });
 
   // ----- saveDreamMemory -----

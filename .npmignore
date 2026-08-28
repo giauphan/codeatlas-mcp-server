@@ -33,6 +33,12 @@ Thumbs.db
 coverage/
 *.lcov
 .nyc_output/
+**/*.test.ts
+**/*.test.js
+**/*.test.js.map
+**/*.spec.ts
+**/*.spec.js
+**/*.spec.js.map
 
 # Misc
 *.patch
@@ -45,10 +51,7 @@ coverage/
 # Docs and tests (npm package doesn't need these)
 docs/
 tests/
-*.test.ts
-*.test.js
-*.spec.ts
-*.spec.js
+# (test file exclusion moved above to cover nested paths)
 benchmark*.ts
 scripts/
 verify-*.sh

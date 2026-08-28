@@ -23,7 +23,8 @@ log() {
 API_KEY="${CODEATLAS_API_KEY:-}"
 [ -z "$API_KEY" ] && exit 0
 
-BASE="${CODEATLAS_API_URL:-http://localhost:3381}"
+BASE="${CODEATLAS_API_URL:-}"
+[ -n "$BASE" ] || exit 0
 CLAUDE_PROJECTS="$HOME/.claude/projects"
 
 # PostToolUse sends tool metadata and response as JSON on stdin.
