@@ -61,8 +61,25 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build
+      - name: Build (compiles src without test files)
         run: npm run build
+
+      - name: Verify no test files in build output
+        run: |
+          if find dist -name '*.test.js' -o -name '*.spec.js' | grep -q .; then
+            echo "::error::Test files leaked into dist/"
+            find dist -name '*.test.js' -o -name '*.spec.js'
+            exit 1
+          fi
+          echo "  ✓ dist/ contains no test files"
+
+      - name: Verify no hardcoded URLs in build output
+        run: |
+          if grep -rEl 'your-server\.com|localhost:[0-9]{4}' dist --include='*.js' --include='*.sh'; then
+            echo "::error::Hardcoded URL fallback found in dist/"
+            exit 1
+          fi
+          echo "  ✓ dist/ contains no hardcoded URL fallbacks"
 
       - name: Validate package contents
         run: npm pack --dry-run
@@ -91,9 +108,6 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
-
-      - name: Build (tests run against built dist/)
-        run: npm run build
 
       - name: Test
         run: npm test

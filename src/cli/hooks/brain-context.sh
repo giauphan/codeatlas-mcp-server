@@ -14,7 +14,8 @@ set -euo pipefail
 # stdout is injected straight into Claude's context. Opt in explicitly.
 [ "${CODEATLAS_INJECT_BRAIN_CONTEXT:-0}" = "1" ] || exit 0
 
-API_URL="${CODEATLAS_API_URL:-http://localhost:3381}"
+API_URL="${CODEATLAS_API_URL:-}"
+[ -n "$API_URL" ] || exit 0
 API_KEY="${CODEATLAS_API_KEY:-}"
 [ -n "$API_KEY" ] || exit 0
 

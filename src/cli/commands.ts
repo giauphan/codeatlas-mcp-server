@@ -13,7 +13,7 @@ import * as os from "os";
 import { getHermesConfigPath, getHermesPluginDir, getZedSettingsPath } from "../utils/pathUtils.js";
 import * as readline from "readline";
 
-export const API_URL = process.env.CODEATLAS_API_URL || "https://your-server.com";
+export const API_URL = process.env.CODEATLAS_API_URL ?? "";
 
 /* ── Helpers ───────────────────────────────────────────────────── */
 

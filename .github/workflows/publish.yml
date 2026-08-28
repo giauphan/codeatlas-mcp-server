@@ -77,6 +77,19 @@ jobs:
       - name: Validate npm package contents
         run: npm pack --dry-run
 
+      - name: Verify no test files or hardcoded URLs in build output
+        run: |
+          if find dist -name '*.test.js' -o -name '*.spec.js' | grep -q .; then
+            echo "::error::Test files leaked into dist/ — refusing to publish"
+            find dist -name '*.test.js' -o -name '*.spec.js'
+            exit 1
+          fi
+          if grep -rEl 'your-server\.com|localhost:[0-9]{4}' dist --include='*.js' --include='*.sh'; then
+            echo "::error::Hardcoded URL fallback found in dist/ — refusing to publish"
+            exit 1
+          fi
+          echo "  ✓ dist/ is clean (no test files, no hardcoded URLs)"
+
       - name: Release and publish
         id: sr
         run: |
@@ -96,6 +109,10 @@ jobs:
 
           echo "Released version: $VERSION"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+          # Ensure latest dist-tag always points to the just-published version
+          npm dist-tag add "codeatlas-mcp-server@$VERSION" latest
+          echo "Latest dist-tag set to $VERSION"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
@@ -163,6 +180,26 @@ jobs:
           done
 
           echo "  ✓ All critical files present"
+
+      - name: Verify no test files in published tarball
+        run: |
+          if grep -E '\.(test|spec)\.(js|ts)(\.map)?$' /tmp/published-files.txt; then
+            echo "::error::Published tarball contains test files"
+            exit 1
+          fi
+          echo "  ✓ No test files in published tarball"
+
+      - name: Verify latest dist-tag points to released version
+        run: |
+          PKG_VERSION=${{ needs.release.outputs.version }}
+          LATEST=$(npm view codeatlas-mcp-server dist-tags.latest)
+          echo "latest dist-tag: $LATEST"
+          echo "released version: $PKG_VERSION"
+          if [ "$LATEST" != "$PKG_VERSION" ]; then
+            echo "::error::latest dist-tag ($LATEST) does not match released version ($PKG_VERSION)"
+            exit 1
+          fi
+          echo "  ✓ latest dist-tag is correct"
 
       - name: Install globally and verify CLI entry points
         run: |
