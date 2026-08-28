@@ -1137,7 +1137,7 @@ export function registerTools(server: McpServer) {
       const traceLinks = links.filter((l) => visited.has(l.source) && visited.has(l.target));
 
       const byFile = new Map<string, Array<{ name: string; type: string; isSeed: boolean; line: number | null }>>();
-      for (const node of traceNodes) {
+      for (const node of filteredTraceNodes) {
         const filePath = node.filePath || "external";
         if (!byFile.has(filePath)) byFile.set(filePath, []);
         byFile.get(filePath)!.push({
@@ -1296,9 +1296,9 @@ export function registerTools(server: McpServer) {
         if (nextFrontier.size === 0) break;
       }
 
-      let traceNodes = getTraceNodes(visited, nodeMap, (node) => node.type === "function" || node.type === "class");
+      let filteredTraceNodes = getTraceNodes(visited, nodeMap, (node) => node.type === "function" || node.type === "class");
 
-      if (traceNodes.length > maxN) {
+      if (filteredTraceNodes.length > maxN) {
         const callConnections = new Map<string, number>();
         for (const link of links) {
           if (link.type === "call") {
@@ -1306,15 +1306,15 @@ export function registerTools(server: McpServer) {
             callConnections.set(link.target, (callConnections.get(link.target) || 0) + 1);
           }
         }
-        traceNodes.sort((a, b) => {
+        filteredTraceNodes.sort((a, b) => {
           if (seedNodes.has(a.id) && !seedNodes.has(b.id)) return -1;
           if (!seedNodes.has(a.id) && seedNodes.has(b.id)) return 1;
           return (callConnections.get(b.id) || 0) - (callConnections.get(a.id) || 0);
         });
-        traceNodes = traceNodes.slice(0, maxN);
+        filteredTraceNodes = filteredTraceNodes.slice(0, maxN);
       }
 
-      const traceNodeIds = createNodeIdSet(traceNodes);
+      const traceNodeIds = createNodeIdSet(filteredTraceNodes);
       const linkSet = new Set<string>();
       const dedupLinks: GraphLink[] = [];
 
@@ -1335,7 +1335,7 @@ export function registerTools(server: McpServer) {
       for (const link of dedupLinks) {
         hasIncoming.add(link.target);
       }
-      const entryPoints = traceNodes.filter(
+      const entryPoints = filteredTraceNodes.filter(
         (n) => !hasIncoming.has(n.id) || seedNodes.has(n.id)
       );
 
@@ -1346,7 +1346,7 @@ export function registerTools(server: McpServer) {
         const seqLines: string[] = ["sequenceDiagram"];
         const participantMap = new Map<string, string>();
         let pCounter = 0;
-        for (const node of traceNodes) {
+        for (const node of filteredTraceNodes) {
           const pid = `P${pCounter++}`;
           participantMap.set(node.id, pid);
           const icon = node.type === "class" ? "🏗️" : "⚡";
