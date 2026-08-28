@@ -1,27 +1,29 @@
-const { routeTask } = require("./taskRouter.js");
+import * as assert from "node:assert";
+import { describe, it } from "node:test";
+import { routeTask } from "./taskRouter.js";
 
 describe("routeTask", () => {
-  test("routes architecture/debug tasks to opus max", () => {
-    const r = routeTask("design the architecture");
-    expect(r.model).toBe("ag/claude-opus-4-6-thinking");
-    expect(r.effort).toBe("max");
+  it("routes architecture/debug tasks to opus max", () => {
+    const result = routeTask("design the architecture");
+    assert.strictEqual(result.model, "ag/claude-opus-4-6-thinking");
+    assert.strictEqual(result.effort, "max");
   });
 
-  test("routes code_generation / implement to sonnet medium", () => {
-    const r = routeTask("implement login", "code_generation");
-    expect(r.model).toBe("ag/claude-sonnet-4-6");
-    expect(r.effort).toBe("medium");
+  it("routes code_generation / implement to sonnet medium", () => {
+    const result = routeTask("implement login", "code_generation");
+    assert.strictEqual(result.model, "ag/claude-sonnet-4-6");
+    assert.strictEqual(result.effort, "medium");
   });
 
-  test("routes simple/docs tasks to sonnet low", () => {
-    const r = routeTask("what is AST", "explain");
-    expect(r.model).toBe("ag/claude-sonnet-4-6");
-    expect(r.effort).toBe("low");
+  it("routes simple/docs tasks to sonnet low", () => {
+    const result = routeTask("what is AST", "explain");
+    assert.strictEqual(result.model, "ag/claude-sonnet-4-6");
+    assert.strictEqual(result.effort, "low");
   });
 
-  test("falls back to sonnet medium", () => {
-    const r = routeTask("hello");
-    expect(r.model).toBe("ag/claude-sonnet-4-6");
-    expect(r.effort).toBe("medium");
+  it("falls back to sonnet medium", () => {
+    const result = routeTask("hello");
+    assert.strictEqual(result.model, "ag/claude-sonnet-4-6");
+    assert.strictEqual(result.effort, "medium");
   });
 });
