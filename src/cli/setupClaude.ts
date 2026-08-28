@@ -122,10 +122,14 @@ export async function cmdSetupClaude(projectDir: string = process.cwd()): Promis
       const raw = fs.readFileSync(settingsPath, 'utf8');
       const settings = JSON.parse(raw);
       const merged = mergeSettings(settings);
-      fs.writeFileSync(settingsPath, JSON.stringify(merged, null, 2), 'utf8');
+
+      const tempPath = settingsPath + ".tmp";
+      fs.writeFileSync(tempPath, JSON.stringify(merged, null, 2), 'utf8');
+      fs.renameSync(tempPath, settingsPath);
+
       console.log(`  ${ok()} Hooks registered in settings.json`);
-    } catch (e: any) {
-      console.log(`  ${fail()} Failed to update settings.json: ${e.message}`);
+    } catch (e: unknown) {
+      console.log(`  ${fail()} Failed to update settings.json: ${e instanceof Error ? e.message : 'Unknown error'}`);
     }
   } else {
     console.log(`  ${warn()} ${settingsPath} not found. Start Claude Code first.`);
@@ -188,7 +192,11 @@ export async function cmdSetupZed(): Promise<void> {
   };
 
   fs.mkdirSync(getZedConfigDir(), { recursive: true });
-  fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2));
+
+  const tempPath = settingsPath + ".tmp";
+  fs.writeFileSync(tempPath, JSON.stringify(settings, null, 2), "utf-8");
+  fs.renameSync(tempPath, settingsPath);
+
   console.log(`  ${ok()} Registered 'codeatlas' context server in ${settingsPath}`);
 
   console.log("=".repeat(50));
