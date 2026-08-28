@@ -3293,6 +3293,8 @@ def register(ctx):
         }
 
         for (const s of skills) {
+          if (!s?.name || !s?.description) continue;
+
           // Only evaluate regex if one is defined (i.e. query is not empty)
           if (!regex || regex.test(s.name) || regex.test(s.description)) {
             count++;
