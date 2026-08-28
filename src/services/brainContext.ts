@@ -93,8 +93,14 @@ export async function loadBrainContext(input: BrainContextInput): Promise<BrainC
     if (project) immuneQs.set("project", project);
 
     const [genomeData, immuneData] = await Promise.all([
-      fetchJson(`${serverUrl}/api/genome/search?${genomeQs}`, apiKey).catch(() => ({})),
-      fetchJson(`${serverUrl}/api/genome/immune/context?${immuneQs}`, apiKey).catch(() => ({})),
+      fetchJson(`${serverUrl}/api/genome/search?${genomeQs}`, apiKey).catch((e) => {
+        console.warn(`Warning: Failed to fetch genome data - ${e.message}`);
+        return {};
+      }),
+      fetchJson(`${serverUrl}/api/genome/immune/context?${immuneQs}`, apiKey).catch((e) => {
+        console.warn(`Warning: Failed to fetch immune context - ${e.message}`);
+        return {};
+      }),
     ]);
 
     const rawGenes = Array.isArray(genomeData?.genes) ? genomeData.genes : [];

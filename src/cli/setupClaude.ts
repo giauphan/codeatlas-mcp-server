@@ -152,13 +152,17 @@ export async function cmdSetupZed(): Promise<void> {
   console.log(`\n${bold("CodeAtlas Zed Integration Setup")}`);
   console.log("=".repeat(50));
 
+  if (!process.env.CODEATLAS_API_KEY) {
+    console.log(`  ${warn()} Warning: CODEATLAS_API_KEY environment variable is not set. Memory retrieval features may not work.`);
+  }
+
   const settingsPath = getZedSettingsPath();
   let settings: any = {};
   if (fs.existsSync(settingsPath)) {
     try {
       settings = JSON.parse(fs.readFileSync(settingsPath, "utf-8"));
     } catch (e: any) {
-      console.log(`  ${fail()} Could not parse existing ${settingsPath}: ${e.message}`);
+      console.log(`  ${fail()} Could not parse existing ${settingsPath}: ${e.message}. Please fix syntax errors in your Zed settings.json file and try again.`);
       return;
     }
   } else {
@@ -166,7 +170,7 @@ export async function cmdSetupZed(): Promise<void> {
   }
 
   if (settings.context_servers && (typeof settings.context_servers !== "object" || Array.isArray(settings.context_servers))) {
-    console.log(`  ${fail()} settings.context_servers exists but is not an object. Aborting to avoid clobbering.`);
+    console.log(`  ${fail()} settings.context_servers exists but is not an object. Aborting to avoid clobbering. Please set it to a valid JSON object.`);
     return;
   }
 
