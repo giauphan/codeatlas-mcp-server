@@ -157,12 +157,12 @@ export async function cmdSetupZed(): Promise<void> {
   }
 
   const settingsPath = getZedSettingsPath();
-  let settings: Record<string, any> = {};
+  let settings: Record<string, unknown> = {};
   if (fs.existsSync(settingsPath)) {
     try {
       settings = JSON.parse(fs.readFileSync(settingsPath, "utf-8"));
-    } catch (e: any) {
-      console.log(`  ${fail()} Could not parse existing ${settingsPath}: ${e.message}. Please fix syntax errors in your Zed settings.json file and try again.`);
+    } catch (e: unknown) {
+      console.log(`  ${fail()} Could not parse existing ${settingsPath}: ${e instanceof Error ? e.message : 'Unknown error'}. Please fix syntax errors in your Zed settings.json file and try again.`);
       return;
     }
   } else {
@@ -174,14 +174,17 @@ export async function cmdSetupZed(): Promise<void> {
     return;
   }
 
-  const ctxServers = settings.context_servers = settings.context_servers || {};
+  const ctxServers = settings.context_servers = (settings.context_servers as Record<string, unknown>) || {};
   const env: Record<string, string> = {};
-  if (process.env.CODEATLAS_API_KEY) env.CODEATLAS_API_KEY = process.env.CODEATLAS_API_KEY;
+  if (process.env.CODEATLAS_API_KEY) {
+    env.CODEATLAS_API_KEY = process.env.CODEATLAS_API_KEY;
+    console.log(`  ${warn()} Note: CODEATLAS_API_KEY will be written to ${settingsPath}`);
+  }
   if (process.env.CODEATLAS_API_URL) env.CODEATLAS_API_URL = process.env.CODEATLAS_API_URL;
   ctxServers.codeatlas = {
     command: "npx",
     args: ["-y", "codeatlas-mcp-server"],
-    env,
+    ...(Object.keys(env).length ? { env } : {}),
   };
 
   fs.mkdirSync(getZedConfigDir(), { recursive: true });

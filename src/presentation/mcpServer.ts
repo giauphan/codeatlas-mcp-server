@@ -3299,12 +3299,16 @@ def register(ctx):
 
           // Only evaluate regex if one is defined (i.e. query is not empty)
           if (!regex || regex.test(s.name) || regex.test(s.description)) {
-            count++;
+            // We explicitly only increment `count` for valid items that match the regex.
+            if (regex) count++;
             if (results.length < limitVal) {
               results.push({ name: s.name, description: s.description, source: s.source });
             }
           }
         }
+
+        // If there's no query filter, total match count equals total valid elements traversed
+        if (!regex) count = validSkillsCount;
 
         return { content: [{ type: "text" as const, text: JSON.stringify({
           query: queryText || "(all)", count, totalSkills: validSkillsCount,

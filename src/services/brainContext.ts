@@ -66,8 +66,8 @@ export function formatBrainContext(result: BrainContextResult): string {
 
 export interface ApiGene { name?: string; gene_name?: string; description?: string; solution?: string; }
 
-async function fetchJson(url: string, apiKey: string): Promise<any> {
-  const resp = await fetch(url, {
+async function fetchJson(url: string, apiKey: string, signal?: AbortSignal): Promise<unknown> {
+  const resp = await fetch(url, { signal,
     headers: { "x-api-key": apiKey, "User-Agent": "codeatlas-enterprise/2.0" },
   });
   if (!resp.ok) {
@@ -95,15 +95,15 @@ export async function loadBrainContext(input: BrainContextInput): Promise<BrainC
     if (project) immuneQs.set("project", project);
 
     const [genomeData, immuneData] = await Promise.all([
-      fetchJson(`${serverUrl}/api/genome/search?${genomeQs}`, apiKey).catch((e) => {
+      fetchJson(`${serverUrl}/api/genome/search?${genomeQs}`, apiKey, AbortSignal.timeout(8000)).catch((e) => {
         console.warn(`Warning: Failed to fetch genome data - ${e.message}`);
         return {};
       }),
-      fetchJson(`${serverUrl}/api/genome/immune/context?${immuneQs}`, apiKey).catch((e) => {
+      fetchJson(`${serverUrl}/api/genome/immune/context?${immuneQs}`, apiKey, AbortSignal.timeout(8000)).catch((e) => {
         console.warn(`Warning: Failed to fetch immune context - ${e.message}`);
         return {};
       }),
-    ]);
+    ]) as [Record<string, any>, Record<string, any>];
 
     const rawGenes = Array.isArray(genomeData?.genes) ? genomeData.genes : [];
     genes = rawGenes.map((gene: any) => ({
