@@ -2789,28 +2789,65 @@ def register(ctx):
       const loaded = await loadAnalysisAsync(project);
       if (!loaded) return { content: [{ type: "text" as const, text: "No analysis found. Run 'analyze' first." }] };
 
-      const nodes = loaded.analysis.graph.nodes.filter(n => !n.id.startsWith("external:"));
       const links = loaded.analysis.graph.links;
 
-      // Entity type distribution
-      const typeCounts: Record<string, number> = {};
-      for (const n of nodes) typeCounts[n.type] = (typeCounts[n.type] || 0) + 1;
+      const linkedNodeIds = new Set<string>();
+      for (const l of links) {
+        linkedNodeIds.add(l.source);
+        linkedNodeIds.add(l.target);
+      }
 
-      // File distribution
+      const typeCounts: Record<string, number> = {};
       const fileEntityCount = new Map<string, number>();
       const fileTypeMap = new Map<string, Set<string>>();
-      for (const n of nodes) {
-        if (!n.filePath) continue;
-        const fp = path.isAbsolute(n.filePath) ? path.relative(loaded.projectDir, n.filePath) : n.filePath;
-        fileEntityCount.set(fp, (fileEntityCount.get(fp) || 0) + 1);
-        if (!fileTypeMap.has(fp)) fileTypeMap.set(fp, new Set());
-        fileTypeMap.get(fp)!.add(n.type);
+
+      let totalValidNodes: number = 0;
+      let withFilePath: number = 0;
+      let orphanNodes: number = 0;
+
+      const ALWAYS_CONNECTED_TYPES = new Set(["variable"]);
+      const normalizeFilePath = (filePath: string, projectDir: string) =>
+        path.isAbsolute(filePath) ? path.relative(projectDir, filePath) : filePath;
+
+      for (const n of loaded.analysis.graph.nodes) {
+        if (!n.id || !n.type) {
+          console.warn(`[index_coverage] Warning: Skipping malformed node with missing id or type`);
+          continue;
+        }
+
+        if (n.id.startsWith("external:")) continue;
+
+        totalValidNodes++;
+        typeCounts[n.type] = (typeCounts[n.type] || 0) + 1;
+
+        if (!ALWAYS_CONNECTED_TYPES.has(n.type) && !linkedNodeIds.has(n.id)) orphanNodes++;
+
+        if (n.filePath) {
+          // Additional safety check to prevent processing completely empty filePaths
+          if (n.filePath.trim() === "") {
+             console.warn(`[index_coverage] Warning: Node ${n.id} has an empty filePath`);
+             continue;
+          }
+          withFilePath++;
+          const fp = normalizeFilePath(n.filePath, loaded.projectDir);
+          fileEntityCount.set(fp, (fileEntityCount.get(fp) || 0) + 1);
+          if (!fileTypeMap.has(fp)) fileTypeMap.set(fp, new Set());
+          fileTypeMap.get(fp)!.add(n.type);
+        }
       }
 
       const topFiles = Array.from(fileEntityCount.entries())
         .sort((a, b) => b[1] - a[1])
         .slice(0, 15)
         .map(([f, c]) => ({ file: f, entities: c }));
+
+      // Coverage quality score
+      let coveragePercentage = 0;
+      if (totalValidNodes === 0) {
+        console.warn(`[index_coverage] Warning: Graph contains 0 valid internal entities for project ${loaded.projectName}`);
+      } else {
+        coveragePercentage = Math.round((withFilePath / totalValidNodes) * 100);
+      }
 
       // Extension distribution
       const extCounts: Record<string, number> = {};
@@ -2819,26 +2856,10 @@ def register(ctx):
         extCounts[ext] = (extCounts[ext] || 0) + 1;
       }
 
-      // Coverage quality score
-      const withFilePath = nodes.filter(n => n.filePath).length;
-      const coveragePct = nodes.length > 0 ? Math.round((withFilePath / nodes.length) * 100) : 0;
-
-      // ⚡ Bolt Optimization: Use a precomputed Set for O(1) link lookups instead of O(N*L) Array.some()
-      const linkedNodeIds = new Set<string>();
-      for (const l of links) {
-        linkedNodeIds.add(l.source);
-        linkedNodeIds.add(l.target);
-      }
-      let orphanNodes = 0;
-      for (const n of nodes) {
-        if (n.type !== "variable" && !linkedNodeIds.has(n.id)) {
-          orphanNodes++;
-        }
-      }
-
       // Discover actual project files not indexed
       const indexedFiles = new Set(fileEntityCount.keys());
-      const projectExtSet = new Set([".ts", ".tsx", ".js", ".jsx", ".py", ".php", ".go", ".rs", ".java", ".rb", ".vue", ".svelte"]);
+      const SUPPORTED_FILE_EXTENSIONS = [".ts", ".tsx", ".js", ".jsx", ".py", ".php", ".go", ".rs", ".java", ".rb", ".vue", ".svelte"];
+      const projectExtSet = new Set(SUPPORTED_FILE_EXTENSIONS);
       const unindexedFiles: string[] = [];
 
       const walkForMissing = (dir: string, depth: number) => {
@@ -2860,10 +2881,10 @@ def register(ctx):
       const result = {
         project: loaded.projectName,
         summary: {
-          totalEntities: nodes.length,
+          totalEntities: totalValidNodes,
           totalRelationships: links.length,
           uniqueFiles: fileEntityCount.size,
-          coveragePercent: coveragePct,
+          coveragePercent: coveragePercentage,
           orphanEntities: orphanNodes,
           unindexedFilesFound: unindexedFiles.length,
         },
@@ -3250,33 +3271,11 @@ def register(ctx):
       }
 
       if (action === "query") {
-        const q = query || "";
-        const maxResults = typeof limit === 'number' && limit > 0 ? limit : 20;
-        const results: Array<{ name: string; description: string; source: string }> = [];
-        let matchCount = 0;
-
-        if (q) {
-          // ⚡ Bolt Optimization: Replace O(N) chained .filter().slice().map() with a single loop
-          // and precompiled regex to avoid memory-intensive .toLowerCase() allocations
-          const qRegex = new RegExp(escapeRegExp(q), 'i');
-          for (const s of skills) {
-            if (qRegex.test(s.name) || qRegex.test(s.description)) {
-              matchCount++;
-              if (results.length < maxResults) {
-                results.push({ name: s.name, description: s.description, source: s.source });
-              }
-            }
-          }
-        } else {
-          matchCount = skills.length;
-          for (let i = 0; i < Math.min(maxResults, skills.length); i++) {
-            results.push({ name: skills[i].name, description: skills[i].description, source: skills[i].source });
-          }
-        }
-
+        const q = (query || "").toLowerCase();
+        const matches = q ? skills.filter(s => s.name.includes(q) || s.description.toLowerCase().includes(q)) : skills;
         return { content: [{ type: "text" as const, text: JSON.stringify({
-          query: q || "(all)", count: matchCount, totalSkills: skills.length,
-          results,
+          query: q || "(all)", count: matches.length, totalSkills: skills.length,
+          results: matches.slice(0, limit || 20).map(s => ({ name: s.name, description: s.description, source: s.source })),
         }, null, 2) }] };
       }
 
