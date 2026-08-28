@@ -178,11 +178,14 @@ export async function cmdSetupZed(): Promise<void> {
     return;
   }
 
-  const ctxServers = settings.context_servers = (settings.context_servers as Record<string, unknown>) || {};
+  if (!settings.context_servers) settings.context_servers = {};
+  const ctxServers = settings.context_servers as Record<string, unknown>;
+  if (process.env.CODEATLAS_API_KEY) {
+    console.log(`  ${warn()} ${bold("SECURITY WARNING:")} CODEATLAS_API_KEY will be written in plaintext to ${settingsPath}. This file is typically world-readable. Consider setting it via environment variables instead if this is a shared machine.`);
+  }
   const env: Record<string, string> = {};
   if (process.env.CODEATLAS_API_KEY) {
     env.CODEATLAS_API_KEY = process.env.CODEATLAS_API_KEY;
-    console.log(`  ${warn()} ${bold("SECURITY WARNING:")} CODEATLAS_API_KEY will be written in plaintext to ${settingsPath}. This file is typically world-readable. Consider setting it via environment variables instead if this is a shared machine.`);
   }
   if (process.env.CODEATLAS_API_URL) env.CODEATLAS_API_URL = process.env.CODEATLAS_API_URL;
   ctxServers.codeatlas = {

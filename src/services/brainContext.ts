@@ -110,14 +110,14 @@ export async function loadBrainContext(input: BrainContextInput): Promise<BrainC
 
     const sharedController = new AbortController();
     const timeoutId = setTimeout(() => sharedController.abort(), 8000);
-    const sharedSignal = sharedController.signal;
+    const timeoutSignal = sharedController.signal;
 
     const [genomeData, immuneData] = await Promise.all([
-      fetchJson(`${serverUrl}/api/genome/search?${genomeQs}`, apiKey, sharedSignal).catch((e) => {
+      fetchJson(`${serverUrl}/api/genome/search?${genomeQs}`, apiKey, timeoutSignal).catch((e) => {
         console.warn(`Warning: Failed to fetch genome data - ${e.message}`);
         return {};
       }),
-      fetchJson(`${serverUrl}/api/genome/immune/context?${immuneQs}`, apiKey, sharedSignal).catch((e) => {
+      fetchJson(`${serverUrl}/api/genome/immune/context?${immuneQs}`, apiKey, timeoutSignal).catch((e) => {
         console.warn(`Warning: Failed to fetch immune context - ${e.message}`);
         return {};
       }),

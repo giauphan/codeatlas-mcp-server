@@ -2174,7 +2174,7 @@ export function registerTools(server: McpServer) {
           // Security: Block shell metacharacters to prevent indirect command injection in the target script
           if (SHELL_METACHAR_RE.test(args)) {
             const truncatedArgs = args.length > 50 ? args.substring(0, 50) + "..." : args;
-            return { content: [{ type: "text" as const, text: JSON.stringify({ error: `Security Error: Arguments contain forbidden shell metacharacters (& | ; < > $ \` \\). Received: ${truncatedArgs}` }, null, 2) }] };
+           return { content: [{ type: "text" as const, text: JSON.stringify({ error: `Security Error: Arguments contain forbidden shell metacharacters (& | ; < > $ \` \\). Received: ${truncatedArgs}` }, null, 2) }] };
           }
           const match = args.match(/(?:[^\s"']+|"[^"]*"|'[^']*')+/g);
           if (match) {
@@ -2623,16 +2623,16 @@ def register(ctx):
         switch (action) {
           case "list": {
             const adrs = await listADRs(project);
-            return { content: [{ type: "text" as const, text: JSON.stringify({
+           return { content: [{ type: "text" as const, text: JSON.stringify({
               count: adrs.length,
               adrs: adrs.map(a => ({ id: a.id, title: a.title, status: a.status, date: a.date, project: a.project })),
-            }, null, 2) }] };
+           }, null, 2) }] };
           }
           case "get": {
             if (!id || !project) return { content: [{ type: "text" as const, text: JSON.stringify({ error: "id and project required" }) }] };
             const adr = getADR(id, project);
             if (!adr) return { content: [{ type: "text" as const, text: JSON.stringify({ error: `ADR '${id}' not found` }) }] };
-            return { content: [{ type: "text" as const, text: JSON.stringify(adr, null, 2) }] };
+           return { content: [{ type: "text" as const, text: JSON.stringify(adr, null, 2) }] };
           }
           case "create": {
             if (!project || !title || !decision) return { content: [{ type: "text" as const, text: JSON.stringify({ error: "project, title, and decision are required" }) }] };
@@ -2654,7 +2654,7 @@ def register(ctx):
               date: new Date().toISOString().split("T")[0],
             };
             saveADR(newAdr);
-            return { content: [{ type: "text" as const, text: JSON.stringify({ success: true, adr: newAdr }, null, 2) }] };
+           return { content: [{ type: "text" as const, text: JSON.stringify({ success: true, adr: newAdr }, null, 2) }] };
           }
           case "update_status": {
             if (!id || !project || !status) return { content: [{ type: "text" as const, text: JSON.stringify({ error: "id, project, and status required" }) }] };
@@ -2663,15 +2663,15 @@ def register(ctx):
             adr.status = status;
             if (status === "superseded" && supersededBy) adr.supersededBy = supersededBy;
             saveADR(adr);
-            return { content: [{ type: "text" as const, text: JSON.stringify({ success: true, adr }, null, 2) }] };
+           return { content: [{ type: "text" as const, text: JSON.stringify({ success: true, adr }, null, 2) }] };
           }
           case "delete": {
             if (!id || !project) return { content: [{ type: "text" as const, text: JSON.stringify({ error: "id and project required" }) }] };
             const deleted = deleteADR(id, project);
-            return { content: [{ type: "text" as const, text: JSON.stringify({ success: deleted, message: deleted ? `Deleted ${id}` : `${id} not found` }) }] };
+           return { content: [{ type: "text" as const, text: JSON.stringify({ success: deleted, message: deleted ? `Deleted ${id}` : `${id} not found` }) }] };
           }
           default:
-            return { content: [{ type: "text" as const, text: `Unknown action: ${action}` }] };
+           return { content: [{ type: "text" as const, text: `Unknown action: ${action}` }] };
         }
       } catch (err: unknown) {
         return { content: [{ type: "text" as const, text: `ADR error: ${err instanceof Error ? err.message : String(err)}` }], isError: true };
@@ -3076,7 +3076,7 @@ def register(ctx):
         if (fs.existsSync(resolvedArtifactDir)) {
           resolvedArtifactDir = fs.realpathSync(resolvedArtifactDir);
           if (!isPathInAuthorizedProjects(resolvedArtifactDir, authorizedProjects)) {
-            return { content: [{ type: "text" as const, text: "Unauthorized artifact directory" }] };
+           return { content: [{ type: "text" as const, text: "Unauthorized artifact directory" }] };
           }
         }
         fs.mkdirSync(resolvedArtifactDir, { recursive: true });
@@ -3280,16 +3280,16 @@ def register(ctx):
         const results: Array<{ name: string; description: string; source: string }> = [];
 
         if (!Array.isArray(skills) || skills.length === 0) {
-           return { content: [{ type: "text" as const, text: JSON.stringify({
+          return { content: [{ type: "text" as const, text: JSON.stringify({
             query: queryText || "(all)", count: 0, totalSkills: Array.isArray(skills) ? skills.length : 0, results: [],
-           }, null, 2) }] };
+          }, null, 2) }] };
         }
 
         // Escape regex characters to prevent ReDoS and compile once.
         // Case-insensitivity ('i') is used to match standard user expectations for search queries.
         let regex: RegExp | null = null;
         if (queryText) {
-          // Limit query length to 100 characters to prevent excessive backtracking (ReDoS prevention)
+          // Escape regex characters to neutralize ReDoS, and limit length to 100 characters to prevent large inputs
           regex = new RegExp(queryText.slice(0, 100).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
         }
 

@@ -20,7 +20,7 @@ export function getClaudeConfigPath(): string {
 
 export function getZedConfigDir(): string {
   if (process.platform === "win32") {
-    return path.join(process.env.APPDATA || getHomePath(), "zed");
+    return path.join(process.env.APPDATA || getHomePath(), "Zed");
   }
   if (process.platform === "darwin") {
     return path.join(getHomePath(), "Library", "Application Support", "Zed");

@@ -65,12 +65,20 @@ function getSetFromEnv(envVar: string | undefined, defaultValue: Set<string>): S
 
 // Allow externalization of hardcoded keyword mappings for dynamic configuration.
 // We evaluate these once upon module loading to save computation time.
-const highComplexity = getListFromEnv(process.env.CODEATLAS_HIGH_COMPLEXITY, DEFAULT_HIGH_COMPLEXITY);
-const mediumComplexity = getListFromEnv(process.env.CODEATLAS_MEDIUM_COMPLEXITY, DEFAULT_MEDIUM_COMPLEXITY);
-const lowComplexity = getListFromEnv(process.env.CODEATLAS_LOW_COMPLEXITY, DEFAULT_LOW_COMPLEXITY);
+let highComplexity = getListFromEnv(process.env.CODEATLAS_HIGH_COMPLEXITY, DEFAULT_HIGH_COMPLEXITY);
+let mediumComplexity = getListFromEnv(process.env.CODEATLAS_MEDIUM_COMPLEXITY, DEFAULT_MEDIUM_COMPLEXITY);
+let lowComplexity = getListFromEnv(process.env.CODEATLAS_LOW_COMPLEXITY, DEFAULT_LOW_COMPLEXITY);
 
-const mediumTaskTypes = getSetFromEnv(process.env.CODEATLAS_MEDIUM_TASK_TYPES, DEFAULT_MEDIUM_TASK_TYPES);
-const lowTaskTypes = getSetFromEnv(process.env.CODEATLAS_LOW_TASK_TYPES, DEFAULT_LOW_TASK_TYPES);
+let mediumTaskTypes = getSetFromEnv(process.env.CODEATLAS_MEDIUM_TASK_TYPES, DEFAULT_MEDIUM_TASK_TYPES);
+let lowTaskTypes = getSetFromEnv(process.env.CODEATLAS_LOW_TASK_TYPES, DEFAULT_LOW_TASK_TYPES);
+
+export function resetRouterConfig() {
+  highComplexity = getListFromEnv(process.env.CODEATLAS_HIGH_COMPLEXITY, DEFAULT_HIGH_COMPLEXITY);
+  mediumComplexity = getListFromEnv(process.env.CODEATLAS_MEDIUM_COMPLEXITY, DEFAULT_MEDIUM_COMPLEXITY);
+  lowComplexity = getListFromEnv(process.env.CODEATLAS_LOW_COMPLEXITY, DEFAULT_LOW_COMPLEXITY);
+  mediumTaskTypes = getSetFromEnv(process.env.CODEATLAS_MEDIUM_TASK_TYPES, DEFAULT_MEDIUM_TASK_TYPES);
+  lowTaskTypes = getSetFromEnv(process.env.CODEATLAS_LOW_TASK_TYPES, DEFAULT_LOW_TASK_TYPES);
+}
 
 export function routeTask(taskName: string = "unknown", taskType: string = "unknown"): TaskRoute {
   // Convert to lower case for case-insensitive matching. Note that taskName.includes()
