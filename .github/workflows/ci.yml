@@ -98,8 +98,8 @@ jobs:
       - name: Test
         run: npm test
 
-      - name: Coverage gate (must hit 40% threshold)
-        run: npx c8 --reporter=text --reportDir=coverage --check-coverage --lines=40 npm test
+      - name: Coverage gate (must hit 50% threshold)
+        run: npx c8 --reporter=text --reportDir=coverage --check-coverage --lines=50 npm test
 
       - name: Upload coverage report
         if: always()
@@ -107,6 +107,14 @@ jobs:
         with:
           name: coverage-report
           path: coverage/
+          retention-days: 7
+
+      - name: Save error artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: error-logs
+          path: ./error-logs/
           retention-days: 7
 
   # ── ⑦ PASS/FAIL gate — all 3 must pass ────────────────

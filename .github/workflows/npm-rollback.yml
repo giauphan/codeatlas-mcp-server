@@ -40,7 +40,12 @@ jobs:
           registry-url: https://registry.npmjs.org
 
       - name: Verify target version exists on npm
-        run: npm view codeatlas-mcp-server@${{ inputs.stable_version }} version
+        run: |
+          if ! npm view codeatlas-mcp-server@${{ inputs.stable_version }}; then
+            echo "::error::Version ${{ inputs.stable_version }} does not exist!"
+            exit 1
+          fi
+          npm view codeatlas-mcp-server@${{ inputs.stable_version }} version
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
