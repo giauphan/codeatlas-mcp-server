@@ -117,6 +117,30 @@ Add to `settings.json`:
 }
 ```
 
+### Connect to Zed (MCP context server)
+Zed has no Claude-style hooks, so the Second Brain hooks are exposed as MCP tools instead.
+
+**Option A — automatic setup:**
+```bash
+codeatlas-enterprise setup zed
+```
+This writes a `codeatlas` entry into Zed's `context_servers` (passing `CODEATLAS_API_KEY`/`CODEATLAS_API_URL` from your environment). Restart Zed afterward.
+
+**Option B — manual:** add to Zed `settings.json` (open via `zed: open settings file`):
+```json
+{
+  "context_servers": {
+    "codeatlas": {
+      "command": "npx",
+      "args": ["-y", "codeatlas-mcp-server"],
+      "env": { "CODEATLAS_API_KEY": "your_api_key_here" }
+    }
+  }
+}
+```
+
+Then in Zed's Agent Panel, call the `brain_context` tool at the start of a task to inject Second Brain memory, and `save_dream_memory` after a task to persist learnings. `route_task` suggests a model/effort (advisory only — Zed does not auto-switch models). See [Zed Integration](./docs/ZED_INTEGRATION.md).
+
 ---
 
 ## 📚 Documentation
