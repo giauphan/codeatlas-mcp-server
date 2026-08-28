@@ -16,7 +16,22 @@ function memory(partial: Partial<DreamMemoryResult>): DreamMemoryResult {
   };
 }
 
-describe("brainContext", () => {
+describe("brain context", () => {
+  it("requires API URL when cloud context is requested", async () => {
+    const originalUrl = process.env.CODEATLAS_API_URL;
+    const originalKey = process.env.CODEATLAS_API_KEY;
+    delete process.env.CODEATLAS_API_URL;
+    process.env.CODEATLAS_API_KEY = "test-key";
+    try {
+      const { loadBrainContext } = await import("./brainContext.js");
+      await assert.rejects(() => loadBrainContext({ query: "test" }), /CODEATLAS_API_URL/);
+    } finally {
+      if (originalUrl === undefined) delete process.env.CODEATLAS_API_URL;
+      else process.env.CODEATLAS_API_URL = originalUrl;
+      if (originalKey === undefined) delete process.env.CODEATLAS_API_KEY;
+      else process.env.CODEATLAS_API_KEY = originalKey;
+    }
+  });
   it("drops unrecognized memory types", () => {
     const kept = filterAllowedDreams([
       memory({ memory_type: "KNOWLEDGE", content: "Parser uses ESTree." }),

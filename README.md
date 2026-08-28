@@ -61,7 +61,9 @@ pnpm install
 cp .env.example .env
 
 # Edit .env (Oracle DB optional for persistent memory)
-# Set CODEATLAS_API_URL and CODEATLAS_API_KEY if using cloud
+# Cloud features require both variables; no default URL is used
+# Set CODEATLAS_API_URL to your CodeAtlas API base URL
+# Set CODEATLAS_API_KEY to your CodeAtlas API key
 ```
 
 ### 3. Build

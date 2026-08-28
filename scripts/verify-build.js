@@ -20,15 +20,20 @@ try {
 }
 
 const testFiles = files.filter((file) => /\.(test|spec)\.(js|js\.map)$/.test(file));
+const sourceMaps = files.filter((file) => file.endsWith(".map"));
 const unsafeFiles = files.filter((file) => {
   if (!/\.(js|sh)$/.test(file)) return false;
   return /your-server\.com|localhost:[0-9]{4}/.test(readFileSync(file, "utf8"));
 });
 
-if (testFiles.length || unsafeFiles.length) {
+if (testFiles.length || sourceMaps.length || unsafeFiles.length) {
   if (testFiles.length) {
     console.error("::error::Test files found in build output:");
     testFiles.forEach((file) => console.error(`  - ${file}`));
+  }
+  if (sourceMaps.length) {
+    console.error("::error::Source maps found in build output:");
+    sourceMaps.forEach((file) => console.error(`  - ${file}`));
   }
   if (unsafeFiles.length) {
     console.error("::error::Hardcoded URL fallbacks found in build output:");
@@ -37,4 +42,4 @@ if (testFiles.length || unsafeFiles.length) {
   process.exit(1);
 }
 
-console.log(`Build validation passed: ${files.length} files checked; no test files or hardcoded URL fallbacks.`);
+console.log(`Build validation passed: ${files.length} files checked; no test files, source maps, or hardcoded URL fallbacks.`);

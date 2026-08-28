@@ -19,9 +19,18 @@ describe("getApiUrl", () => {
     assert.throws(() => getApiUrl(), /CODEATLAS_API_URL environment variable is not set/);
   });
 
-  it("throws when CODEATLAS_API_URL is empty", () => {
+  it("throws when CODEATLAS_API_URL is empty or whitespace", () => {
     process.env.CODEATLAS_API_URL = "";
     assert.throws(() => getApiUrl(), /CODEATLAS_API_URL environment variable is not set/);
+    process.env.CODEATLAS_API_URL = "   ";
+    assert.throws(() => getApiUrl(), /CODEATLAS_API_URL environment variable is not set/);
+  });
+
+  it("throws when CODEATLAS_API_URL is malformed or uses an unsupported protocol", () => {
+    process.env.CODEATLAS_API_URL = "not a URL";
+    assert.throws(() => getApiUrl(), /must be a valid HTTP or HTTPS URL/);
+    process.env.CODEATLAS_API_URL = "ftp://example.test";
+    assert.throws(() => getApiUrl(), /must be a valid HTTP or HTTPS URL/);
   });
 
   it("returns the configured URL", () => {
@@ -29,8 +38,8 @@ describe("getApiUrl", () => {
     assert.strictEqual(getApiUrl(), "http://127.0.0.1:3381");
   });
 
-  it("strips trailing slashes", () => {
-    process.env.CODEATLAS_API_URL = "http://127.0.0.1:3381///";
+  it("trims whitespace and strips trailing slashes", () => {
+    process.env.CODEATLAS_API_URL = "  http://127.0.0.1:3381///  ";
     assert.strictEqual(getApiUrl(), "http://127.0.0.1:3381");
   });
 });
