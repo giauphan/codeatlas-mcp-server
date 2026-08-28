@@ -3271,11 +3271,35 @@ def register(ctx):
       }
 
       if (action === "query") {
-        const q = (query || "").toLowerCase();
-        const matches = q ? skills.filter(s => s.name.includes(q) || s.description.toLowerCase().includes(q)) : skills;
+        // ⚡ Bolt Optimization: Optimized O(N) array filtering with string allocations when full traversal is necessary
+        const q = query || "";
+        const limitVal = limit || 20;
+        let count = 0;
+        const results = [];
+
+        if (q) {
+          // Escape regex characters and compile once
+          const escapedQ = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          const regex = new RegExp(escapedQ, 'i');
+          for (const s of skills) {
+            if (regex.test(s.name) || regex.test(s.description)) {
+              count++;
+              if (results.length < limitVal) {
+                results.push({ name: s.name, description: s.description, source: s.source });
+              }
+            }
+          }
+        } else {
+          count = skills.length;
+          for (let i = 0; i < Math.min(skills.length, limitVal); i++) {
+            const s = skills[i];
+            results.push({ name: s.name, description: s.description, source: s.source });
+          }
+        }
+
         return { content: [{ type: "text" as const, text: JSON.stringify({
-          query: q || "(all)", count: matches.length, totalSkills: skills.length,
-          results: matches.slice(0, limit || 20).map(s => ({ name: s.name, description: s.description, source: s.source })),
+          query: q || "(all)", count, totalSkills: skills.length,
+          results,
         }, null, 2) }] };
       }
 
