@@ -67,15 +67,16 @@ export function formatBrainContext(result: BrainContextResult): string {
 export interface ApiGene { name?: string; gene_name?: string; description?: string; solution?: string; }
 
 async function fetchJson(url: string, apiKey: string, signal?: AbortSignal): Promise<unknown> {
-  if (!url.startsWith('https://') && !url.startsWith('http://localhost') && !url.startsWith('http://127.0.0.1')) {
-     throw new Error(`Invalid URL scheme: ${url}`);
+  const parsed = new URL(url);
+  if (parsed.protocol !== 'https:' && !['localhost', '127.0.0.1'].includes(parsed.hostname)) {
+    throw new Error(`Invalid URL scheme: ${url}`);
   }
 
   const resp = await fetch(url, { signal,
     headers: { "x-api-key": apiKey, "User-Agent": "codeatlas-enterprise/2.0" },
   });
   if (!resp.ok) {
-    throw new Error(`${url} failed: ${resp.status}`);
+    throw new Error(`Genome API failed: ${resp.status}`);
   }
   return resp.json();
 }
@@ -110,10 +111,13 @@ export async function loadBrainContext(input: BrainContextInput): Promise<BrainC
     ]) as [Record<string, unknown>, Record<string, unknown>];
 
     const rawGenes = Array.isArray(genomeData?.genes) ? genomeData.genes : [];
-    genes = rawGenes.map((gene: ApiGene) => ({
-      name: gene?.name || gene?.gene_name || "",
-      description: gene?.description || gene?.solution || "",
-    })).filter((gene: { name: string; description: string }) => gene.name || gene.description);
+    genes = rawGenes.map((gene: unknown) => {
+      const g = (typeof gene === 'object' && gene !== null ? gene : {}) as ApiGene;
+      return {
+        name: g.name || g.gene_name || "",
+        description: g.description || g.solution || "",
+      };
+    }).filter((gene: { name: string; description: string }) => gene.name || gene.description);
 
     immune = typeof immuneData?.context === "string" ? immuneData.context : "";
   }
