@@ -3289,7 +3289,8 @@ def register(ctx):
         // Case-insensitivity ('i') is used to match standard user expectations for search queries.
         let regex: RegExp | null = null;
         if (queryText) {
-          regex = new RegExp(queryText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+          // Limit query length to 100 characters to prevent excessive backtracking (ReDoS prevention)
+          regex = new RegExp(queryText.slice(0, 100).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
         }
 
         for (const s of skills) {

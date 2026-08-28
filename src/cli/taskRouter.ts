@@ -63,18 +63,19 @@ function getSetFromEnv(envVar: string | undefined, defaultValue: Set<string>): S
   return defaultValue;
 }
 
+// Allow externalization of hardcoded keyword mappings for dynamic configuration.
+// We evaluate these once upon module loading to save computation time.
+const highComplexity = getListFromEnv(process.env.CODEATLAS_HIGH_COMPLEXITY, DEFAULT_HIGH_COMPLEXITY);
+const mediumComplexity = getListFromEnv(process.env.CODEATLAS_MEDIUM_COMPLEXITY, DEFAULT_MEDIUM_COMPLEXITY);
+const lowComplexity = getListFromEnv(process.env.CODEATLAS_LOW_COMPLEXITY, DEFAULT_LOW_COMPLEXITY);
+
+const mediumTaskTypes = getSetFromEnv(process.env.CODEATLAS_MEDIUM_TASK_TYPES, DEFAULT_MEDIUM_TASK_TYPES);
+const lowTaskTypes = getSetFromEnv(process.env.CODEATLAS_LOW_TASK_TYPES, DEFAULT_LOW_TASK_TYPES);
+
 export function routeTask(taskName: string = "unknown", taskType: string = "unknown"): TaskRoute {
   // Convert to lower case for case-insensitive matching. Note that taskName.includes()
   // searches against this lowercased string using low-case default tokens.
   const lower = taskName.toLowerCase();
-
-  // Allow externalization of hardcoded keyword mappings for dynamic configuration
-  const highComplexity = getListFromEnv(process.env.CODEATLAS_HIGH_COMPLEXITY, DEFAULT_HIGH_COMPLEXITY);
-  const mediumComplexity = getListFromEnv(process.env.CODEATLAS_MEDIUM_COMPLEXITY, DEFAULT_MEDIUM_COMPLEXITY);
-  const lowComplexity = getListFromEnv(process.env.CODEATLAS_LOW_COMPLEXITY, DEFAULT_LOW_COMPLEXITY);
-
-  const mediumTaskTypes = getSetFromEnv(process.env.CODEATLAS_MEDIUM_TASK_TYPES, DEFAULT_MEDIUM_TASK_TYPES);
-  const lowTaskTypes = getSetFromEnv(process.env.CODEATLAS_LOW_TASK_TYPES, DEFAULT_LOW_TASK_TYPES);
 
   if (containsAny(lower, highComplexity)) {
     return { model: "ag/claude-opus-4-6-thinking", effort: "max" };

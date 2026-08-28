@@ -157,7 +157,7 @@ export async function cmdSetupZed(): Promise<void> {
   }
 
   const settingsPath = getZedSettingsPath();
-  let settings: any = {};
+  let settings: Record<string, any> = {};
   if (fs.existsSync(settingsPath)) {
     try {
       settings = JSON.parse(fs.readFileSync(settingsPath, "utf-8"));
