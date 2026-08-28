@@ -67,9 +67,18 @@ export function formatBrainContext(result: BrainContextResult): string {
 export interface ApiGene { name?: string; gene_name?: string; description?: string; solution?: string; }
 
 async function fetchJson(url: string, apiKey: string, signal?: AbortSignal): Promise<unknown> {
-  const parsed = new URL(url);
-  if (parsed.protocol !== 'https:' && !['localhost', '127.0.0.1'].includes(parsed.hostname)) {
-    throw new Error(`Invalid URL scheme: ${url}`);
+  let parsed;
+  try {
+    parsed = new URL(url);
+  } catch {
+    throw new Error("Invalid URL format");
+  }
+
+  if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
+    throw new Error("Invalid URL scheme");
+  }
+  if (parsed.protocol === 'http:' && !['localhost', '127.0.0.1'].includes(parsed.hostname)) {
+    throw new Error("Invalid URL scheme");
   }
 
   const resp = await fetch(url, { signal,
@@ -99,18 +108,26 @@ export async function loadBrainContext(input: BrainContextInput): Promise<BrainC
     const immuneQs = new URLSearchParams({ problem: query });
     if (project) immuneQs.set("project", project);
 
+    const sharedController = new AbortController();
+    const timeoutId = setTimeout(() => sharedController.abort(), 8000);
+    const sharedSignal = sharedController.signal;
+
     const [genomeData, immuneData] = await Promise.all([
-      fetchJson(`${serverUrl}/api/genome/search?${genomeQs}`, apiKey, AbortSignal.timeout(8000)).catch((e) => {
+      fetchJson(`${serverUrl}/api/genome/search?${genomeQs}`, apiKey, sharedSignal).catch((e) => {
         console.warn(`Warning: Failed to fetch genome data - ${e.message}`);
         return {};
       }),
-      fetchJson(`${serverUrl}/api/genome/immune/context?${immuneQs}`, apiKey, AbortSignal.timeout(8000)).catch((e) => {
+      fetchJson(`${serverUrl}/api/genome/immune/context?${immuneQs}`, apiKey, sharedSignal).catch((e) => {
         console.warn(`Warning: Failed to fetch immune context - ${e.message}`);
         return {};
       }),
-    ]) as [Record<string, unknown>, Record<string, unknown>];
+    ]).finally(() => clearTimeout(timeoutId));
 
-    const rawGenes = Array.isArray(genomeData?.genes) ? genomeData.genes : [];
+    const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null;
+    const genomeRec = isRecord(genomeData) ? genomeData : {};
+    const immuneRec = isRecord(immuneData) ? immuneData : {};
+
+    const rawGenes = Array.isArray(genomeRec.genes) ? genomeRec.genes : [];
     genes = rawGenes.map((gene: unknown) => {
       const g = (typeof gene === 'object' && gene !== null ? gene : {}) as ApiGene;
       return {
@@ -119,7 +136,7 @@ export async function loadBrainContext(input: BrainContextInput): Promise<BrainC
       };
     }).filter((gene: { name: string; description: string }) => gene.name || gene.description);
 
-    immune = typeof immuneData?.context === "string" ? immuneData.context : "";
+    immune = typeof immuneRec.context === "string" ? immuneRec.context : "";
   }
 
   return { dreams, genes, immune };

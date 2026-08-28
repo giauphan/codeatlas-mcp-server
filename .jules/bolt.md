@@ -66,23 +66,9 @@
 **Learning:** Moving a global regular expression (`/g`) outside a loop is a common performance optimization to avoid recompilation overhead. However, when doing so, it is critical to reset the regex's internal state (specifically the `lastIndex` property) before reusing it within the loop. Failure to reset `lastIndex` causes the regex to continue matching from where it left off in the previous string, leading to missed matches or incorrect tokenization across different strings.
 **Action:** When hoisting global regexes out of loops (e.g., in `mcpServer.ts`), always explicitly set `regex.lastIndex = 0` immediately before the loop or matching block that reuses it.
 
-<<<<<<< HEAD
-## 2026-08-19 - [Performance improvement] Optimized O(N) array filtering with string allocations when full traversal is necessary
-**Learning:** In the `manage_skills` query action, checking for case-insensitive matches using `s.description.toLowerCase().includes(q)` combined with chained `.filter().slice().map()` created massive garbage collection pressure by constantly allocating new temporary string, arrays, and objects for every element. Even when full array traversal is strictly required (e.g. to return the total `matchCount`), we can still dramatically reduce memory bloat.
-**Action:** When filtering through large string fields inside an array where full traversal is needed to count matches, avoid `.toLowerCase().includes()`. Instead, use a precompiled regular expression (`new RegExp(escapeRegExp(q), 'i')`) and `regex.test()`. Combine the filtering, counting, slicing, and mapping logic into a single `for...of` loop to completely eliminate intermediate array allocations.
-
-## 2026-08-27 - [Performance improvement] Optimized O(N) array `.find` with O(log N) binary search
-**Learning:** Checking for the closest preceding parent element by using `Array.prototype.find()` on an array that is already sorted (e.g., `reversedClasses` sorted descending by line number) is an O(N) operation inside another loop, leading to O(N*C) complexity.
-**Action:** When searching for an element based on a comparative condition (e.g. `line < func.line`) within a sorted array, always use a binary search to reduce the time complexity from O(N) to O(log N).
-
-## 2026-08-27 - [Performance improvement] Optimized multiple array allocations by avoiding `.slice().filter().slice()`
-**Learning:** Chaining array methods like `ls.slice().filter().slice()` creates multiple intermediate arrays, causing significant GC overhead, especially when parsing large text blocks (like git commit logs).
-**Action:** When extracting a small subset of elements from a large array based on a condition, avoid chained array methods. Instead, use a single `for` loop, conditionally push elements, and break early when the limit is reached.
-=======
 ## 2024-05-24 - [Performance improvement] Optimized O(N) chained array .filter() operations across multiple metrics
 **Learning:** Chaining array methods (e.g. `.filter(n => n.filePath).length`) and mapping over arrays separately to calculate simple metrics like counts or orphan entities wastes execution time and creates large intermediate array memory allocations.
 **Action:** When computing multiple simple metrics across a graph or dataset (e.g., node typing, relationships, existence of file paths), combine all checks into a single `for...of` loop with simple accumulators (`count++`, `Map.set`) to collapse multiple O(N) array loops into a single O(N) pass.
->>>>>>> 819a139 (refactor: remove noisy bolt comment)
 
 ## 2024-06-03 - [Performance improvement] Optimized O(N) array filtering with string allocations when full traversal is necessary
 **Learning:** Checking for case-insensitive matches using `s.description.toLowerCase().includes(q)` combined with chained `.filter().slice().map()` creates massive garbage collection pressure by constantly allocating new temporary string, arrays, and objects for every element. Even when full array traversal is strictly required, we can still dramatically reduce memory bloat.
