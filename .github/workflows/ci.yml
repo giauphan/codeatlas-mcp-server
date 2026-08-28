@@ -1,0 +1,123 @@
+name: CI
+
+# ──────────────────────────────────────────────────────────
+# ① TRIGGER  —  code push / PR → webhook → schedules build
+# ──────────────────────────────────────────────────────────
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+# ──────────────────────────────────────────────────────────
+# ② + ③ + ④ + ⑤ + ⑥  —  3 jobs run IN PARALLEL after checkout
+# Each job: npm ci → its own step(s)
+# ──────────────────────────────────────────────────────────
+jobs:
+  # ── Lint (type-check only — no build needed) ─────────
+  lint:
+    name: lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          # Keep Node 20 for lint — TypeScript type-checking has no Node version requirement.
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: TypeScript type check
+        run: npm run lint
+
+  # ── Build + package validation ─────────────────────────
+  build:
+    name: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          # Node 22 matches the test job — no harm in keeping build on the same runtime.
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Validate package contents
+        run: npm pack --dry-run
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+          retention-days: 1
+
+  # ── Test + coverage gate ────────────────────────────────
+  test:
+    name: test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          # Module mocking and test glob support require Node.js 22+.
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build (tests run against built dist/)
+        run: npm run build
+
+      - name: Test
+        run: npm test
+
+      - name: Coverage gate (must hit 40% threshold)
+        run: npx c8 --reporter=text --reportDir=coverage --check-coverage --lines=40 npm test
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage/
+          retention-days: 7
+
+  # ── ⑦ PASS/FAIL gate — all 3 must pass ────────────────
+  # This job has no steps; its sole purpose is to enforce
+  # that lint + build + test ALL succeed before the pipeline
+  # reports green. Add manual quality gates here if needed.
+  gate:
+    name: gate
+    runs-on: ubuntu-latest
+    needs: [lint, build, test]
+    # If any of lint/build/test fails, this job fails → CI red
+    steps:
+      - name: All checks passed
+        run: echo "CI passed — lint, build, and test are all green"
