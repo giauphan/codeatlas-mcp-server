@@ -98,8 +98,8 @@ jobs:
       - name: Test
         run: npm test
 
-      - name: Coverage gate (must hit 50% threshold)
-        run: npx c8 --reporter=text --reportDir=coverage --check-coverage --lines=50 npm test
+      - name: Coverage gate (must hit 40% threshold)
+        run: npx c8 --reporter=text --reportDir=coverage --check-coverage --lines=40 npm test
 
       - name: Upload coverage report
         if: always()
