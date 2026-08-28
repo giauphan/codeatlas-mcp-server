@@ -3,7 +3,7 @@ import { z } from "zod";
 import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
-import { getHomePath, getHermesConfigPath, getHermesPluginDir, getClaudeConfigPath } from "../utils/pathUtils.js";
+import { getHomePath, getHermesConfigPath, getHermesPluginDir, getClaudeConfigPath, writeFileSyncNoFollow } from "../utils/pathUtils.js";
 import { jaccardSimilarity } from "../utils/mathUtils.js";
 import { checkAuth, logActivity } from "../services/authService.js";
 import {
@@ -3052,7 +3052,7 @@ def register(ctx):
 
           const outPath = path.join(resolvedArtifactDir, "artifact-summary.json");
           // Prevent symlink following on the output file itself
-          fs.writeFileSync(outPath, JSON.stringify(summary, null, 2), { flag: "w" });
+          writeFileSyncNoFollow(outPath, JSON.stringify(summary, null, 2));
           const size = fs.statSync(outPath).size;
 
           return { content: [{ type: "text" as const, text: JSON.stringify({
@@ -3074,7 +3074,7 @@ def register(ctx):
 
         const outPath = path.join(resolvedArtifactDir, "artifact.json");
         // Prevent symlink following on the output file itself
-        fs.writeFileSync(outPath, JSON.stringify(artifact, null, 2), { flag: "w" });
+        writeFileSyncNoFollow(outPath, JSON.stringify(artifact, null, 2));
         const size = fs.statSync(outPath).size;
 
         // Also update .gitignore to track it
