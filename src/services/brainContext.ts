@@ -1,4 +1,5 @@
-import { queryDreamMemories, DreamMemoryResult } from "./dreamingService.js";
+import { queryDreamMemories, type DreamMemoryResult } from "./dreamingService.js";
+import { getApiUrl } from "../utils/envUtils.js";
 
 const ALLOWED_TYPES = new Set(["MISTAKE", "PREFERENCE", "KNOWLEDGE", "PATTERN", "SESSION_SUMMARY"]);
 
@@ -78,7 +79,7 @@ export async function loadBrainContext(input: BrainContextInput): Promise<BrainC
   const query = input.query.trim() || "session context";
   const project = input.project || process.env.CODEATLAS_PROJECT;
   const limit = Math.min(Math.max(input.limit ?? 5, 1), 10);
-  const serverUrl = (process.env.CODEATLAS_API_URL || "https://your-server.com").replace(/\/+$/, "");
+  const serverUrl = getApiUrl();
   const apiKey = process.env.CODEATLAS_API_KEY;
 
   const dreams = await queryDreamMemories({ query, project, limit }).catch(() => [] as DreamMemoryResult[]);

@@ -22,6 +22,7 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.build.json && node scripts/copy-hooks.js",
+    "verify-build": "node scripts/verify-build.js",
     "start": "node dist/index.js",
     "dev": "tsx index.ts",
     "lint": "tsc --noEmit",

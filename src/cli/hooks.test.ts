@@ -32,7 +32,6 @@ describe("bash hook scripts", () => {
     const file = path.join(HOOKS_DIR, "brain-context.sh");
     const output = execFileSync("bash", [file], {
       encoding: "utf8",
-      input: JSON.stringify({ prompt: "fix parser", cwd: "/tmp/codeatlas" }),
       env: {
         PATH: process.env.PATH ?? "",
         HOME: process.env.HOME ?? "",

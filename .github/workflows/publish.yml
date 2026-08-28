@@ -77,18 +77,8 @@ jobs:
       - name: Validate npm package contents
         run: npm pack --dry-run
 
-      - name: Verify no test files or hardcoded URLs in build output
-        run: |
-          if find dist -name '*.test.js' -o -name '*.spec.js' | grep -q .; then
-            echo "::error::Test files leaked into dist/ — refusing to publish"
-            find dist -name '*.test.js' -o -name '*.spec.js'
-            exit 1
-          fi
-          if grep -rEl 'your-server\.com|localhost:[0-9]{4}' dist --include='*.js' --include='*.sh'; then
-            echo "::error::Hardcoded URL fallback found in dist/ — refusing to publish"
-            exit 1
-          fi
-          echo "  ✓ dist/ is clean (no test files, no hardcoded URLs)"
+      - name: Verify build output
+        run: npm run verify-build
 
       - name: Release and publish
         id: sr
