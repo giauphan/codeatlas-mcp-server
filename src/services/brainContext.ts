@@ -64,12 +64,14 @@ export function formatBrainContext(result: BrainContextResult): string {
   return lines.join("\n");
 }
 
+export interface ApiGene { name?: string; gene_name?: string; description?: string; solution?: string; }
+
 async function fetchJson(url: string, apiKey: string): Promise<any> {
   const resp = await fetch(url, {
     headers: { "x-api-key": apiKey, "User-Agent": "codeatlas-enterprise/2.0" },
   });
   if (!resp.ok) {
-    throw new Error(`${url} failed: ${resp.status} ${await resp.text()}`);
+    throw new Error(`${url} failed: ${resp.status}`);
   }
   return resp.json();
 }

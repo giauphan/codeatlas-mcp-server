@@ -3277,6 +3277,7 @@ def register(ctx):
         const queryText = query || "";
         const limitVal = limit || 20;
         let count = 0;
+        let validSkillsCount = 0;
         const results: any[] = [];
 
         if (!Array.isArray(skills) || skills.length === 0) {
@@ -3295,6 +3296,7 @@ def register(ctx):
 
         for (const s of skills) {
           if (!s?.name || !s?.description) continue;
+          validSkillsCount++;
 
           // Only evaluate regex if one is defined (i.e. query is not empty)
           if (!regex || regex.test(s.name) || regex.test(s.description)) {
@@ -3306,13 +3308,16 @@ def register(ctx):
           // Early exit logic: if there is no query, we just want the first `limit` items.
           // However, we still need `count` to reflect the total number of skills.
           if (!regex && results.length >= limitVal) {
-            count = skills.length; // Ensure total count is correct when breaking early
-            break;
+            // Because there can be malformed entries, early break no longer works for
+            // accurately determining total match counts, we must finish traversal
+            continue;
           }
         }
 
+        if (!regex) count = validSkillsCount;
+
         return { content: [{ type: "text" as const, text: JSON.stringify({
-          query: queryText || "(all)", count, totalSkills: skills.length,
+          query: queryText || "(all)", count, totalSkills: validSkillsCount,
           results,
         }, null, 2) }] };
       }
