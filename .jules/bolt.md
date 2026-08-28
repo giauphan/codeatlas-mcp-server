@@ -69,6 +69,11 @@
 ## 2026-08-19 - [Performance improvement] Optimized O(N) array filtering with string allocations when full traversal is necessary
 **Learning:** In the `manage_skills` query action, checking for case-insensitive matches using `s.description.toLowerCase().includes(q)` combined with chained `.filter().slice().map()` created massive garbage collection pressure by constantly allocating new temporary string, arrays, and objects for every element. Even when full array traversal is strictly required (e.g. to return the total `matchCount`), we can still dramatically reduce memory bloat.
 **Action:** When filtering through large string fields inside an array where full traversal is needed to count matches, avoid `.toLowerCase().includes()`. Instead, use a precompiled regular expression (`new RegExp(escapeRegExp(q), 'i')`) and `regex.test()`. Combine the filtering, counting, slicing, and mapping logic into a single `for...of` loop to completely eliminate intermediate array allocations.
-## 2024-05-15 - Optimizing and refactoring subset filtering in graph traces
-**Learning:** In operations like BFS/DFS traces where a small `visited` set is populated from a massive overall graph (e.g., `nodes.length > 100k`), using `nodes.filter(n => visited.has(n.id))` creates an O(N) bottleneck. Additionally, this filtering logic is often duplicated across different trace implementations.
-**Action:** Created a reusable `getTraceNodes` helper function to replace the O(N) array filter. It iterates over the smaller `visited` set (O(V)) and performs O(1) lookups in a precomputed Map, dropping complexity to O(V). It also includes an optional typed `predicate` (with a default fallback) for additional filtering and a warning log for missing map entries.
+
+## 2026-08-27 - [Performance improvement] Optimized O(N) array `.find` with O(log N) binary search
+**Learning:** Checking for the closest preceding parent element by using `Array.prototype.find()` on an array that is already sorted (e.g., `reversedClasses` sorted descending by line number) is an O(N) operation inside another loop, leading to O(N*C) complexity.
+**Action:** When searching for an element based on a comparative condition (e.g. `line < func.line`) within a sorted array, always use a binary search to reduce the time complexity from O(N) to O(log N).
+
+## 2026-08-27 - [Performance improvement] Optimized multiple array allocations by avoiding `.slice().filter().slice()`
+**Learning:** Chaining array methods like `ls.slice().filter().slice()` creates multiple intermediate arrays, causing significant GC overhead, especially when parsing large text blocks (like git commit logs).
+**Action:** When extracting a small subset of elements from a large array based on a condition, avoid chained array methods. Instead, use a single `for` loop, conditionally push elements, and break early when the limit is reached.

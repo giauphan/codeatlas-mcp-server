@@ -2294,16 +2294,41 @@ export function registerTools(server: McpServer) {
           const [behind, ahead] = execGit(["rev-list", "--left-right", "--count", "HEAD...@{upstream}"]).trim().split("\t").map(Number);
           result.ahead = ahead || 0; result.behind = behind || 0;
         } catch { result.ahead = null; result.behind = null; }
+        // logRaw format per commit: COMMIT\n<hash>\n<author>\n<date>\n<message>\nFILES:\n<file1>\n<file2>...
         const logRaw = execGit(["log", `-${maxC}`, "--format=COMMIT%n%H%n%an%n%ai%n%s%nFILES:", "--name-only"], 1024 * 1024);
         result.recentCommits = [];
         for (const block of logRaw.split("COMMIT\n").filter(Boolean)) {
           const ls = block.trim().split("\n"); if (ls.length < 4) continue;
-          const ci: any = { hash: ls[0]?.substring(0, 12), author: ls[1], date: ls[2], message: ls[3] };
+          const ci: { hash: string; author: string; date: string; message: string; files?: string[] } = {
+            hash: ls[0]?.substring(0, 12) || "",
+            author: ls[1] || "",
+            date: ls[2] || "",
+            message: ls[3] || ""
+          };
           const fi = ls.findIndex((x: string) => x === "FILES:");
-          if (fi !== -1) ci.files = ls.slice(fi + 1).filter((x: string) => x.trim()).slice(0, 15);
+          if (fi !== -1) {
+            ci.files = [];
+            const MAX_FILES = 15;
+            for (let i = fi + 1; i < ls.length; i++) {
+              if (ls[i].trim()) {
+                ci.files.push(ls[i]);
+                if (ci.files.length >= MAX_FILES) break;
+              }
+            }
+          }
           result.recentCommits.push(ci);
         }
-      } catch (err: any) { result.error = err.message?.substring(0, 300); }
+      } catch (err: unknown) {
+        if (err instanceof Error) {
+          result.error = err.message.length > 300 ? `${err.message.substring(0, 300)}... (truncated)` : err.message;
+        } else {
+          try {
+            result.error = `Unknown error occurred: ${JSON.stringify(err)}`;
+          } catch {
+            result.error = "Unknown error occurred and could not be serialized";
+          }
+        }
+      }
 
       return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
     }

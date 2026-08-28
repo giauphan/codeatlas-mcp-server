@@ -5,6 +5,7 @@ import ignore from 'ignore';
 import { GraphData, GraphNode, GraphLink, AnalysisResult, AIInsight, AnalysisManifest, FolderInfo, ChunkData, CrossChunkLinks } from './types.js';
 import { PythonParser } from './pythonParser.js';
 import { PhpParser } from './phpParser.js';
+import { binarySearchClosestPrecedingClass, ClassReference } from '../utils/arrayUtils.js';
 
 export class CodeAnalyzer {
   private workspaceRoot: string;
@@ -702,11 +703,13 @@ export class CodeAnalyzer {
       });
 
       let linkSourceId = moduleId;
-      if (func.indent && func.indent > 0) {
+      if (typeof func.indent === 'number' && func.indent > 0 && Array.isArray(reversedClasses) && reversedClasses.length > 0) {
         // Functions without an explicit parent class are assigned to the closest
-  // preceding class by line number. This handles PHP/Python file-scoped functions.
-        const parentClass = reversedClasses
-          .find(cls => cls.line < func.line);
+        // preceding class by line number. This handles PHP/Python file-scoped functions.
+        const parentClass = binarySearchClosestPrecedingClass(
+          reversedClasses as unknown as ClassReference[],
+          func.line
+        );
         if (parentClass) {
           linkSourceId = `class:${moduleId}:${parentClass.name}`;
         }
@@ -1298,14 +1301,19 @@ export class CodeAnalyzer {
     
     // Mock AI Insights generation based on simple heuristics
     
-    // 1. Large files / God objects
+    // Optimization: Combine multiple O(E) links traversals into a single pass
     const moduleFunctionCounts = new Map<string, number>();
+    const moduleDependencies = new Map<string, number>();
+
     for (const l of graph.links) {
       if (l.type === 'contains' && l.target.startsWith('function')) {
         moduleFunctionCounts.set(l.source, (moduleFunctionCounts.get(l.source) || 0) + 1);
+      } else if (l.type === 'import' && l.source.startsWith('module:') && l.target.startsWith('module:')) {
+        moduleDependencies.set(l.source, (moduleDependencies.get(l.source) || 0) + 1);
       }
     }
 
+    // 1. Large files / God objects
     const affectedModules: string[] = [];
     for (const node of this.nodes.values()) {
       if (node.type === 'module' && (moduleFunctionCounts.get(node.id) || 0) > 10) {
@@ -1325,13 +1333,6 @@ export class CodeAnalyzer {
     }
 
     // 2. High coupling
-    const moduleDependencies = new Map<string, number>();
-    for (const l of graph.links) {
-      if (l.type === 'import' && l.source.startsWith('module:') && l.target.startsWith('module:')) {
-        moduleDependencies.set(l.source, (moduleDependencies.get(l.source) || 0) + 1);
-      }
-    }
-
     const highlyCoupled: string[] = [];
     for (const [id, count] of moduleDependencies.entries()) {
       if (count > 15) highlyCoupled.push(id);
