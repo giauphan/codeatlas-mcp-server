@@ -93,3 +93,150 @@ build/
     assert.strictEqual(hasExternalLink, false, "Should have no links to external libraries");
   });
 });
+
+describe("CodeAnalyzer allFiles Set implementation", () => {
+  it("should accurately maintain totalFilesSkipped and not increment duplicate elements on errors", async () => {
+    const TEST_ERR_DIR = path.resolve("./temp_err_test_2");
+    if (fs.existsSync(TEST_ERR_DIR)) {
+      fs.rmSync(TEST_ERR_DIR, { recursive: true, force: true });
+    }
+    fs.mkdirSync(TEST_ERR_DIR);
+
+    // Simulate initial scan
+    const analyzer = new CodeAnalyzer(TEST_ERR_DIR);
+    await analyzer.analyzeProject();
+
+    // Mock private methods to simulate success/failure for parsing
+    const originalAnalyze = (analyzer as any).analyzeFile;
+
+    // Simulate analyze failure
+    (analyzer as any).analyzeFile = () => false;
+    const fakeFile = path.join(TEST_ERR_DIR, "bad.ts");
+    fs.writeFileSync(fakeFile, "bad content");
+
+    let result = await analyzer.analyzeFileIncremental(fakeFile);
+    assert.strictEqual(result.totalFilesAnalyzed, -1);
+    assert.strictEqual(result.totalFilesSkipped, 1);
+
+    (analyzer as any).analyzeFile = originalAnalyze;
+    fs.rmSync(TEST_ERR_DIR, { recursive: true, force: true });
+  });
+  const INCREMENTAL_TEST_DIR = path.resolve("./temp_incremental_test");
+
+  before(() => {
+    if (fs.existsSync(INCREMENTAL_TEST_DIR)) {
+      fs.rmSync(INCREMENTAL_TEST_DIR, { recursive: true, force: true });
+    }
+    fs.mkdirSync(INCREMENTAL_TEST_DIR);
+    fs.writeFileSync(path.join(INCREMENTAL_TEST_DIR, "a.ts"), "export const a = 1;");
+    fs.writeFileSync(path.join(INCREMENTAL_TEST_DIR, "b.ts"), "import { a } from './a';");
+  });
+
+  after(() => {
+    if (fs.existsSync(INCREMENTAL_TEST_DIR)) {
+      fs.rmSync(INCREMENTAL_TEST_DIR, { recursive: true, force: true });
+    }
+  });
+
+  it("should accurately maintain allFiles Set during initial load", async () => {
+    const analyzer = new CodeAnalyzer(INCREMENTAL_TEST_DIR);
+    const result = await analyzer.analyzeProject();
+    const allFiles = (analyzer as any).allFiles as Set<string>;
+
+    assert.strictEqual(allFiles.size, 2);
+    assert.ok(allFiles.has(path.resolve(INCREMENTAL_TEST_DIR, "a.ts")));
+    assert.ok(allFiles.has(path.resolve(INCREMENTAL_TEST_DIR, "b.ts")));
+    assert.strictEqual(result.totalFilesAnalyzed, 2);
+  });
+
+  it("should accurately maintain allFiles Set when adding a file", async () => {
+    const analyzer = new CodeAnalyzer(INCREMENTAL_TEST_DIR);
+    await analyzer.analyzeProject();
+
+    const newFilePath = path.resolve(INCREMENTAL_TEST_DIR, "c.ts");
+    fs.writeFileSync(newFilePath, "export const c = 3;");
+
+    const result = await analyzer.analyzeFileIncremental(newFilePath);
+    const allFiles = (analyzer as any).allFiles as Set<string>;
+
+    assert.strictEqual(allFiles.size, 3);
+    assert.ok(allFiles.has(newFilePath));
+    assert.strictEqual(result.totalFilesAnalyzed, 3);
+  });
+
+  it("should accurately maintain allFiles Set when deleting a file", async () => {
+    // Setup fresh environment for delete test to ensure no state pollution
+    const TEST_DEL_DIR = path.resolve("./temp_del_test_2");
+    if (fs.existsSync(TEST_DEL_DIR)) {
+      fs.rmSync(TEST_DEL_DIR, { recursive: true, force: true });
+    }
+    fs.mkdirSync(TEST_DEL_DIR);
+    fs.writeFileSync(path.join(TEST_DEL_DIR, "a.ts"), "a");
+    fs.writeFileSync(path.join(TEST_DEL_DIR, "b.ts"), "b");
+
+    const analyzer = new CodeAnalyzer(TEST_DEL_DIR);
+    await analyzer.analyzeProject();
+
+    const deleteFilePath = path.resolve(TEST_DEL_DIR, "b.ts");
+    fs.rmSync(deleteFilePath);
+
+    const result = await analyzer.analyzeFileIncremental(deleteFilePath);
+    const allFiles = (analyzer as any).allFiles as Set<string>;
+
+    assert.strictEqual(allFiles.size, 1);
+    assert.strictEqual(allFiles.has(deleteFilePath), false);
+    assert.strictEqual(result.totalFilesAnalyzed, 1);
+
+    fs.rmSync(TEST_DEL_DIR, { recursive: true, force: true });
+  });
+
+  it("should reliably handle errors during file analysis gracefully", async () => {
+    // Setup fresh environment
+    const TEST_ERR_DIR = path.resolve("./temp_err_test");
+    if (fs.existsSync(TEST_ERR_DIR)) {
+      fs.rmSync(TEST_ERR_DIR, { recursive: true, force: true });
+    }
+    fs.mkdirSync(TEST_ERR_DIR);
+    const errFilePath = path.join(TEST_ERR_DIR, "err.ts");
+    fs.writeFileSync(errFilePath, "export const a = 1;");
+
+    const analyzer = new CodeAnalyzer(TEST_ERR_DIR);
+    await analyzer.analyzeProject();
+
+    // Simulate failure by modifying permissions if possible or mock fs inside to throw, but here we just manually simulate the ENOENT via analyzing non-existent file
+    const missingFilePath = path.join(TEST_ERR_DIR, "missing.ts");
+    const result = await analyzer.analyzeFileIncremental(missingFilePath);
+    const allFiles = (analyzer as any).allFiles as Set<string>;
+
+    assert.strictEqual(allFiles.has(missingFilePath), false);
+    assert.strictEqual(allFiles.size, 1);
+
+    fs.rmSync(TEST_ERR_DIR, { recursive: true, force: true });
+  });
+
+  it("should maintain unique files when re-analyzing an existing file", async () => {
+    // Setup fresh environment
+    const TEST_UNIQ_DIR = path.resolve("./temp_uniq_test_2");
+    if (fs.existsSync(TEST_UNIQ_DIR)) {
+      fs.rmSync(TEST_UNIQ_DIR, { recursive: true, force: true });
+    }
+    fs.mkdirSync(TEST_UNIQ_DIR);
+    fs.writeFileSync(path.join(TEST_UNIQ_DIR, "a.ts"), "a");
+    fs.writeFileSync(path.join(TEST_UNIQ_DIR, "b.ts"), "b");
+
+    const analyzer = new CodeAnalyzer(TEST_UNIQ_DIR);
+    await analyzer.analyzeProject();
+
+    const existingFilePath = path.resolve(TEST_UNIQ_DIR, "a.ts");
+    fs.writeFileSync(existingFilePath, "export const a = 2;");
+
+    const result = await analyzer.analyzeFileIncremental(existingFilePath);
+    const allFiles = (analyzer as any).allFiles as Set<string>;
+
+    assert.strictEqual(allFiles.size, 2);
+    assert.ok(allFiles.has(existingFilePath));
+    assert.strictEqual(result.totalFilesAnalyzed, 2);
+
+    fs.rmSync(TEST_UNIQ_DIR, { recursive: true, force: true });
+  });
+});
