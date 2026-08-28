@@ -141,5 +141,13 @@ jobs:
     needs: [lint, build, test]
     # If any of lint/build/test fails, this job fails → CI red
     steps:
-      - name: All checks passed
-        run: echo "CI passed — lint, build, and test are all green"
+      - name: Check all jobs passed
+        run: |
+          if [ -n "$FAILED" ]; then
+            echo "::error::One or more jobs failed"
+            exit 1
+          else
+            echo "All checks passed — lint, build, and test are green"
+          fi
+        env:
+          FAILED: ${{ fromJSON('{"failed": "true"}') if (always() && needs.lint.result == 'failure') || (always() && needs.build.result == 'failure') || (always() && needs.test.result == 'failure') else '' }}
