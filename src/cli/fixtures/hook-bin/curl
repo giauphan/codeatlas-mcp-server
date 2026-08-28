@@ -1,0 +1,2 @@
+#!/bin/sh
+printf '%s' "$CODEATLAS_TEST_CURL_RESPONSE"
