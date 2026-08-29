@@ -1107,6 +1107,14 @@ export function registerTools(server: McpServer) {
       }
 
       if (seedNodes.size === 0) {
+        const suggestions: string[] = [];
+        for (const n of nodes) {
+          if (n.type === "module" && n.filePath) {
+            suggestions.push(n.label);
+            if (suggestions.length >= 10) break;
+          }
+        }
+
         return {
           content: [
             {
@@ -1115,10 +1123,7 @@ export function registerTools(server: McpServer) {
                 keyword,
                 matchCount: 0,
                 message: `No entities found matching '${keyword}'. Try a broader keyword.`,
-                suggestions: nodes
-                  .filter((n) => n.type === "module" && n.filePath)
-                  .map((n) => n.label)
-                  .slice(0, 10),
+                suggestions,
               }, null, 2),
             },
           ],
@@ -2298,7 +2303,15 @@ export function registerTools(server: McpServer) {
         result.branch = execGit(["rev-parse", "--abbrev-ref", "HEAD"]).trim();
         const st = execGit(["status", "--porcelain"]);
         const mod: string[] = [], add: string[] = [], del: string[] = [];
-        for (const line of st.split("\n").map((x: string) => x.trim()).filter(Boolean)) { const s = line.substring(0, 2), f = line.substring(3); if (s.includes("M")) mod.push(f); if (s.includes("A")) add.push(f); if (s.includes("D")) del.push(f); }
+        const lines = st.split("\n");
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i].trim();
+          if (!line) continue;
+          const s = line.substring(0, 2), f = line.substring(3);
+          if (s.includes("M")) mod.push(f);
+          if (s.includes("A")) add.push(f);
+          if (s.includes("D")) del.push(f);
+        }
         result.uncommitted = { modified: mod.slice(0, 20), added: add.slice(0, 10), deleted: del.slice(0, 10), hasChanges: st.trim().length > 0 };
         try {
           const [behind, ahead] = execGit(["rev-list", "--left-right", "--count", "HEAD...@{upstream}"]).trim().split("\t").map(Number);
