@@ -78,7 +78,11 @@ jobs:
         run: npm pack --dry-run
 
       - name: Verify build output
-        run: npm run verify-build
+        run: |
+          if ! node scripts/verify-build.js; then
+            echo "::error::Build verification failed. Check dist for test files, source maps, or hardcoded URLs."
+            exit 1
+          fi
 
       - name: Release and publish
         id: sr
