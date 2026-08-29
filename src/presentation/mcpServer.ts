@@ -2308,9 +2308,9 @@ export function registerTools(server: McpServer) {
           const line = lines[i].trim();
           if (!line) continue;
           const s = line.substring(0, 2), f = line.substring(3);
-          if (s.includes("M")) mod.push(f);
-          if (s.includes("A")) add.push(f);
-          if (s.includes("D")) del.push(f);
+          if (s[0] === "M" || s[1] === "M") mod.push(f);
+          if (s[0] === "A" || s[1] === "A") add.push(f);
+          if (s[0] === "D" || s[1] === "D") del.push(f);
         }
         result.uncommitted = { modified: mod.slice(0, 20), added: add.slice(0, 10), deleted: del.slice(0, 10), hasChanges: st.trim().length > 0 };
         try {
