@@ -2305,12 +2305,21 @@ export function registerTools(server: McpServer) {
         const mod: string[] = [], add: string[] = [], del: string[] = [];
         const lines = st.split("\n");
         for (let i = 0; i < lines.length; i++) {
-          const line = lines[i].trim();
-          if (!line) continue;
-          const s = line.substring(0, 2), f = line.substring(3);
-          if (s[0] === "M" || s[1] === "M") mod.push(f);
-          if (s[0] === "A" || s[1] === "A") add.push(f);
-          if (s[0] === "D" || s[1] === "D") del.push(f);
+          const line = lines[i]; // do not trim entirely to preserve space padding for porcelain status
+          if (!line.trim()) continue;
+          const s = line.substring(0, 2), f = line.substring(3).trim();
+          // We intentionally allow double-counting mixed statuses (e.g. AM pushed to both add and mod)
+          // to align with the previous s.includes() behavior.
+          // However, we prevent duplicate pushes to the *same* array (e.g. MM).
+          if (s[0] === "M" || s[1] === "M") {
+            mod.push(f);
+          }
+          if (s[0] === "A" || s[1] === "A") {
+            add.push(f);
+          }
+          if (s[0] === "D" || s[1] === "D") {
+            del.push(f);
+          }
         }
         result.uncommitted = { modified: mod.slice(0, 20), added: add.slice(0, 10), deleted: del.slice(0, 10), hasChanges: st.trim().length > 0 };
         try {
