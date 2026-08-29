@@ -78,8 +78,9 @@
 ## 2026-08-27 - [Performance improvement] Optimized multiple array allocations by avoiding `.slice().filter().slice()`
 **Learning:** Chaining array methods like `ls.slice().filter().slice()` creates multiple intermediate arrays, causing significant GC overhead, especially when parsing large text blocks (like git commit logs).
 **Action:** When extracting a small subset of elements from a large array based on a condition, avoid chained array methods. Instead, use a single `for` loop, conditionally push elements, and break early when the limit is reached.
-=======
 ## 2024-05-24 - [Performance improvement] Optimized O(N) chained array .filter() operations across multiple metrics
 **Learning:** Chaining array methods (e.g. `.filter(n => n.filePath).length`) and mapping over arrays separately to calculate simple metrics like counts or orphan entities wastes execution time and creates large intermediate array memory allocations.
 **Action:** When computing multiple simple metrics across a graph or dataset (e.g., node typing, relationships, existence of file paths), combine all checks into a single `for...of` loop with simple accumulators (`count++`, `Map.set`) to collapse multiple O(N) array loops into a single O(N) pass.
->>>>>>> 819a139 (refactor: remove noisy bolt comment)
+## 2026-08-31 - [Performance improvement] Optimized O(N) array filtering and memory allocations when parsing data
+**Learning:** Chaining array methods like `.filter().map().slice()` creates multiple intermediate array and string allocations, increasing Garbage Collection overhead. Specifically, using `.slice().map(l => l.trim()).filter(Boolean)` iteratively on file lines causes massive GC spikes in tools like `code_search`.
+**Action:** When extracting a subset of elements (like code context blocks) or filtering items dynamically, avoid array method chaining. Instead, use a single `for` or `for...of` loop with early breaks, and push matching, pre-processed elements into a single result array to prevent unnecessary allocations.
