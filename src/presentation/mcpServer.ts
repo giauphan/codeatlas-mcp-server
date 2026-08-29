@@ -2305,12 +2305,11 @@ export function registerTools(server: McpServer) {
         const mod: string[] = [], add: string[] = [], del: string[] = [];
         const lines = st.split("\n");
         for (let i = 0; i < lines.length; i++) {
-          const line = lines[i]; // do not trim entirely to preserve space padding for porcelain status
+          const line = lines[i]; // do not trim the full line before reading status columns 0-1
           if (!line.trim()) continue;
           const s = line.substring(0, 2), f = line.substring(3).trim();
           // We intentionally allow double-counting mixed statuses (e.g. AM pushed to both add and mod)
           // to align with the previous s.includes() behavior.
-          // However, we prevent duplicate pushes to the *same* array (e.g. MM).
           if (s[0] === "M" || s[1] === "M") {
             mod.push(f);
           }
