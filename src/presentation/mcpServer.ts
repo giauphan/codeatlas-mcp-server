@@ -3282,7 +3282,7 @@ def register(ctx):
         const q = query || "";
         const maxResults = limit || 20;
         let matchCount = 0;
-        const results = [];
+        const results: Array<{ name: string; description: string; source: string }> = [];
 
         if (q) {
           const searchRegex = new RegExp(escapeRegExp(q), 'i');
