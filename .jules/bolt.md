@@ -84,6 +84,6 @@
 **Action:** When computing multiple simple metrics across a graph or dataset (e.g., node typing, relationships, existence of file paths), combine all checks into a single `for...of` loop with simple accumulators (`count++`, `Map.set`) to collapse multiple O(N) array loops into a single O(N) pass.
 >>>>>>> 819a139 (refactor: remove noisy bolt comment)
 
-## 2026-08-31 - [Performance improvement] Optimized array filtering with string allocations when full traversal is necessary
+## 2024-08-31 - [Performance improvement] Optimized array filtering with string allocations when full traversal is necessary
 **Learning:** In `sync_skills_inventory`, filtering for case-insensitive matches using `s.description.toLowerCase().includes(q)` combined with chained `.filter().slice().map()` created unnecessary garbage collection pressure by repeatedly allocating new temporary strings, arrays, and objects for every element.
 **Action:** When searching large string fields, avoid chained array methods like `.filter().slice().map()` and `.toLowerCase().includes()`. Instead, compile a regular expression (`new RegExp(escapeRegExp(q), 'i')`) outside the loop, use a single `for...of` loop to traverse, test conditions, maintain counters, and early-terminate the result pushing when limits are reached. Ensure any utilities like `escapeRegExp` are actually available before using them to prevent ReferenceErrors.
