@@ -3279,11 +3279,32 @@ def register(ctx):
       }
 
       if (action === "query") {
-        const q = (query || "").toLowerCase();
-        const matches = q ? skills.filter(s => s.name.includes(q) || s.description.toLowerCase().includes(q)) : skills;
+        const q = query || "";
+        const maxResults = limit || 20;
+        let matchCount = 0;
+        const results: Array<{ name: string; description: string; source: string }> = [];
+
+        if (q) {
+          const searchRegex = new RegExp(escapeRegExp(q), 'i');
+          for (const s of skills) {
+            if (searchRegex.test(s.name) || searchRegex.test(s.description)) {
+              matchCount++;
+              if (results.length < maxResults) {
+                results.push({ name: s.name, description: s.description, source: s.source });
+              }
+            }
+          }
+        } else {
+          matchCount = skills.length;
+          for (let i = 0; i < Math.min(skills.length, maxResults); i++) {
+            const s = skills[i];
+            results.push({ name: s.name, description: s.description, source: s.source });
+          }
+        }
+
         return { content: [{ type: "text" as const, text: JSON.stringify({
-          query: q || "(all)", count: matches.length, totalSkills: skills.length,
-          results: matches.slice(0, limit || 20).map(s => ({ name: s.name, description: s.description, source: s.source })),
+          query: q || "(all)", count: matchCount, totalSkills: skills.length,
+          results,
         }, null, 2) }] };
       }
 
