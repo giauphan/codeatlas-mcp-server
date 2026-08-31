@@ -3279,30 +3279,40 @@ def register(ctx):
       }
 
       if (action === "query") {
+        const inputSkills = Array.isArray(skills) ? skills : [];
         const q = (query || "").toLowerCase();
         let count = 0;
-        const results = [];
-        const maxResults = limit || 20;
+        const results: any[] = [];
+        const maxResults = Math.max(0, limit || 20);
+
+        function createResult(skill: any, maxRes: number, resArray: any[]) {
+          if (resArray.length < maxRes) {
+            resArray.push({ name: skill.name, description: skill.description, source: skill.source });
+          }
+        }
+
+        function matchesQuery(skill: any, queryStr: string) {
+          const lowerDescription = skill.description.toLowerCase();
+          return skill.name.includes(queryStr) || lowerDescription.includes(queryStr);
+        }
 
         if (q) {
-          for (const s of skills) {
-            // ⚡ Bolt Optimization: Prevent O(N) chained array methods and intermediate allocations
-            if (s.name.includes(q) || s.description.toLowerCase().includes(q)) {
+          for (const s of inputSkills) {
+            // ⚡ Bolt Optimization: Prevent O(N) intermediate array memory allocations and redundant string preprocessing
+            if (matchesQuery(s, q)) {
               count++;
-              if (results.length < maxResults) {
-                results.push({ name: s.name, description: s.description, source: s.source });
-              }
+              createResult(s, maxResults, results);
             }
           }
         } else {
-          count = skills.length;
+          count = inputSkills.length;
           for (let i = 0; i < Math.min(count, maxResults); i++) {
-            results.push({ name: skills[i].name, description: skills[i].description, source: skills[i].source });
+            createResult(inputSkills[i], maxResults, results);
           }
         }
 
         return { content: [{ type: "text" as const, text: JSON.stringify({
-          query: q || "(all)", count, totalSkills: skills.length,
+          query: q || "(all)", count, totalSkills: inputSkills.length,
           results,
         }, null, 2) }] };
       }
