@@ -3280,7 +3280,7 @@ def register(ctx):
 
       if (action === "query") {
         const inputSkills = Array.isArray(skills) ? skills : [];
-        const q = (query || "").toLowerCase();
+        const q = query || "";
         let count = 0;
         const results: any[] = [];
         const maxResults = Math.max(0, limit || 20);
@@ -3291,15 +3291,16 @@ def register(ctx):
           }
         }
 
-        function matchesQuery(skill: any, queryStr: string) {
-          const lowerDescription = skill.description.toLowerCase();
-          return skill.name.includes(queryStr) || lowerDescription.includes(queryStr);
+        function matchesQuery(skill: any, regex: RegExp) {
+          const description = skill.description ? skill.description : "";
+          return regex.test(skill.name) || regex.test(description);
         }
 
         if (q) {
+          const regex = new RegExp(escapeRegExp(q), 'i');
           for (const s of inputSkills) {
             // ⚡ Bolt Optimization: Prevent O(N) intermediate array memory allocations and redundant string preprocessing
-            if (matchesQuery(s, q)) {
+            if (matchesQuery(s, regex)) {
               count++;
               createResult(s, maxResults, results);
             }
@@ -3314,7 +3315,7 @@ def register(ctx):
         return { content: [{ type: "text" as const, text: JSON.stringify({
           query: q || "(all)", count, totalSkills: inputSkills.length,
           results,
-        }, null, 2) }] };
+        }) }] };
       }
 
       // Default: sync
