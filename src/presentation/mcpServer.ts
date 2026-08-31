@@ -3280,10 +3280,30 @@ def register(ctx):
 
       if (action === "query") {
         const q = (query || "").toLowerCase();
-        const matches = q ? skills.filter(s => s.name.includes(q) || s.description.toLowerCase().includes(q)) : skills;
+        let count = 0;
+        const results = [];
+        const maxResults = limit || 20;
+
+        if (q) {
+          for (const s of skills) {
+            // ⚡ Bolt Optimization: Prevent O(N) chained array methods and intermediate allocations
+            if (s.name.includes(q) || s.description.toLowerCase().includes(q)) {
+              count++;
+              if (results.length < maxResults) {
+                results.push({ name: s.name, description: s.description, source: s.source });
+              }
+            }
+          }
+        } else {
+          count = skills.length;
+          for (let i = 0; i < Math.min(count, maxResults); i++) {
+            results.push({ name: skills[i].name, description: skills[i].description, source: skills[i].source });
+          }
+        }
+
         return { content: [{ type: "text" as const, text: JSON.stringify({
-          query: q || "(all)", count: matches.length, totalSkills: skills.length,
-          results: matches.slice(0, limit || 20).map(s => ({ name: s.name, description: s.description, source: s.source })),
+          query: q || "(all)", count, totalSkills: skills.length,
+          results,
         }, null, 2) }] };
       }
 
