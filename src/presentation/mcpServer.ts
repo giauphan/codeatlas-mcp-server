@@ -3279,12 +3279,43 @@ def register(ctx):
       }
 
       if (action === "query") {
-        const q = (query || "").toLowerCase();
-        const matches = q ? skills.filter(s => s.name.includes(q) || s.description.toLowerCase().includes(q)) : skills;
+        const inputSkills = Array.isArray(skills) ? skills : [];
+        const q = query || "";
+        let count = 0;
+        const results: any[] = [];
+        const maxResults = Math.max(0, limit || 20);
+
+        function createResult(skill: any, maxRes: number, resArray: any[]) {
+          if (resArray.length < maxRes) {
+            resArray.push({ name: skill.name, description: skill.description, source: skill.source });
+          }
+        }
+
+        function matchesQuery(skill: any, regex: RegExp) {
+          const description = skill.description ? skill.description : "";
+          return regex.test(skill.name) || regex.test(description);
+        }
+
+        if (q) {
+          const regex = new RegExp(escapeRegExp(q), 'i');
+          for (const s of inputSkills) {
+            // ⚡ Bolt Optimization: Prevent O(N) intermediate array memory allocations and redundant string preprocessing
+            if (matchesQuery(s, regex)) {
+              count++;
+              createResult(s, maxResults, results);
+            }
+          }
+        } else {
+          count = inputSkills.length;
+          for (let i = 0; i < Math.min(count, maxResults); i++) {
+            createResult(inputSkills[i], maxResults, results);
+          }
+        }
+
         return { content: [{ type: "text" as const, text: JSON.stringify({
-          query: q || "(all)", count: matches.length, totalSkills: skills.length,
-          results: matches.slice(0, limit || 20).map(s => ({ name: s.name, description: s.description, source: s.source })),
-        }, null, 2) }] };
+          query: q || "(all)", count, totalSkills: inputSkills.length,
+          results,
+        }) }] };
       }
 
       // Default: sync
