@@ -13,7 +13,7 @@ import * as os from "os";
 const homeDir = os.homedir();
 const logDir = path.join(homeDir, ".codeatlas");
 const logFilePath = path.join(logDir, "mcp.log");
-const pidFilePath = path.join(logDir, "mcp.pid");
+
 
 try {
   if (!fs.existsSync(logDir)) {
@@ -33,13 +33,8 @@ if (isCLICommand(process.argv)) {
 }
 // ──────────────────────────────────────────────────────────────────────
 
-// ── Single-instance PID guard ──────────────────────────────────────────
-// Prevents duplicate MCP server processes from consuming excessive memory.
-// But allow --version and --help flags to pass through.
-
-// Handle --version before PID guard
+// Handle one-shot commands before starting the stdio MCP server.
 if (process.argv.includes('--version') || process.argv.includes('-v')) {
-  // Try both relative locations (source: index.ts, dist: dist/index.js)
   let version = 'unknown';
   for (const p of ['./package.json', '../package.json']) {
     try {
@@ -52,42 +47,12 @@ if (process.argv.includes('--version') || process.argv.includes('-v')) {
 }
 
 // One-shot dream sync: node index.ts --sync-dreams
-// Reads dream count from cloud API and exits. Designed for cron or AI IDE pre-init hooks.
 if (process.argv.includes('--sync-dreams')) {
   const { syncDreams } = await import("./src/services/dreamingService.js");
   const result = await syncDreams();
   console.log(JSON.stringify(result, null, 2));
   process.exit(result.success ? 0 : 1);
 }
-
-if (!process.argv.includes('--help') && !process.argv.includes('-h')) {
-  try {
-    if (fs.existsSync(pidFilePath)) {
-      const existingPid = parseInt(fs.readFileSync(pidFilePath, "utf-8").trim(), 10);
-      if (!isNaN(existingPid) && existingPid > 0) {
-        try {
-          process.kill(existingPid, 0); // Check if alive
-          // Another instance is already running. Exit immediately to avoid duplicates.
-          // DO NOT kill the old instance — that would break the active MCP connection
-          // and cause Hermes to reconnect in an infinite kill-restart loop.
-          console.error(`[PID-Guard] 🔒 Instance already running (PID: ${existingPid}). New instance exiting.`);
-          process.exit(0);
-        } catch (e: any) {
-          if (e?.code === 'ESRCH') {
-            console.error(`[PID-Guard] 🗑️ Stale PID ${existingPid} — old instance is gone. Starting fresh.`);
-          } else {
-            console.error(`[PID-Guard] ⚠️ Cannot verify PID ${existingPid}. Will overwrite.`);
-          }
-        }
-      }
-    }
-    fs.writeFileSync(pidFilePath, String(process.pid));
-    console.error(`[PID-Guard] 🔒 Lock acquired (PID: ${process.pid})`);
-  } catch (err) {
-    console.error(`[PID-Guard] ⚠️ Could not write PID file — running without guard: ${err}`);
-  }
-}
-// ────────────────────────────────────────────────────────────────────────
 
 // ⚠️ NOTE: API key must be set via CODEATLAS_API_KEY environment variable or .env file.
 // Passing API keys via command-line arguments is NOT supported — they are visible
@@ -276,7 +241,7 @@ async function main() {
 main().catch(console.error);
 
 // ── Graceful shutdown handlers ─────────────────────────────────────────
-// Prevent zombie processes by cleaning up watchers, cache, and PID file.
+// Prevent zombie processes by cleaning up watchers and cache.
 function cleanup(signal: string) {
   console.error(`[Cleanup] 🧹 Received ${signal}. Shutting down...`);
   try {
@@ -284,14 +249,7 @@ function cleanup(signal: string) {
   } catch (e) {
     console.error(`[Cleanup] ⚠️ Watcher cleanup error: ${e}`);
   }
-  try {
-    if (fs.existsSync(pidFilePath)) {
-      fs.unlinkSync(pidFilePath);
-      console.error(`[Cleanup] 🗑️ PID file removed.`);
-    }
-  } catch (e) {
-    console.error(`[Cleanup] ⚠️ PID file cleanup error: ${e}`);
-  }
+
   process.exit(0);
 }
 

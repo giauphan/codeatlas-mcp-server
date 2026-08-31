@@ -27,7 +27,7 @@
     "dev": "tsx index.ts",
     "lint": "tsc --noEmit",
     "coverage": "c8 --reporter=text --reportDir=coverage npm test",
-    "test": "node --experimental-test-module-mocks --import tsx --test \"src/**/*.test.ts\"",
+    "test": "node --experimental-test-module-mocks --import tsx --test \"src/**/*.test.ts\" \"test/**/*.test.ts\"",
     "release": "semantic-release",
     "prepublishOnly": "npm run build"
   },

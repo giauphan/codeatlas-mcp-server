@@ -8,6 +8,7 @@
     ".vscode-test",
     "vite.config.ts",
     "src/test/fixtures",
+    "test",
     "**/*.test.ts",
     "**/*.spec.ts"
   ]

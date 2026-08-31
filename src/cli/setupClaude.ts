@@ -56,6 +56,19 @@ function mergeSettings(existingSettings: any): any {
   // from arbitrary hook stdout, but retain existing router behavior for consumers.
   mergeCommandHook("UserPromptSubmit", taskRouterCmd);
 
+  // Migrate older installs that registered RTK without a Bash matcher.
+  if (Array.isArray(merged.hooks.PreToolUse)) {
+    for (const group of merged.hooks.PreToolUse) {
+      if (Array.isArray(group?.hooks)) {
+        group.hooks = group.hooks.filter((hook: any) =>
+          !(hook?.type === "command" && hook?.command === "rtk hook claude"),
+        );
+      }
+    }
+  }
+  // Let RTK rewrite Bash commands before execution.
+  mergeCommandHook("PreToolUse", "rtk hook claude", "Bash");
+
   // Save outcomes after successful and failed tool calls.
   mergeCommandHook("PostToolUse", brainSaveCmd, "*");
   mergeCommandHook("PostToolUseFailure", brainSaveCmd, "*");

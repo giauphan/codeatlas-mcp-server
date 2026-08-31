@@ -51,6 +51,7 @@ coverage/
 # Docs and tests (npm package doesn't need these)
 docs/
 tests/
+test/
 # (test file exclusion moved above to cover nested paths)
 benchmark*.ts
 scripts/
