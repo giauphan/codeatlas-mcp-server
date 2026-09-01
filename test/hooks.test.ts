@@ -55,6 +55,7 @@ describe("bash hook scripts", () => {
     const output = await runHook(file, JSON.stringify({ cwd: "/workspace/demo-project", project_name: "demo-project" }), {
       PATH: process.env.PATH ?? "",
       CODEATLAS_INJECT_BRAIN_CONTEXT: "1",
+      CODEATLAS_TEST_MODE: "1",
     });
     assert.ok(output.stdout.includes("Parser uses ESTree"));
   });
@@ -125,6 +126,7 @@ describe("bash hook scripts", () => {
         HOME: home,
         CODEATLAS_API_URL: `http://127.0.0.1:${address.port}`,
         CODEATLAS_API_KEY: "integration-test-key",
+        CODEATLAS_TEST_MODE: "1",
       });
       assert.strictEqual(result.stdout.trim(), "");
       assert.ok(requestBody !== null);
@@ -138,37 +140,6 @@ describe("bash hook scripts", () => {
       await new Promise<void>(resolve => server.close(() => resolve()));
       fs.rmSync(home, { recursive: true, force: true });
     }
-  });
-
-  it("task-router.sh - routes task with tool and description", async () => {
-    const file = path.join(HOOKS_DIR, "task-router.sh");
-    const output = await runHook(file, JSON.stringify({
-      tool: "read_file",
-      path: "/workspace/demo-project/src/main.ts",
-      description: "Need to review the main entry point",
-    }), {
-      PATH: process.env.PATH ?? "",
-      CODEATLAS_BASE_DIR: "/workspace",
-    });
-    const result = JSON.parse(output.stdout);
-    assert.strictEqual(result.tool_name, "read_file");
-    assert.deepStrictEqual(result.arguments, { path: "/workspace/demo-project/src/main.ts" });
-    assert.strictEqual(result.description, "Need to review the main entry point");
-  });
-
-  it("task-router.sh - routes task without description", async () => {
-    const file = path.join(HOOKS_DIR, "task-router.sh");
-    const output = await runHook(file, JSON.stringify({
-      tool: "grep",
-      pattern: "TODO",
-    }), {
-      PATH: process.env.PATH ?? "",
-      CODEATLAS_BASE_DIR: "/workspace",
-    });
-    const result = JSON.parse(output.stdout);
-    assert.strictEqual(result.tool_name, "grep");
-    assert.deepStrictEqual(result.arguments, { pattern: "TODO" });
-    assert.strictEqual(result.description, undefined);
   });
 
   it("task-router.sh - routes task with tool and description", async () => {

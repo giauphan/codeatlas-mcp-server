@@ -1,16 +1,73 @@
 #!/bin/bash
 # Hook: route tasks to working models on the 9router proxy.
+# For CLI tool processing, reads stdin JSON and returns structured tool info.
 # Run chmod +x after editing, then restart Claude server.
 #
 # Available concrete models:
 #   ag/claude-sonnet-4-6       <- heavy code tasks, balanced
 #   ag/claude-opus-4-6-thinking <- most capable, most expensive
 #
-# Env vars:
+# Can receive data via stdin (JSON with tool, description) or via env vars:
 #   CLAUDE_TASK_NAME, CLAUDE_TASK_TYPE, CLAUDE_MODEL_NAME, CLAUDE_EFFORT
 #
-# Output: MODEL_NAME=<id> and EFFORT=<low|medium|high|max>
+# Output: For tool processing mode: JSON with tool_name, arguments, description
+#         For task routing mode: MODEL_NAME=<id> and EFFORT=<low|medium|high|max>
 
+HOOK_INPUT="$(cat 2>/dev/null || true)"
+
+# Check if this is a tool processing request (has tool field in input)
+if echo "$HOOK_INPUT" | python3 -c '
+import json, sys
+try:
+    data = json.load(sys.stdin)
+    if "tool" in data or "tool_name" in data:
+        print("true")
+    else:
+        print("false")
+except:
+    print("false")
+' 2>/dev/null | grep -q "true"; then
+
+  # Tool processing mode: parse the input and return structured JSON
+  python3 - "$HOOK_INPUT" <<'PY'
+import json, sys
+
+def main():
+    input_str = sys.argv[1]
+    try:
+        data = json.loads(input_str)
+    except json.JSONDecodeError:
+        data = {}
+    
+    tool = data.get("tool") or data.get("tool_name", "")
+    
+    # Extract arguments (remove tool-specific fields)
+    arguments = {}
+    if "path" in data:
+        arguments["path"] = data["path"]
+    if "pattern" in data:
+        arguments["pattern"] = data["pattern"]
+    if "arguments" in data:
+        arguments.update(data["arguments"])
+    
+    description = data.get("description", "")
+    
+    result = {
+        "tool_name": tool,
+        "arguments": arguments
+    }
+    if description:
+        result["description"] = description
+    
+    print(json.dumps(result))
+
+if __name__ == "__main__":
+    main()
+PY
+  exit 0
+fi
+
+# Task routing mode: use env vars for model routing
 TASK_TYPE="${CLAUDE_TASK_TYPE:-unknown}"
 TASK_NAME="${CLAUDE_TASK_NAME:-unknown}"
 LOWER_TASK_NAME=$(echo "$TASK_NAME" | tr '[:upper:]' '[:lower:]')
@@ -31,7 +88,7 @@ fi
 
 # --- 3. Per-skill routing: parse SKILL.md frontmatter for model preference ---
 if [ "$TASK_TYPE" = "skill_invocation" ]; then
-    SKILL_NAME=$(echo "$LOWER_TASK_NAME" | sed -n 's/^\/skill \([a-zA-Z0-9-]\+\).*/\1/p')
+    SKILL_NAME=$(echo "$LOWER_TASK_NAME" | sed -n 's|^/skill \([a-zA-Z0-9-]\+\).*|\1|p')
     if [ -n "$SKILL_NAME" ]; then
         # Directory traversal guard: only allow alphanumeric, dash, underscore
         if ! echo "$SKILL_NAME" | grep -qE '^[a-zA-Z0-9_-]+$'; then
@@ -57,8 +114,8 @@ if [ "$TASK_TYPE" = "skill_invocation" ]; then
         if [ -f "$SKILL_MD_PATH" ]; then
             PREFERRED_MODEL=$(grep -E "^(model|preferred_model)[[:space:]]*:" "$SKILL_MD_PATH" | head -n 1 | cut -d':' -f2 | tr -d ' ' | tr -d '"')
             if [ -n "$PREFERRED_MODEL" ]; then
-                echo "MODEL_NAME=$PREFERRED_MODEL"
-                echo "EFFORT=medium"
+                echo "MODEL_NAME=${PREFERRED_MODEL}"
+                echo "EFFORT=high"
                 exit 0
             fi
         fi
@@ -67,11 +124,13 @@ fi
 
 # --- 4. Cost-aware routing: Low Complexity / Quick Tasks -> cheap model ---
 if [ "$TASK_TYPE" = "qa_response" ] || [ "$TASK_TYPE" = "documentation" ] || [ "$TASK_TYPE" = "summarize" ] || [ "$TASK_TYPE" = "explain" ] || echo "$LOWER_TASK_NAME" | grep -qF -e "typo" -e "minor change" -e "read" -e "list" -e "simple" -e "what is" -e "how to" -e "find"; then
-    echo "MODEL_NAME=ag/claude-sonnet-4-6"
     echo "EFFORT=low"
-    exit 0
 fi
 
-# --- Default fallback ---
-echo "MODEL_NAME=ag/claude-sonnet-4-6"
-echo "EFFORT=medium"
+# Default fallback
+if [ "$MODEL_NAME" = "" ]; then
+    echo "MODEL_NAME=ag/claude-sonnet-4-6"
+fi
+if [ "$EFFORT" = "" ]; then
+    echo "EFFORT=medium"
+fi
