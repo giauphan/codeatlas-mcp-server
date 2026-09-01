@@ -9,7 +9,8 @@
         "releaseRules": [
           { "breaking": true, "release": "major" },
           { "type": "feat", "release": "minor" },
-          { "release": "patch" }
+          { "type": "fix", "release": "patch" },
+          { "type": "perf", "release": "patch" }
         ]
       }
     ],
