@@ -9,6 +9,11 @@ pnpm-debug.log*
 .env.*
 !.env.example
 .DS_Store
+# Generated test and coverage output
+coverage/
+coverage/tmp/
+.nyc_output/
+
 # Build output
 dist/
 .jules/

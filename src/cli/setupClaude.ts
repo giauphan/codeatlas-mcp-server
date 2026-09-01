@@ -16,20 +16,20 @@ function getHooksDir(): string {
 }
 
 /**
- * Deep merge hooks into existing settings.json
+ * Strict safe deep merge of hooks into existing settings.json
  * Idempotent: won't duplicate exact commands
  */
 function mergeSettings(existingSettings: any): any {
-  const merged = { ...existingSettings };
+  const merged = JSON.parse(JSON.stringify(existingSettings || {}));
   if (!merged.hooks) merged.hooks = {};
   if (!merged.permissions) merged.permissions = {};
   if (!merged.permissions.allow) merged.permissions.allow = [];
   if (!merged.permissions.additionalDirectories) merged.permissions.additionalDirectories = [];
 
-  const home = os.homedir();
-  const brainContextCmd = `${home}/.claude/hooks/brain-context.sh`;
-  const taskRouterCmd = `${home}/.claude/hooks/task-router.sh`;
-  const brainSaveCmd = `${home}/.claude/hooks/brain-save.sh`;
+  // Use native codeatlas CLI commands instead of bash scripts
+  const brainContextCmd = "codeatlas brain-context";
+  const taskRouterCmd = "codeatlas task-router";
+  const brainSaveCmd = "codeatlas brain-save";
 
   function mergeCommandHook(event: string, command: string, matcher?: string): void {
     if (!Array.isArray(merged.hooks[event])) merged.hooks[event] = [];
@@ -56,19 +56,6 @@ function mergeSettings(existingSettings: any): any {
   // from arbitrary hook stdout, but retain existing router behavior for consumers.
   mergeCommandHook("UserPromptSubmit", taskRouterCmd);
 
-  // Migrate older installs that registered RTK without a Bash matcher.
-  if (Array.isArray(merged.hooks.PreToolUse)) {
-    for (const group of merged.hooks.PreToolUse) {
-      if (Array.isArray(group?.hooks)) {
-        group.hooks = group.hooks.filter((hook: any) =>
-          !(hook?.type === "command" && hook?.command === "rtk hook claude"),
-        );
-      }
-    }
-  }
-  // Let RTK rewrite Bash commands before execution.
-  mergeCommandHook("PreToolUse", "rtk hook claude", "Bash");
-
   // Save outcomes after successful and failed tool calls.
   mergeCommandHook("PostToolUse", brainSaveCmd, "*");
   mergeCommandHook("PostToolUseFailure", brainSaveCmd, "*");
@@ -88,64 +75,50 @@ export async function cmdSetupClaude(projectDir: string = process.cwd()): Promis
   console.log(`\n${bold("CodeAtlas Claude Integration Setup")}`);
   console.log("=".repeat(50));
 
-  // 1. Copy hooks
-  console.log(`\n${bold("1. Installing Claude Hooks")}`);
-  const hooksDir = getHooksDir();
-  if (!fs.existsSync(hooksDir)) {
-    fs.mkdirSync(hooksDir, { recursive: true });
-  }
-
-  // Try to find the hooks package dir (works in dev and prod/dist)
-  let packageHooksDir = path.join(path.dirname(fileURLToPath(import.meta.url)), "hooks");
-  if (!fs.existsSync(packageHooksDir)) {
-    // Fallback for some TS-node environments where __dirname points differently
-    packageHooksDir = path.join(process.cwd(), 'src', 'cli', 'hooks');
-  }
-
-  const hooks = ['brain-context.sh', 'brain-save.sh', 'task-router.sh'];
-  let hooksCopied = 0;
-
-  for (const hook of hooks) {
-    const src = path.join(packageHooksDir, hook);
-    const dst = path.join(hooksDir, hook);
-    try {
-      if (fs.existsSync(src)) {
-        fs.copyFileSync(src, dst);
-        fs.chmodSync(dst, 0o755); // make executable
-        hooksCopied++;
-      } else {
-        console.log(`  ${warn()} Hook source not found: ${src}`);
-      }
-    } catch (e: any) {
-      console.log(`  ${fail()} Failed to install ${hook}: ${e.message}`);
-    }
-  }
-
-  if (hooksCopied === hooks.length) {
-    console.log(`  ${ok()} Installed ${hooksCopied} hooks in ${hooksDir}`);
-  } else if (hooksCopied > 0) {
-    console.log(`  ${warn()} Installed ${hooksCopied}/${hooks.length} hooks`);
+  // 1. Verify codeatlas CLI is available
+  console.log(`\n${bold("1. Verifying CodeAtlas CLI")}`);
+  try {
+    const { execSync } = await import("child_process");
+    const version = execSync("codeatlas-enterprise --version", { encoding: "utf-8", timeout: 5000 }).trim();
+    console.log(`  ${ok()} CodeAtlas CLI version: ${version}`);
+  } catch (e: any) {
+    console.log(`  ${warn()} CodeAtlas CLI not found globally. Using npx/local path.`);
   }
 
   // 2. Update ~/.claude/settings.json
   console.log(`\n${bold("2. Updating ~/.claude/settings.json")}`);
   const settingsPath = getSettingsPath();
+
+  let existingSettings: any = {};
   if (fs.existsSync(settingsPath)) {
     try {
-      const raw = fs.readFileSync(settingsPath, 'utf8');
-      const settings = JSON.parse(raw);
-      const merged = mergeSettings(settings);
-      fs.writeFileSync(settingsPath, JSON.stringify(merged, null, 2), 'utf8');
-      console.log(`  ${ok()} Hooks registered in settings.json`);
+      const content = fs.readFileSync(settingsPath, "utf-8");
+      existingSettings = JSON.parse(content || "{}");
     } catch (e: any) {
-      console.log(`  ${fail()} Failed to update settings.json: ${e.message}`);
+      console.log(`  ${warn()} Could not parse existing settings.json: ${e.message}`);
+      console.log(`  ${warn()} Creating backup and merging default settings.`);
+      // Create backup
+      fs.writeFileSync(`${settingsPath}.bak-${Date.now()}`, fs.readFileSync(settingsPath, "utf-8"));
+      existingSettings = {};
     }
   } else {
-    console.log(`  ${warn()} ${settingsPath} not found. Start Claude Code first.`);
+    console.log(`  ${warn()} ${settingsPath} not found — will create it.`);
   }
 
-  // 3. Generate CLAUDE.md
-  console.log(`\n${bold("3. Generating CLAUDE.md")}`);
+  try {
+    const merged = mergeSettings(existingSettings);
+    fs.writeFileSync(settingsPath, JSON.stringify(merged, null, 2), "utf-8");
+    console.log(`  ${ok()} Updated hooks in ${settingsPath}`);
+    console.log(`  • UserPromptSubmit: codeatlas brain-context + task-router`);
+    console.log(`  • PostToolUse: codeatlas brain-save (all tools)`);
+    console.log(`  • PostToolUseFailure: codeatlas brain-save (all tools)`);
+  } catch (e: any) {
+    console.log(`  ${fail()} Failed to update settings.json: ${e.message}`);
+    process.exit(1);
+  }
+
+  // 3. Generate CLAUDE.md with project rules
+  console.log(`\n${bold("3. Ensuring CLAUDE.md project rules")}`);
   try {
     // Dynamic import to avoid circular dependencies
     const { generateMemory } = await import("../memoryGenerator.js");
@@ -187,15 +160,14 @@ export async function cmdSetupZed(): Promise<void> {
   const env: Record<string, string> = {};
   if (process.env.CODEATLAS_API_KEY) env.CODEATLAS_API_KEY = process.env.CODEATLAS_API_KEY;
   if (process.env.CODEATLAS_API_URL) env.CODEATLAS_API_URL = process.env.CODEATLAS_API_URL;
-  ctxServers.codeatlas = {
+  ctxServers["codeatlas-mcp-server"] = {
     command: "npx",
     args: ["-y", "codeatlas-mcp-server"],
     env,
   };
 
-  fs.mkdirSync(getZedConfigDir(), { recursive: true });
-  fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2));
-  console.log(`  ${ok()} Registered 'codeatlas' context server in ${settingsPath}`);
+  fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2), "utf-8");
+  console.log(`  ${ok()} Registered context server in ${settingsPath}`);
 
   console.log("=".repeat(50));
   console.log(`\n${bold("Zed integration setup complete!")}`);

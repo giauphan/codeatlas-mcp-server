@@ -10,8 +10,8 @@
 import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
-import { getHermesConfigPath, getHermesPluginDir, getZedSettingsPath } from "../utils/pathUtils.js";
 import * as readline from "readline";
+import { getHermesConfigPath, getHermesPluginDir, getZedSettingsPath } from "../utils/pathUtils.js";
 
 export const API_URL = process.env.CODEATLAS_API_URL ?? "";
 
@@ -188,14 +188,16 @@ export async function cmdDoctor(): Promise<void> {
   console.log("=".repeat(50));
 }
 
-/* ── Main CLI router ────────────────────────────────────────────── */
-
+// ──────────────────────────────────────────────────────────────────────
+// ── Main CLI router ──────────────────────────────────────────────
+// ──────────────────────────────────────────────────────────────────────
+  
 export function isCLICommand(argv: string[]): boolean {
   const cmd = argv[2];
   if (!cmd) return false;
   return ["init", "setup", "doctor", "--help", "-h"].includes(cmd);
 }
-
+  
 export async function runCLI(): Promise<void> {
   const cmd = process.argv[2];
   if (cmd === "doctor") {
@@ -208,7 +210,6 @@ export async function runCLI(): Promise<void> {
         console.error("Error: --projectDir= value is required");
         process.exit(1);
       }
-      // No need to warn on multiple --projectDir= — find() returns the first match
       const value = projectDirArg.slice(prefix.length).trim();
       if (!value) {
         console.error("Error: --projectDir= value cannot be empty or whitespace-only");
@@ -228,11 +229,162 @@ Commands:
   init           Interactive Second Brain setup wizard
   setup          Same as init
   setup claude   Install Claude hooks and configs
-  setup zed      Register CodeAtlas as a Zed MCP context server
+  setup zed      Register CodeAtlas as a Zed MCP context
   doctor         Health check & diagnostics
+  brain-context  Load Second Brain context for current task
+  brain-save     Save dream memory to Second Brain
+  task-router    Route task to appropriate model
 
 Without a command, runs the MCP server.
 `);
+  }
+}
+
+/* ── Brain Context & Save Commands ───────────────────────────────── */
+
+export async function cmdBrainContext(): Promise<void> {
+  const input = await readStdin();
+  let payload: any = {};
+  
+  if (input) {
+    try {
+      payload = JSON.parse(input);
+    } catch {
+      // Invalid JSON, use defaults
+    }
+  }
+
+  const prompt = payload.prompt || payload.query || "session context";
+  const cwd = payload.cwd || process.env.CLAUDE_PROJECT_DIR || process.cwd();
+  const project = process.env.CODEATLAS_PROJECT || (cwd ? path.basename(cwd) : "default");
+  const limit = payload.limit || 5;
+
+  if (!process.env.CODEATLAS_API_URL || !process.env.CODEATLAS_API_KEY) {
+    // Silently exit if not configured
+    process.exit(0);
+  }
+
+  try {
+    const { loadBrainContext, formatBrainContext } = await import("../services/brainContext.js");
+    const result = await loadBrainContext({ query: prompt, project, limit });
+    console.log(formatBrainContext(result));
+  } catch (err) {
+    // Fail silently - hooks should not break Claude
+    console.error("Brain context error:", err instanceof Error ? err.message : String(err));
+    process.exit(0);
+  }
+}
+
+export async function cmdBrainSave(): Promise<void> {
+  const input = await readStdin();
+  let payload: any = {};
+  
+  if (input) {
+    try {
+      payload = JSON.parse(input);
+    } catch {
+      // Invalid JSON, exit silently
+      process.exit(0);
+    }
+  }
+
+  if (!process.env.CODEATLAS_API_URL || !process.env.CODEATLAS_API_KEY) {
+    // Silently exit if not configured
+    process.exit(0);
+  }
+
+  const cwd = payload.cwd || process.env.CLAUDE_PROJECT_DIR || process.cwd();
+  const project = process.env.CODEATLAS_PROJECT || (cwd ? path.basename(cwd) : "default");
+  const toolName = payload.tool_name || "unknown";
+  const sessionId = payload.session_id || payload.sessionId || "";
+
+  // Extract content from tool response
+  let content = "";
+  let memoryType: "KNOWLEDGE" | "MISTAKE" | "PREFERENCE" | "PATTERN" | "SESSION_SUMMARY" = "KNOWLEDGE";
+  
+  if (payload.response) {
+    const response = typeof payload.response === "string" ? payload.response : JSON.stringify(payload.response);
+    content = response.slice(0, 1000);
+    
+    // Detect mistakes from errors
+    if (payload.error || response.toLowerCase().includes("error") || response.toLowerCase().includes("failed")) {
+      memoryType = "MISTAKE";
+    }
+  }
+
+  if (!content) {
+    // Nothing to save
+    process.exit(0);
+  }
+
+  try {
+    const { saveDreamMemory } = await import("../services/dreamingService.js");
+    await saveDreamMemory({
+      memory_type: memoryType,
+      content: `[${toolName}] ${content}`,
+      importance: 5,
+      session_id: sessionId,
+      project,
+    });
+  } catch {
+    // Fail silently - hooks should not break Claude
+    process.exit(0);
+  }
+}
+
+function readStdin(): Promise<string> {
+  return new Promise((resolve) => {
+    let data = "";
+    process.stdin.setEncoding("utf8");
+    const chunks: string[] = [];
+
+    process.stdin.on("data", (chunk) => {
+      chunks.push(chunk);
+    });
+
+    process.stdin.on("end", () => {
+      data = chunks.join("");
+      resolve(data);
+    });
+
+    // Handle cases where stdin might close immediately
+    if (process.stdin.isTTY) {
+      setTimeout(() => resolve(data), 500);
+    } else {
+      // For pipes, we'll wait until the stream ends
+      const timeout = setTimeout(() => {
+        process.stdin.destroy();
+        resolve(chunks.join(""));
+      }, 2000);
+      process.stdin.once("end", () => clearTimeout(timeout));
+    }
+  });
+}
+
+export async function cmdTaskRouter(): Promise<void> {
+  const input = await readStdin();
+  let payload: any = {};
+
+  if (input) {
+    try {
+      payload = JSON.parse(input);
+    } catch {
+      // Invalid JSON, use defaults
+    }
+  }
+
+  const taskName = payload.task_name || payload.taskName || payload.prompt || "unknown";
+  const taskType = payload.task_type || payload.taskType || "unknown";
+
+  try {
+    const { routeTask } = await import("./taskRouter.js");
+    const route = routeTask(taskName, taskType);
+    console.log(`MODEL_NAME=${route.model}`);
+    console.log(`EFFORT=${route.effort}`);
+  } catch (err) {
+    // Fail silently - hooks should not break Claude
+    console.error("Task router error:", err instanceof Error ? err.message : String(err));
+    process.exit(0);
   }
 }
 
