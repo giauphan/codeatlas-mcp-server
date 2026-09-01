@@ -336,7 +336,7 @@ function readStdin(): Promise<string> {
   return new Promise((resolve) => {
     let data = "";
     process.stdin.setEncoding("utf8");
-    const chunks: string[] = [];
+    const chunks: (string | Buffer)[] = [];
 
     process.stdin.on("data", (chunk) => {
       chunks.push(chunk);

@@ -39,30 +39,28 @@ describe("bash hook scripts", () => {
 
   it("brain-context.sh emits nothing unless CODEATLAS_INJECT_BRAIN_CONTEXT=1", () => {
     const file = path.join(HOOKS_DIR, "brain-context.sh");
-    const output = execFileSync("bash", [file], {
-      encoding: "utf8",
-      env: { PATH: process.env.PATH ?? "", HOME: process.env.HOME ?? "", CODEATLAS_API_KEY: "test-key" },
+    const output = await runHook(file, "", {
+      PATH: process.env.PATH ?? "",
+      HOME: process.env.HOME ?? "",
+      CODEATLAS_API_KEY: "test-key"
     });
-    assert.strictEqual(output, "");
+    assert.strictEqual(output.stdout.trim(), "");
   });
 
-  it("brain-context.sh emits nothing unless CODEATLAS_API_URL is set", () => {
+  it("brain-context.sh emits nothing unless CODEATLAS_API_URL is set", async () => {
     const file = path.join(HOOKS_DIR, "brain-context.sh");
-    const output = execFileSync("bash", [file], {
-      encoding: "utf8",
-      env: {
-        PATH: process.env.PATH ?? "",
-        HOME: process.env.HOME ?? "",
-        CODEATLAS_API_KEY: "test-key",
-        CODEATLAS_INJECT_BRAIN_CONTEXT: "1",
-      },
+    const output = await runHook(file, "", {
+      PATH: process.env.PATH ?? "",
+      HOME: process.env.HOME ?? "",
+      CODEATLAS_API_KEY: "test-key",
+      CODEATLAS_INJECT_BRAIN_CONTEXT: "1"
     });
-    assert.strictEqual(output, "");
+    assert.strictEqual(output.stdout.trim(), "");
   });
 
-  it("brain-context.sh drops unrecognized memory types when enabled", () => {
+  it("brain-context.sh drops unrecognized memory types when enabled", async () => {
     const file = path.join(HOOKS_DIR, "brain-context.sh");
-    const curlDir = path.resolve(__dirname, "fixtures/hook-bin");
+    const curlDir = path.resolve(__dirname, "fixtures", "hook-bin");
     const response = JSON.stringify({
       memories: [
         { memory_type: "KNOWLEDGE", content: "Parser uses ESTree." },
@@ -70,19 +68,14 @@ describe("bash hook scripts", () => {
         { memory_type: "WEATHER", content: "Sunny tomorrow." },
       ],
     });
-    const result = spawnSync("bash", [file], {
-      encoding: "utf8",
-      input: JSON.stringify({ prompt: "fix parser", cwd: "/tmp/codeatlas" }),
-      env: {
-        PATH: `${curlDir}:${process.env.PATH ?? ""}`,
-        HOME: process.env.HOME ?? "",
-        CODEATLAS_API_URL: "http://127.0.0.1:9",
-        CODEATLAS_API_KEY: "test-key",
-        CODEATLAS_INJECT_BRAIN_CONTEXT: "1",
-        CODEATLAS_TEST_CURL_RESPONSE: response,
-      },
+    const result = await runHook(file, JSON.stringify({ prompt: "fix parser", cwd: "/tmp/codeatlas" }), {
+      PATH: `${curlDir}:${process.env.PATH ?? ""}`,
+      HOME: process.env.HOME ?? "",
+      CODEATLAS_API_URL: "http://127.0.0.1:9",
+      CODEATLAS_API_KEY: "test-key",
+      CODEATLAS_INJECT_BRAIN_CONTEXT: "1",
+      CODEATLAS_TEST_CURL_RESPONSE: response,
     });
-    assert.strictEqual(result.status, 0, result.stderr);
     assert.match(result.stdout, /Parser uses ESTree/);
     assert.doesNotMatch(result.stdout, /Buy milk|Sunny tomorrow/);
   });
