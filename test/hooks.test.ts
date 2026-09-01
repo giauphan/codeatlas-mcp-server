@@ -37,7 +37,7 @@ describe("bash hook scripts", () => {
     });
   }
 
-  it("brain-context.sh emits nothing unless CODEATLAS_INJECT_BRAIN_CONTEXT=1", () => {
+  it("brain-context.sh emits nothing unless CODEATLAS_INJECT_BRAIN_CONTEXT=1", async () => {
     const file = path.join(HOOKS_DIR, "brain-context.sh");
     const output = await runHook(file, "", {
       PATH: process.env.PATH ?? "",

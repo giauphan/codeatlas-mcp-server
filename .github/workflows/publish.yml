@@ -90,20 +90,18 @@ jobs:
           # A successful semantic-release command does not necessarily mean that
           # a release was made. For example, docs-only or non-conventional commits
           # produce no npm package and no git tag.
-          BEFORE_TAGS=$(git tag --list 'v*' | sort)
+          BEFORE_VERSION=$(node -p "require('./package.json').version")
           npm run release
-          AFTER_TAGS=$(git tag --list 'v*' | sort)
-          VERSION=$(comm -13 <(printf '%s\n' "$BEFORE_TAGS") <(printf '%s\n' "$AFTER_TAGS") \
-            | sed -n 's/^v//p' | sort -V | tail -n 1)
+          AFTER_VERSION=$(node -p "require('./package.json').version")
 
-          if [ -z "$VERSION" ]; then
+          if [ "$BEFORE_VERSION" = "$AFTER_VERSION" ]; then
             echo "No release created; no Conventional Commit requires a version bump."
             exit 0
           fi
 
-          echo "Released version: $VERSION"
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-          echo "Latest dist-tag set to $VERSION"
+          echo "Released version: $AFTER_VERSION"
+          echo "version=$AFTER_VERSION" >> "$GITHUB_OUTPUT"
+          echo "Latest dist-tag set to $AFTER_VERSION"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
