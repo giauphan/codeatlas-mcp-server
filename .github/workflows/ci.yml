@@ -41,7 +41,7 @@ jobs:
         run: npm ci
 
       - name: TypeScript type check
-        run: npm run lint -- --noEmit
+        run: npm run lint
 
   # ── Build + package validation ─────────────────────────
   build:

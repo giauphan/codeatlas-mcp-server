@@ -275,35 +275,6 @@ export async function cmdBrainContext(): Promise<void> {
     process.exit(0);
   }
 }
-  
-  if (input) {
-    try {
-      payload = JSON.parse(input);
-    } catch {
-      // Invalid JSON, use defaults
-    }
-  }
-
-  const prompt = payload.prompt || payload.query || "session context";
-  const cwd = payload.cwd || process.env.CLAUDE_PROJECT_DIR || process.cwd();
-  const project = process.env.CODEATLAS_PROJECT || (cwd ? path.basename(cwd) : "default");
-  const limit = payload.limit || 5;
-
-  if (!process.env.CODEATLAS_API_URL || !process.env.CODEATLAS_API_KEY) {
-    // Silently exit if not configured
-    process.exit(0);
-  }
-
-  try {
-    const { loadBrainContext, formatBrainContext } = await import("../services/brainContext.js");
-    const result = await loadBrainContext({ query: prompt, project, limit });
-    console.log(formatBrainContext(result));
-  } catch (err) {
-    // Fail silently - hooks should not break Claude
-    console.error("Brain context error:", err instanceof Error ? err.message : String(err));
-    process.exit(0);
-  }
-}
 
 export async function cmdBrainSave(): Promise<void> {
   const input = await readStdin();

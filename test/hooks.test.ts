@@ -23,7 +23,10 @@ function runHook(file: string, input: string, env: NodeJS.ProcessEnv): Promise<{
       if (code === 0) resolve({ stdout, stderr });
       else reject(new Error(`hook exited ${code}: ${stderr}`));
     });
-    child.stdin.end(input);
+    if (input) {
+      child.stdin.write(input);
+    }
+    child.stdin.end();
   });
 }
 
@@ -166,42 +169,6 @@ describe("bash hook scripts", () => {
     assert.strictEqual(result.tool_name, "grep");
     assert.deepStrictEqual(result.arguments, { pattern: "TODO" });
     assert.strictEqual(result.description, undefined);
-  });
-});
-
-    let requestBody: any = null;
-    const server = http.createServer((request, response) => {
-      let body = "";
-      request.on("data", chunk => { body += chunk; });
-      request.on("end", () => {
-        requestBody = JSON.parse(body);
-        response.writeHead(200);
-        response.end(JSON.stringify({ success: true, dreamsExtracted: 1 }));
-      });
-    });
-    await new Promise<void>(resolve => server.listen(0, "127.0.0.1", resolve));
-    const address = server.address();
-    assert.ok(address && typeof address !== "string");
-
-    try {
-      const result = await runHook(file, JSON.stringify({ cwd: project, session_id: sessionId, tool_name: "Edit" }), {
-        PATH: process.env.PATH ?? "",
-        HOME: home,
-        CODEATLAS_API_URL: `http://127.0.0.1:${address.port}`,
-        CODEATLAS_API_KEY: "integration-test-key",
-      });
-      assert.strictEqual(result.stdout.trim(), "");
-      assert.ok(requestBody !== null);
-      assert.strictEqual(requestBody.dream.prompt, "Please remember this important project decision for future work.");
-      assert.strictEqual(requestBody.dream.response, "I will record this project decision in CodeAtlas memory.");
-      assert.strictEqual(requestBody.model, "test-model");
-      assert.ok(requestBody.meta?.cwd?.endsWith("-workspace-demo-project"));
-      assert.strictEqual(requestBody.meta?.sessionId, sessionId);
-      assert.strictEqual(requestBody.meta?.toolName, "Edit");
-    } finally {
-      await new Promise<void>(resolve => server.close(() => resolve()));
-      fs.rmSync(home, { recursive: true, force: true });
-    }
   });
 
   it("task-router.sh - routes task with tool and description", async () => {
