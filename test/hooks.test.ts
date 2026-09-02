@@ -24,7 +24,7 @@ function runHook(file: string, input: string, env: NodeJS.ProcessEnv): Promise<{
       else reject(new Error(`hook exited ${code}: ${stderr}`));
     });
     if (input) {
-      child.stdin.write(input);
+      child.stdin.write(input, (err) => { if (err) { /* ignore EPIPE */ } });
     }
     child.stdin.end();
   });
