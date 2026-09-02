@@ -3284,29 +3284,18 @@ def register(ctx):
         const results: Array<{ name: string; description: string; source: string }> = [];
         const maxLimit = limit || 20;
 
-        if (q) {
-          const searchRegex = new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
-          for (const s of skills) {
-            if (searchRegex.test(s.name) || searchRegex.test(s.description)) {
-              matchCount++;
-              if (results.length < maxLimit) {
-                results.push({ name: s.name, description: s.description, source: s.source });
-              }
-            }
-          }
-        } else {
-          matchCount = skills.length;
-          for (const s of skills) {
+        const searchRegex = q ? new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i') : null;
+        for (const s of skills) {
+          if (!searchRegex || searchRegex.test(s.name) || searchRegex.test(s.description)) {
+            matchCount++;
             if (results.length < maxLimit) {
               results.push({ name: s.name, description: s.description, source: s.source });
-            } else {
-              break;
             }
           }
         }
 
         return { content: [{ type: "text" as const, text: JSON.stringify({
-          query: q || "(all)", count: matchCount, totalSkills: skills.length,
+          query: (query || "").toLowerCase() || "(all)", count: matchCount, totalSkills: skills.length,
           results,
         }, null, 2) }] };
       }
