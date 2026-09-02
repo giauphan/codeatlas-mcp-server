@@ -19,6 +19,12 @@ function runHook(file: string, input: string, env: NodeJS.ProcessEnv): Promise<{
     child.stdout.on("data", chunk => { stdout += chunk; });
     child.stderr.on("data", chunk => { stderr += chunk; });
     child.on("error", reject);
+    child.stdin.on("error", err => {
+      // Ignore EPIPE errors which happen if the script exits before reading all input
+      if ((err as NodeJS.ErrnoException).code !== 'EPIPE') {
+        reject(err);
+      }
+    });
     child.on("close", code => {
       if (code === 0) resolve({ stdout, stderr });
       else reject(new Error(`hook exited ${code}: ${stderr}`));
