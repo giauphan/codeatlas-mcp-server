@@ -83,3 +83,7 @@
 **Learning:** Chaining array methods (e.g. `.filter(n => n.filePath).length`) and mapping over arrays separately to calculate simple metrics like counts or orphan entities wastes execution time and creates large intermediate array memory allocations.
 **Action:** When computing multiple simple metrics across a graph or dataset (e.g., node typing, relationships, existence of file paths), combine all checks into a single `for...of` loop with simple accumulators (`count++`, `Map.set`) to collapse multiple O(N) array loops into a single O(N) pass.
 >>>>>>> 819a139 (refactor: remove noisy bolt comment)
+
+## 2026-09-02 - [Performance improvement] Optimized O(N) array filtering when search limit is reached
+**Learning:** In the `manage_skills` query action, the search loop continued to iterate through all skills even after `results.length` had reached `maxLimit` simply to calculate an accurate `matchCount`. When dealing with thousands of elements and small limits, this wastes CPU cycles on full dataset traversal.
+**Action:** When searching and collecting results from a large array where only a subset (`limit`) is needed, check `results.length >= maxLimit` inside the loop and `break` early. If counting total matches across the dataset is not strictly necessary for correct functionality, prefer skipping the remaining iterations to achieve O(limit) time instead of O(N).
