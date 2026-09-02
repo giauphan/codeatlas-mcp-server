@@ -3281,13 +3281,13 @@ def register(ctx):
       if (action === "query") {
         const q = (query || "").toLowerCase();
         let matchCount = 0;
-        const results = [];
+        const results: Array<{ name: string; description: string; source: string }> = [];
         const maxLimit = limit || 20;
 
         if (q) {
           const searchRegex = new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
           for (const s of skills) {
-            if (s.name.includes(q) || searchRegex.test(s.description)) {
+            if (searchRegex.test(s.name) || searchRegex.test(s.description)) {
               matchCount++;
               if (results.length < maxLimit) {
                 results.push({ name: s.name, description: s.description, source: s.source });
