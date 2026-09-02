@@ -3280,10 +3280,37 @@ def register(ctx):
 
       if (action === "query") {
         const q = (query || "").toLowerCase();
-        const matches = q ? skills.filter(s => s.name.includes(q) || s.description.toLowerCase().includes(q)) : skills;
+        let matchCount = 0;
+        const results = [];
+        const limitCount = limit || 20;
+
+        if (q) {
+          const escapeRegExp = (str: string) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          const regex = new RegExp(escapeRegExp(q), 'i');
+          for (const s of skills) {
+            if (s.name.toLowerCase().includes(q) || regex.test(s.description)) {
+              matchCount++;
+              if (results.length < limitCount) {
+                results.push({ name: s.name, description: s.description, source: s.source });
+              }
+            }
+          }
+        } else {
+          matchCount = skills.length;
+          for (const s of skills) {
+            if (results.length < limitCount) {
+              results.push({ name: s.name, description: s.description, source: s.source });
+            } else {
+              break;
+            }
+          }
+        }
+
+        // ⚡ Bolt: Replaced chained array methods and intermediate string allocations in skills query
+        // with a single loop and precompiled Regex to significantly reduce GC overhead on large inventories.
         return { content: [{ type: "text" as const, text: JSON.stringify({
-          query: q || "(all)", count: matches.length, totalSkills: skills.length,
-          results: matches.slice(0, limit || 20).map(s => ({ name: s.name, description: s.description, source: s.source })),
+          query: q || "(all)", count: matchCount, totalSkills: skills.length,
+          results,
         }, null, 2) }] };
       }
 
