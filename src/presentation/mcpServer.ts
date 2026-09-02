@@ -2394,9 +2394,9 @@ export function registerTools(server: McpServer) {
               envContent = envContent.replace(/CODEATLAS_API_KEY=.*(\r?\n|$)/g, () => `CODEATLAS_API_KEY=${key}\n`);
             }
             // Use writeFileSync with temp file to avoid race conditions (partial mitigate)
-            fs.writeFileSync(envPath, envContent, { mode: 0o600 });
+            writeFileSyncNoFollow(envPath, envContent, 0o600);
           } else {
-            fs.writeFileSync(envPath, `CODEATLAS_API_KEY=${key}\n`, { mode: 0o600 });
+            writeFileSyncNoFollow(envPath, `CODEATLAS_API_KEY=${key}\n`, 0o600);
           }
         }
       } catch (err: any) {
@@ -2420,15 +2420,15 @@ export function registerTools(server: McpServer) {
               results.push({ client: "hermes", action: "mcp_config", status });
             } else if (cfg.includes("mcp_servers:")) {
               cfg = cfg.replace("mcp_servers:", () => "mcp_servers:\n" + mcpEntry);
-              fs.writeFileSync(hermesCfg, cfg);
+              writeFileSyncNoFollow(hermesCfg, cfg, 0o666);
               results.push({ client: "hermes", action: "mcp_config", status: "updated" });
             } else {
-              fs.writeFileSync(hermesCfg, "\nmcp_servers:\n" + mcpEntry, { flag: "a" });
+              writeFileSyncNoFollow(hermesCfg, "\nmcp_servers:\n" + mcpEntry, 0o666, true);
               results.push({ client: "hermes", action: "mcp_config", status: "appended" });
             }
           } else {
             fs.mkdirSync(path.dirname(hermesCfg), { recursive: true });
-            fs.writeFileSync(hermesCfg, "mcp_servers:\n" + mcpEntry);
+            writeFileSyncNoFollow(hermesCfg, "mcp_servers:\n" + mcpEntry, 0o666);
             results.push({ client: "hermes", action: "mcp_config", status: "created" });
           }
         } catch (err: any) {
@@ -2498,8 +2498,8 @@ def register(ctx):
     log.info("Second Brain auto plugin active")
 `;
             const pluginYaml = `name: codeatlas_second_brain\nversion: "1.0"\ndescription: Automatic Second Brain activation\nhooks:\n  - pre_llm_call\n  - post_llm_call\nenabled: true\n`;
-            fs.writeFileSync(path.join(pluginDir, "__init__.py"), pluginInit);
-            fs.writeFileSync(path.join(pluginDir, "plugin.yaml"), pluginYaml);
+            writeFileSyncNoFollow(path.join(pluginDir, "__init__.py"), pluginInit, 0o666);
+            writeFileSyncNoFollow(path.join(pluginDir, "plugin.yaml"), pluginYaml, 0o666);
             results.push({ client: "hermes", action: "auto_plugin", status: "installed" });
           } catch (err: any) {
             results.push({ client: "hermes", action: "auto_plugin", status: "error", error: err.message });
@@ -2533,11 +2533,11 @@ def register(ctx):
             }
 
             existing.mcpServers = { ...existing.mcpServers, ...claudeEntry.mcpServers };
-            fs.writeFileSync(claudeCfg, JSON.stringify(existing, null, 2));
+            writeFileSyncNoFollow(claudeCfg, JSON.stringify(existing, null, 2), 0o666);
             results.push({ client: "claude", action: "mcp_config", status: "updated" });
           } else {
             fs.mkdirSync(path.dirname(claudeCfg), { recursive: true });
-            fs.writeFileSync(claudeCfg, JSON.stringify(claudeEntry, null, 2));
+            writeFileSyncNoFollow(claudeCfg, JSON.stringify(claudeEntry, null, 2), 0o666);
             results.push({ client: "claude", action: "mcp_config", status: "created" });
           }
         } catch (err: any) {
@@ -3295,7 +3295,7 @@ def register(ctx):
         skills,
         bySource: skills.reduce((acc, s) => { acc[s.source] = (acc[s.source] || 0) + 1; return acc; }, {} as Record<string, number>),
       };
-      fs.writeFileSync(BRAIN_SKILLS_PATH, JSON.stringify(inventory, null, 2));
+      writeFileSyncNoFollow(BRAIN_SKILLS_PATH, JSON.stringify(inventory, null, 2), 0o666);
 
       // Save a compact summary as dream memory for cross-session recall
       try {
