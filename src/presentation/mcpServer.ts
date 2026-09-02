@@ -3279,7 +3279,7 @@ def register(ctx):
       }
 
       if (action === "query") {
-        const q = (query || "").toLowerCase();
+        const q = query || "";
         let matchCount = 0;
         const results: Array<{ name: string; description: string; source: string }> = [];
         const maxLimit = limit || 20;
