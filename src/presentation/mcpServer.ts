@@ -3296,9 +3296,12 @@ def register(ctx):
           }
         } else {
           matchCount = skills.length;
-          for (let i = 0; i < skills.length && i < maxLimit; i++) {
-            const s = skills[i];
-            results.push({ name: s.name, description: s.description, source: s.source });
+          for (const s of skills) {
+            if (results.length < maxLimit) {
+              results.push({ name: s.name, description: s.description, source: s.source });
+            } else {
+              break;
+            }
           }
         }
 
