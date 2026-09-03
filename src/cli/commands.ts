@@ -195,7 +195,7 @@ export async function cmdDoctor(): Promise<void> {
 export function isCLICommand(argv: string[]): boolean {
   const cmd = argv[2];
   if (!cmd) return false;
-  return ["init", "setup", "doctor", "--help", "-h"].includes(cmd);
+  return ["init", "setup", "setup-hook", "setup-hooks", "validate-hook", "validate-hooks", "doctor", "--help", "-h"].includes(cmd);
 }
   
 export async function runCLI(): Promise<void> {
@@ -224,12 +224,24 @@ export async function runCLI(): Promise<void> {
   } else if (cmd === "setup-hook" || cmd === "setup-hooks" || (cmd === "setup" && process.argv[3] === "hook")) {
     // Install Claude hooks using the setup-hooks script
     console.log("🚀 Installing CodeAtlas hooks for Claude CLI...");
-    const { execSync } = await import("child_process");
     try {
-      execSync("node scripts/setup-hooks.js", { stdio: "inherit" });
+      // Run from repo root so scripts/setup-hooks.js resolves correctly
+      const { execSync } = await import("child_process");
+      execSync("node scripts/setup-hooks.js", { stdio: "inherit", cwd: process.cwd() });
       console.log("✅ Hooks installed successfully!");
     } catch (error) {
       console.error(`${fail()} Failed to install hooks: ${error}`);
+      process.exit(1);
+    }
+  } else if (cmd === "validate-hook" || cmd === "validate-hooks" || (cmd === "setup" && process.argv[3] === "hook" && (process.argv[4] === "--validate" || process.argv[4] === "-v"))) {
+    // Validate Claude hooks installation
+    console.log("🔍 Validating CodeAtlas hooks installation...");
+    const { execSync } = await import("child_process");
+    try {
+      execSync("node scripts/validate-hooks.js", { stdio: "inherit", cwd: process.cwd() });
+      console.log("✅ Hooks validation completed successfully!");
+    } catch (error) {
+      console.error(`${fail()} Hooks validation failed: ${error}`);
       process.exit(1);
     }
   } else if (cmd === "--help" || cmd === "-h") {
@@ -241,6 +253,7 @@ Commands:
   setup             Same as init
   setup claude      Install Claude hooks and configs
   setup hook        Install CodeAtlas hooks for Claude CLI
+  setup validate     Validate hooks installation
   setup zed         Register CodeAtlas as a Zed MCP context
   doctor            Health check & diagnostics
   brain-context     Load Second Brain context for current task

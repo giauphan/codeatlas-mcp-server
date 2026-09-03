@@ -32,6 +32,7 @@
     "release": "semantic-release",
     "prepublishOnly": "npm run build",
     "setup:hooks": "node scripts/setup-hooks.js",
+    "validate:hooks": "node scripts/validate-hooks.js",
     "install:hooks": "bash src/cli/hooks/install-brain-hooks.sh"
   },
   "keywords": [

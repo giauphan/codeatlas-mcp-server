@@ -56,15 +56,15 @@ try {
 ${platform() === 'win32' ? '@echo off' : ''}
 set -euo pipefail
 HOOKS_DIR="${CLAUDE_HOOKS_DIR}"
-if [ "${1:-}" != "hook" ]; then
+if [ "\${1:-}" != "hook" ]; then
   echo "usage: codeatlas hook <brain-context|brain-save|task-router>" >&2
   exit 2
 fi
-case "${2:-}" in
+case "\${2:-}" in
   brain-context) exec "\$HOOKS_DIR/brain-context.sh" ;;
   brain-save) exec "\$HOOKS_DIR/brain-save.sh" ;;
   task-router) exec "\$HOOKS_DIR/task-router.sh" ;;
-  *) echo "unknown codeatlas hook: ${2:-}" >&2; exit 2 ;;
+  *) echo "unknown codeatlas hook: \${2:-}" >&2; exit 2 ;;
 esac
 `;
   
