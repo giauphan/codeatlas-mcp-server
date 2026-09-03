@@ -471,17 +471,27 @@ export class CodeAnalyzer {
         loadedFolders.push(folderInfo.path);
         remaining -= chunk.nodes.length;
       } else {
-        // Partial load: take module nodes first, then classes, then functions, then variables
-        const priorityOrder = ['module', 'class', 'function', 'variable'];
-        const sorted = [...chunk.nodes].sort((a, b) => {
-          const indexA = priorityOrder.indexOf(a.type);
-          const indexB = priorityOrder.indexOf(b.type);
-          // Unknown types go to the end
-          const priorityA = indexA === -1 ? priorityOrder.length : indexA;
-          const priorityB = indexB === -1 ? priorityOrder.length : indexB;
-          return priorityA - priorityB;
-        });
-        loadedNodes.push(...sorted.slice(0, remaining));
+        // Optimization: Replace O(N log N) node sort with O(N) bucket collection during graph chunking
+        const buckets: Record<string, GraphNode[]> = { module: [], class: [], function: [], variable: [], other: [] };
+
+        for (const node of chunk.nodes) {
+          if (node.type === 'module') buckets.module.push(node);
+          else if (node.type === 'class') buckets.class.push(node);
+          else if (node.type === 'function') buckets.function.push(node);
+          else if (node.type === 'variable') buckets.variable.push(node);
+          else buckets.other.push(node);
+        }
+
+        const categories = [buckets.module, buckets.class, buckets.function, buckets.variable, buckets.other];
+        for (const cat of categories) {
+          if (remaining <= 0) break;
+          const take = Math.min(remaining, cat.length);
+          for (let i = 0; i < take; i++) {
+            loadedNodes.push(cat[i]);
+          }
+          remaining -= take;
+        }
+
         loadedFolders.push(folderInfo.path);
         remaining = 0;
       }
@@ -1134,7 +1144,9 @@ export class CodeAnalyzer {
     if (!node) return;
 
     if (Array.isArray(node)) {
-      node.forEach(child => this.traverseAST(child, currentModuleId, filePath, currentScopeId, fileImports));
+      for (const child of node) {
+        this.traverseAST(child, currentModuleId, filePath, currentScopeId, fileImports);
+      }
       return;
     }
 
@@ -1154,11 +1166,11 @@ export class CodeAnalyzer {
       this.handleCallExpression(node, currentModuleId, currentScopeId, fileImports);
     }
 
-    Object.keys(node).forEach(key => {
-      if (key !== 'loc' && key !== 'range' && typeof node[key] === 'object') {
+    for (const key in node) {
+      if (key !== 'loc' && key !== 'range' && key !== 'type' && typeof node[key] === 'object' && node[key] !== null) {
         this.traverseAST(node[key], currentModuleId, filePath, nextScopeId, fileImports);
       }
-    });
+    }
   }
 
   /**
