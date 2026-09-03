@@ -1144,7 +1144,9 @@ export class CodeAnalyzer {
     if (!node) return;
 
     if (Array.isArray(node)) {
-      node.forEach(child => this.traverseAST(child, currentModuleId, filePath, currentScopeId, fileImports));
+      for (const child of node) {
+        this.traverseAST(child, currentModuleId, filePath, currentScopeId, fileImports);
+      }
       return;
     }
 
@@ -1164,11 +1166,11 @@ export class CodeAnalyzer {
       this.handleCallExpression(node, currentModuleId, currentScopeId, fileImports);
     }
 
-    Object.keys(node).forEach(key => {
-      if (key !== 'loc' && key !== 'range' && typeof node[key] === 'object') {
+    for (const key in node) {
+      if (key !== 'loc' && key !== 'range' && key !== 'type' && typeof node[key] === 'object' && node[key] !== null) {
         this.traverseAST(node[key], currentModuleId, filePath, nextScopeId, fileImports);
       }
-    });
+    }
   }
 
   /**
