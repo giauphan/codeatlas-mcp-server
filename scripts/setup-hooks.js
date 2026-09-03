@@ -3,10 +3,11 @@
  * Setup Claude hooks for CodeAtlas MCP Server
  * 
  * This script:
- * 1. Installs hook scripts to ~/.claude/hooks/
- * 2. Creates the codeatlas wrapper for new hook syntax
- * 3. Updates ~/.claude/settings.json with proper hook registration
- * 4. Registers brain-save and brain-context hooks for Claude Code
+ * 1. Cleans up old CodeAtlas hook configurations  
+ * 2. Installs hook scripts to ~/.claude/hooks/
+ * 3. Creates the codeatlas wrapper for new hook syntax
+ * 4. Updates ~/.claude/settings.json with clean new hook registration
+ * 5. Registers brain-save and brain-context hooks for Claude Code
  * 
  * Usage: node scripts/setup-hooks.js
  */
@@ -15,7 +16,6 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync, copyFileSync, chmod
 import { homedir, platform } from 'os';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
-import { execSync } from 'child_process';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -53,18 +53,17 @@ try {
 
   // Create codeatlas wrapper for new hook syntax
   const wrapperContent = `#!/bin/bash
-${platform() === 'win32' ? '@echo off' : ''}
 set -euo pipefail
 HOOKS_DIR="${CLAUDE_HOOKS_DIR}"
-if [ "\${1:-}" != "hook" ]; then
+if [ "\$\{1:-\}" != "hook" ]; then
   echo "usage: codeatlas hook <brain-context|brain-save|task-router>" >&2
   exit 2
 fi
-case "\${2:-}" in
+case "\$\{2:-\}" in
   brain-context) exec "\$HOOKS_DIR/brain-context.sh" ;;
   brain-save) exec "\$HOOKS_DIR/brain-save.sh" ;;
   task-router) exec "\$HOOKS_DIR/task-router.sh" ;;
-  *) echo "unknown codeatlas hook: \${2:-}" >&2; exit 2 ;;
+  *) echo "unknown codeatlas hook: \$\{2:-\}" >&2; exit 2 ;;
 esac
 `;
   
@@ -72,7 +71,7 @@ esac
   chmodSync(join(CLAUDE_HOOKS_DIR, 'codeatlas'), 0o755);
   console.log('✅ Created codeatlas wrapper for new hook syntax');
 
-  // Update settings.json with new hook registration format
+  // Clean up and update settings.json with new hook registration format
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
   let settings = {};
   
@@ -91,22 +90,69 @@ esac
     }
   }
 
-  // Register hooks using the new command flow
-  settings.hooks = settings.hooks || {};
+  // Clean up old CodeAtlas hook configurations completely
+  if (settings.hooks) {
+    console.log('🧹 Cleaning up old CodeAtlas hook configurations...');
+    
+    // Completely remove old deprecated hook configurations 
+    const oldHookEvents = ['UserPromptSubmit', 'PostToolUse', 'PostToolUseFailure', 'PreToolUse'];
+    for (const event of oldHookEvents) {
+      if (settings.hooks[event]) {
+        delete settings.hooks[event];
+      }
+    }
+
+    // Remove old string-based hooks and codeatlas entries from new format
+    const newHookEvents = ['preToolUse', 'postToolUse', 'preSessionStart', 'prePrompt'];
+    for (const event of newHookEvents) {
+      if (settings.hooks[event] && Array.isArray(settings.hooks[event])) {
+        settings.hooks[event] = settings.hooks[event].filter(hook => {
+          // Remove any empty or invalid hooks
+          if (!hook || !hook.command) return false;
+          
+          // Remove string-based hooks that reference old codeatlas
+          if (typeof hook === 'string') {
+            return !hook.includes('codeatlas');
+          }
+          
+          // Remove old .sh script hooks
+          if (hook.command && hook.command.includes('.sh')) {
+            return false;
+          }
+          
+          // Remove rtk hook entries
+          if (hook.command && hook.command.includes('rtk hook claude')) {
+            return false;
+          }
+          
+          return true;
+        });
+        
+        // Remove the event if empty
+        if (settings.hooks[event].length === 0) {
+          delete settings.hooks[event];
+        }
+      }
+    }
+  }
+
+  // Register hooks using the clean new command flow
+  if (!settings.hooks) settings.hooks = {};
+
   settings.hooks.preToolUse = [
     {
       command: "codeatlas",
       args: ["hook", "task-router"]
     }
   ];
-  
+
   settings.hooks.preSessionStart = [
     {
       command: "codeatlas",
       args: ["hook", "brain-context"]
     }
   ];
-  
+
   settings.hooks.postToolUse = [
     {
       command: "codeatlas",
@@ -116,17 +162,17 @@ esac
 
   // Save updated settings
   writeFileSync(SETTINGS_FILE, JSON.stringify(settings, null, 2) + '\n');
-  console.log(`✅ Updated ${SETTINGS_FILE} with new hook registration`);
+  console.log(`✅ Updated ${SETTINGS_FILE} with clean new hook registration`);
   
   console.log('\n🎯 Hook Registration Summary:');
-  console.log('   preToolUse:    codeatlas hook task-router');
+  console.log('   preToolUse:      codeatlas hook task-router');
   console.log('   preSessionStart: codeatlas hook brain-context'); 
-  console.log('   postToolUse:   codeatlas hook brain-save');
+  console.log('   postToolUse:     codeatlas hook brain-save');
   
   console.log('\n📋 Next steps:');
   console.log('   1. restart Claude Code to load new hooks');
   console.log('   2. ensure codeatlas-mcp server is running (npm run start)');
-  console.log('   3. verify hooks are working with CLAUDE_TEST_MODE=1');
+  console.log('   3. verify hooks are working with CODEATLAS_TEST_MODE=1');
   
   console.log('\n✅ Setup complete! CodeAtlas hooks installed successfully.');
 
