@@ -6,7 +6,8 @@
   "bin": {
     "codeatlas-enterprise": "dist/index.js",
     "codeatlas-mcp": "dist/index.js",
-    "codeatlas": "dist/index.js"
+    "codeatlas": "dist/index.js",
+    "codeatlas-setup-claude": "dist/src/cli/setup-claude.js"
   },
   "files": [
     "dist",

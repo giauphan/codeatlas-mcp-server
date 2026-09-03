@@ -221,19 +221,31 @@ export async function runCLI(): Promise<void> {
     } else {
       await cmdSetup();
     }
+  } else if (cmd === "setup-hook" || cmd === "setup-hooks" || (cmd === "setup" && process.argv[3] === "hook")) {
+    // Install Claude hooks using the setup-hooks script
+    console.log("🚀 Installing CodeAtlas hooks for Claude CLI...");
+    const { execSync } = await import("child_process");
+    try {
+      execSync("node scripts/setup-hooks.js", { stdio: "inherit" });
+      console.log("✅ Hooks installed successfully!");
+    } catch (error) {
+      console.error(`${fail()} Failed to install hooks: ${error}`);
+      process.exit(1);
+    }
   } else if (cmd === "--help" || cmd === "-h") {
     console.log(`
 Usage: codeatlas-enterprise <command>
 
 Commands:
-  init           Interactive Second Brain setup wizard
-  setup          Same as init
-  setup claude   Install Claude hooks and configs
-  setup zed      Register CodeAtlas as a Zed MCP context
-  doctor         Health check & diagnostics
-  brain-context  Load Second Brain context for current task
-  brain-save     Save dream memory to Second Brain
-  task-router    Route task to appropriate model
+  init              Interactive Second Brain setup wizard
+  setup             Same as init
+  setup claude      Install Claude hooks and configs
+  setup hook        Install CodeAtlas hooks for Claude CLI
+  setup zed         Register CodeAtlas as a Zed MCP context
+  doctor            Health check & diagnostics
+  brain-context     Load Second Brain context for current task
+  brain-save        Save dream memory to Second Brain
+  task-router       Route task to appropriate model
 
 Without a command, runs the MCP server.
 `);
