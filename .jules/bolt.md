@@ -83,3 +83,7 @@
 **Learning:** Chaining array methods (e.g. `.filter(n => n.filePath).length`) and mapping over arrays separately to calculate simple metrics like counts or orphan entities wastes execution time and creates large intermediate array memory allocations.
 **Action:** When computing multiple simple metrics across a graph or dataset (e.g., node typing, relationships, existence of file paths), combine all checks into a single `for...of` loop with simple accumulators (`count++`, `Map.set`) to collapse multiple O(N) array loops into a single O(N) pass.
 >>>>>>> 819a139 (refactor: remove noisy bolt comment)
+
+## 2024-05-27 - [Performance improvement] Optimized O(N log N) sorting with O(N) bucket collection
+**Learning:** When ordering large arrays by a predefined set of categories, avoid using `Array.prototype.sort()` combined with `Array.prototype.indexOf()` inside the comparator. This creates an O(N log N) performance bottleneck, as `indexOf` is evaluated repeatedly for every comparison.
+**Action:** Use an O(N) bucket-collection strategy to linearly gather elements into respective category arrays and concatenate them. This approach preserves stability and is significantly faster for categorical ordering.
