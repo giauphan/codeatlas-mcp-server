@@ -77,8 +77,8 @@ check('Settings file exists', () => {
 check('Settings file contains hook configuration', () => {
   if (!existsSync(SETTINGS_FILE)) return false;
   const settings = JSON.parse(readFileSync(SETTINGS_FILE, 'utf8'));
-  return settings.hooks && 
-         (settings.hooks.preToolUse || settings.hooks.postToolUse || settings.hooks.preSessionStart);
+  return settings.hooks &&
+         (settings.hooks.PreToolUse || settings.hooks.PostToolUse || settings.hooks.SessionStart);
 });
 
 // 5. Test codeatlas wrapper functionality

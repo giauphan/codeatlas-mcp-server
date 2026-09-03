@@ -93,41 +93,40 @@ esac
   // Clean up old CodeAtlas hook configurations completely
   if (settings.hooks) {
     console.log('🧹 Cleaning up old CodeAtlas hook configurations...');
-    
-    // Completely remove old deprecated hook configurations 
-    const oldHookEvents = ['UserPromptSubmit', 'PostToolUse', 'PostToolUseFailure', 'PreToolUse'];
-    for (const event of oldHookEvents) {
+
+    // List of all old event names to remove (both old and lowercase versions)
+    const eventsToRemove = ['UserPromptSubmit', 'PostToolUse', 'PostToolUseFailure', 'PreToolUse', 'preToolUse', 'postToolUse', 'preSessionStart', 'prePrompt'];
+    for (const event of eventsToRemove) {
       if (settings.hooks[event]) {
         delete settings.hooks[event];
       }
     }
 
-    // Remove old string-based hooks and codeatlas entries from new format
-    const newHookEvents = ['preToolUse', 'postToolUse', 'preSessionStart', 'prePrompt'];
-    for (const event of newHookEvents) {
+    // Clean up any remaining hook events
+    for (const event in settings.hooks) {
       if (settings.hooks[event] && Array.isArray(settings.hooks[event])) {
         settings.hooks[event] = settings.hooks[event].filter(hook => {
           // Remove any empty or invalid hooks
           if (!hook || !hook.command) return false;
-          
+
           // Remove string-based hooks that reference old codeatlas
           if (typeof hook === 'string') {
             return !hook.includes('codeatlas');
           }
-          
+
           // Remove old .sh script hooks
           if (hook.command && hook.command.includes('.sh')) {
             return false;
           }
-          
+
           // Remove rtk hook entries
           if (hook.command && hook.command.includes('rtk hook claude')) {
             return false;
           }
-          
+
           return true;
         });
-        
+
         // Remove the event if empty
         if (settings.hooks[event].length === 0) {
           delete settings.hooks[event];
@@ -139,21 +138,21 @@ esac
   // Register hooks using the clean new command flow
   if (!settings.hooks) settings.hooks = {};
 
-  settings.hooks.preToolUse = [
+  settings.hooks.PreToolUse = [
     {
       command: "codeatlas",
       args: ["hook", "task-router"]
     }
   ];
 
-  settings.hooks.preSessionStart = [
+  settings.hooks.SessionStart = [
     {
       command: "codeatlas",
       args: ["hook", "brain-context"]
     }
   ];
 
-  settings.hooks.postToolUse = [
+  settings.hooks.PostToolUse = [
     {
       command: "codeatlas",
       args: ["hook", "brain-save"]

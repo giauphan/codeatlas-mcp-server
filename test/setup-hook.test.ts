@@ -35,22 +35,22 @@ describe("setup-hook command", () => {
       assert.ok(fs.existsSync(SETTINGS_FILE));
       const settings = JSON.parse(fs.readFileSync(SETTINGS_FILE, 'utf8'));
       assert.ok(settings.hooks);
-      assert.ok(settings.hooks.preToolUse);
-      assert.ok(settings.hooks.postToolUse);
-      assert.ok(settings.hooks.preSessionStart);
+      assert.ok(settings.hooks.PreToolUse);
+      assert.ok(settings.hooks.PostToolUse);
+      assert.ok(settings.hooks.SessionStart);
       
       // Verify hook registration uses new command flow
-      assert.deepStrictEqual(settings.hooks.preToolUse[0], {
+      assert.deepStrictEqual(settings.hooks.PreToolUse[0], {
         command: "codeatlas",
         args: ["hook", "task-router"]
       });
-      
-      assert.deepStrictEqual(settings.hooks.preSessionStart[0], {
-        command: "codeatlas", 
+
+      assert.deepStrictEqual(settings.hooks.SessionStart[0], {
+        command: "codeatlas",
         args: ["hook", "brain-context"]
       });
-      
-      assert.deepStrictEqual(settings.hooks.postToolUse[0], {
+
+      assert.deepStrictEqual(settings.hooks.PostToolUse[0], {
         command: "codeatlas",
         args: ["hook", "brain-save"]
       });
