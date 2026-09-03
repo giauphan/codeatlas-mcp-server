@@ -29,7 +29,9 @@
     "coverage": "c8 --reporter=text --reportDir=coverage npm test",
     "test": "node --experimental-test-module-mocks --import tsx --test \"src/**/*.test.ts\" \"test/**/*.test.ts\"",
     "release": "semantic-release",
-    "prepublishOnly": "npm run build"
+    "prepublishOnly": "npm run build",
+    "setup:hooks": "node scripts/setup-hooks.js",
+    "install:hooks": "bash src/cli/hooks/install-brain-hooks.sh"
   },
   "keywords": [
     "mcp",
