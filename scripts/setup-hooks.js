@@ -90,40 +90,35 @@ esac
     }
   }
 
-  // Clean up old CodeAtlas hook configurations completely
+  // Clean up ONLY old CodeAtlas hook configurations (strict - preserve all other hooks)
   if (settings.hooks) {
     console.log('🧹 Cleaning up old CodeAtlas hook configurations...');
 
-    // List of all old event names to remove (both old and lowercase versions)
-    const eventsToRemove = ['UserPromptSubmit', 'PostToolUse', 'PostToolUseFailure', 'PreToolUse', 'preToolUse', 'postToolUse', 'preSessionStart', 'prePrompt'];
-    for (const event of eventsToRemove) {
-      if (settings.hooks[event]) {
-        delete settings.hooks[event];
-      }
-    }
-
-    // Clean up any remaining hook events
     for (const event in settings.hooks) {
       if (settings.hooks[event] && Array.isArray(settings.hooks[event])) {
+        // Filter to remove ONLY codeatlas-related old hooks
         settings.hooks[event] = settings.hooks[event].filter(hook => {
-          // Remove any empty or invalid hooks
-          if (!hook || !hook.command) return false;
-
-          // Remove string-based hooks that reference old codeatlas
+          if (!hook) return false;
+          
+          // String-based hooks - remove if codeatlas or .sh
           if (typeof hook === 'string') {
-            return !hook.includes('codeatlas');
+            const isCodeAtlasHook = hook.includes('codeatlas') || 
+                                     hook.includes('/home/ubuntu/.claude/hooks/');
+            return !isCodeAtlasHook;
           }
-
-          // Remove old .sh script hooks
-          if (hook.command && hook.command.includes('.sh')) {
-            return false;
+          
+          // Object-based hooks - remove ONLY old CodeAtlas formats
+          if (hook.command) {
+            const isOldCodeAtlas = 
+              // Old direct .sh script calls
+              (hook.command.includes('/home/ubuntu/.claude/hooks/brain-') && hook.command.includes('.sh')) ||
+              (hook.command.includes('/home/ubuntu/.claude/hooks/task-router.sh')) ||
+              // Old codeatlas without args
+              (hook.command.includes('codeatlas') && !hook.args);
+            
+            return !isOldCodeAtlas;
           }
-
-          // Remove rtk hook entries
-          if (hook.command && hook.command.includes('rtk hook claude')) {
-            return false;
-          }
-
+          
           return true;
         });
 
@@ -138,26 +133,43 @@ esac
   // Register hooks using the clean new command flow
   if (!settings.hooks) settings.hooks = {};
 
-  settings.hooks.PreToolUse = [
-    {
-      command: "codeatlas",
-      args: ["hook", "task-router"]
-    }
-  ];
+  // Add CodeAtlas hooks, preserving any existing hooks (like rtk hook claude)
+  const codeatlasPreToolUse = {
+    command: "codeatlas",
+    args: ["hook", "task-router"]
+  };
+  const codeatlasSessionStart = {
+    command: "codeatlas",
+    args: ["hook", "brain-context"]
+  };
+  const codeatlasPostToolUse = {
+    command: "codeatlas",
+    args: ["hook", "brain-save"]
+  };
 
-  settings.hooks.SessionStart = [
-    {
-      command: "codeatlas",
-      args: ["hook", "brain-context"]
-    }
-  ];
+  // Merge with PreToolUse - add codeatlas if not already present
+  if (!settings.hooks.PreToolUse) {
+    settings.hooks.PreToolUse = [];
+  }
+  if (!settings.hooks.PreToolUse.some(h => h.command === "codeatlas" && h.args && h.args.includes("task-router"))) {
+    settings.hooks.PreToolUse.push(codeatlasPreToolUse);
+  }
 
-  settings.hooks.PostToolUse = [
-    {
-      command: "codeatlas",
-      args: ["hook", "brain-save"]
-    }
-  ];
+  // Merge with SessionStart - add codeatlas if not already present
+  if (!settings.hooks.SessionStart) {
+    settings.hooks.SessionStart = [];
+  }
+  if (!settings.hooks.SessionStart.some(h => h.command === "codeatlas" && h.args && h.args.includes("brain-context"))) {
+    settings.hooks.SessionStart.push(codeatlasSessionStart);
+  }
+
+  // Merge with PostToolUse - add codeatlas if not already present
+  if (!settings.hooks.PostToolUse) {
+    settings.hooks.PostToolUse = [];
+  }
+  if (!settings.hooks.PostToolUse.some(h => h.command === "codeatlas" && h.args && h.args.includes("brain-save"))) {
+    settings.hooks.PostToolUse.push(codeatlasPostToolUse);
+  }
 
   // Save updated settings
   writeFileSync(SETTINGS_FILE, JSON.stringify(settings, null, 2) + '\n');
