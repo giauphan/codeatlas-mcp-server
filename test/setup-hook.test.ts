@@ -31,29 +31,27 @@ describe("setup-hook command", () => {
       assert.ok(fs.existsSync(path.join(CLAUDE_HOOKS_DIR, 'task-router.sh')));
       assert.ok(fs.existsSync(path.join(CLAUDE_HOOKS_DIR, 'codeatlas')));
       
-      // Verify settings.json was created with hooks
+      // Verify settings.json was created with hooks (nested format)
       assert.ok(fs.existsSync(SETTINGS_FILE));
       const settings = JSON.parse(fs.readFileSync(SETTINGS_FILE, 'utf8'));
       assert.ok(settings.hooks);
       assert.ok(settings.hooks.PreToolUse);
       assert.ok(settings.hooks.PostToolUse);
       assert.ok(settings.hooks.SessionStart);
-      
-      // Verify hook registration uses new command flow
-      assert.deepStrictEqual(settings.hooks.PreToolUse[0], {
-        command: "codeatlas",
-        args: ["hook", "task-router"]
-      });
 
-      assert.deepStrictEqual(settings.hooks.SessionStart[0], {
-        command: "codeatlas",
-        args: ["hook", "brain-context"]
-      });
+      // Verify hook registration uses nested format
+      assert.ok(settings.hooks.PreToolUse[0].hooks);
+      assert.ok(settings.hooks.SessionStart[0].hooks);
+      assert.ok(settings.hooks.PostToolUse[0].hooks);
 
-      assert.deepStrictEqual(settings.hooks.PostToolUse[0], {
-        command: "codeatlas",
-        args: ["hook", "brain-save"]
-      });
+      // Check for codeatlas hooks in nested arrays
+      const preToolUseHooks = settings.hooks.PreToolUse[0].hooks;
+      const sessionStartHooks = settings.hooks.SessionStart[0].hooks;
+      const postToolUseHooks = settings.hooks.PostToolUse[0].hooks;
+
+      assert.ok(preToolUseHooks.some((h: any) => h.command === "codeatlas" && h.args?.includes("task-router")));
+      assert.ok(sessionStartHooks.some((h: any) => h.command === "codeatlas" && h.args?.includes("brain-context")));
+      assert.ok(postToolUseHooks.some((h: any) => h.command === "codeatlas" && h.args?.includes("brain-save")));
       
     } finally {
       // Clean up temp directory
