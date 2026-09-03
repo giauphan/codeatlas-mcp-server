@@ -138,32 +138,40 @@ try {
       });
       
       if (filtered.length > 0) {
-        setHooksArray(event, filtered);
+        // Add type: "command" to hooks that need it
+        const withType = filtered.map(hook => {
+          if (typeof hook === 'string') return hook;
+          if (hook.command && !hook.type) {
+            return { ...hook, type: 'command' };
+          }
+          return hook;
+        });
+        setHooksArray(event, withType);
       } else {
         delete settings.hooks[event];
       }
     }
   }
 
-  // Add CodeAtlas hooks in nested format
+  // Add CodeAtlas hooks in nested format (with type: 'command')
   const preToolUseHooks = getHooksArray('PreToolUse');
   const hasTaskRouter = preToolUseHooks.some(h => h.command === 'codeatlas' && h.args?.includes('task-router'));
   if (!hasTaskRouter) {
-    preToolUseHooks.push({ command: 'codeatlas', args: ['hook', 'task-router'] });
+    preToolUseHooks.push({ type: 'command', command: 'codeatlas', args: ['hook', 'task-router'] });
   }
   setHooksArray('PreToolUse', preToolUseHooks);
 
   const sessionStartHooks = getHooksArray('SessionStart');
   const hasBrainContext = sessionStartHooks.some(h => h.command === 'codeatlas' && h.args?.includes('brain-context'));
   if (!hasBrainContext) {
-    sessionStartHooks.push({ command: 'codeatlas', args: ['hook', 'brain-context'] });
+    sessionStartHooks.push({ type: 'command', command: 'codeatlas', args: ['hook', 'brain-context'] });
   }
   setHooksArray('SessionStart', sessionStartHooks);
 
   const postToolUseHooks = getHooksArray('PostToolUse');
   const hasBrainSave = postToolUseHooks.some(h => h.command === 'codeatlas' && h.args?.includes('brain-save'));
   if (!hasBrainSave) {
-    postToolUseHooks.push({ command: 'codeatlas', args: ['hook', 'brain-save'] });
+    postToolUseHooks.push({ type: 'command', command: 'codeatlas', args: ['hook', 'brain-save'] });
   }
   setHooksArray('PostToolUse', postToolUseHooks);
 
