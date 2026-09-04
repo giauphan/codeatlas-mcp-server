@@ -5,6 +5,7 @@ import ignore from 'ignore';
 import { GraphData, GraphNode, GraphLink, AnalysisResult, AIInsight, AnalysisManifest, FolderInfo, ChunkData, CrossChunkLinks } from './types.js';
 import { PythonParser } from './pythonParser.js';
 import { PhpParser } from './phpParser.js';
+import { binarySearchClosestPrecedingClass, ClassReference } from '../utils/arrayUtils.js';
 
 export class CodeAnalyzer {
   private workspaceRoot: string;
@@ -14,6 +15,8 @@ export class CodeAnalyzer {
   private readonly excludedDirectories: string[];
   private readonly excludedFiles: string[];
   private readonly fileExtensions: string[];
+
+  private dirCache = new Map<string, Map<string, fs.Dirent> | null>();
 
   private ignoreFilter: ReturnType<typeof ignore> | null = null;
 
@@ -31,6 +34,23 @@ export class CodeAnalyzer {
     this.excludedDirectories = excludedDirectories;
     this.excludedFiles = excludedFiles;
     this.fileExtensions = fileExtensions;
+  }
+
+  private getDirContents(dirPath: string): Map<string, fs.Dirent> | null {
+    let contents = this.dirCache.get(dirPath);
+    if (contents === undefined) {
+      try {
+        contents = new Map();
+        const entries = fs.readdirSync(dirPath, { withFileTypes: true });
+        for (const entry of entries) {
+          contents.set(entry.name, entry);
+        }
+      } catch {
+        contents = null;
+      }
+      this.dirCache.set(dirPath, contents);
+    }
+    return contents;
   }
 
   private getIgnoreFilter(): ReturnType<typeof ignore> {
@@ -67,10 +87,75 @@ export class CodeAnalyzer {
     return this.getIgnoreFilter().ignores(normalizedPath);
   }
 
-  private allFiles: string[] = [];
+  /**
+   * Tracks all analyzed file paths.
+   * Using Set to optimize addition, deletion, and lookup operations. Reduces O(N) operations
+   * (e.g., .includes or .indexOf) to O(1) for large datasets. This is particularly impactful for environments
+   * handling large datasets, where frequent mutations or membership checks may cause major performance costs.
+   * The Set structure also inherently prevents duplicates, eliminating the need for manual uniqueness checks.
+   */
+  private allFiles: Set<string> = new Set<string>();
+
+  /**
+   * Tracks files that encountered transient IO errors (e.g. EACCES locks)
+   * so they can be identified and potentially re-queued by the caller.
+   */
+  public transientErrors: Set<string> = new Set<string>();
+
+  private reportInfo(message: string) {
+    console.info(message);
+  }
+
+  private reportError(message: string) {
+    console.error(message);
+  }
+
+  private reportWarning(message: string, stack?: string) {
+    if (stack) {
+      console.warn(message, stack);
+    } else {
+      console.warn(message);
+    }
+  }
+
+  /**
+   * Sanitizes paths for logging by replacing the workspace root with a placeholder
+   * and normalizing directory separators.
+   */
+  private sanitizePath(absPath: string): string {
+    if (!this.workspaceRoot) return absPath.replace(/\\/g, '/');
+
+    // We cannot use string replace with regex characters dynamically without escaping,
+    // but a safer approach is substring if it starts with the root.
+    if (absPath.startsWith(this.workspaceRoot)) {
+      return '[WORKSPACE]' + absPath.substring(this.workspaceRoot.length).replace(/\\/g, '/');
+    }
+    return absPath.replace(/\\/g, '/');
+  }
+
+  private handleFileError(err: unknown, absPath: string) {
+    const error = err as NodeJS.ErrnoException;
+    // Scrub absolute path using the unified sanitization logic
+    const safeName = this.sanitizePath(absPath);
+    if (error && error.code === 'ENOENT') {
+      this.reportInfo(`[CodeAnalyzer] File not found (likely deleted): ${safeName}`);
+    } else if (error && error.code === 'EACCES') {
+      this.transientErrors.add(absPath);
+      this.reportError(`[CodeAnalyzer][Security][FileAccess] Access denied to file: ${safeName}`);
+    } else {
+      this.transientErrors.add(absPath);
+      const message = (error && error.message) || (error && error.code) || 'Unknown error';
+      if (process.env.DEBUG === 'true') {
+        this.reportWarning(`[CodeAnalyzer] Unexpected error accessing file ${safeName}: ${message}`, error?.stack ? this.sanitizePath(error.stack) : undefined);
+      } else {
+        this.reportWarning(`[CodeAnalyzer] Unexpected error accessing file ${safeName}: ${message}`);
+      }
+    }
+  }
   private totalSkippedCount = 0;
 
   public async analyzeProject(onProgress?: (percent: number, done: number, total: number, currentFile?: string) => void): Promise<AnalysisResult> {
+    this.dirCache.clear();
     this.nodes.clear();
     this.links = [];
 
@@ -80,7 +165,9 @@ export class CodeAnalyzer {
       files = files.slice(0, this.maxFiles);
     }
 
-    this.allFiles = [...files];
+    // The files array is generated from getFiles traversing unique directories recursively,
+    // so duplicates are naturally prevented. The map resolves paths, and the Set enforces uniqueness across edge cases (e.g. symlinks).
+    this.allFiles = new Set(files.map(f => path.resolve(f)));
     const total = files.length;
 
     // Log the files to be indexed
@@ -110,7 +197,16 @@ export class CodeAnalyzer {
     return this.buildAnalysisResult();
   }
 
+  /**
+   * Returns a copy of the uniquely tracked files as an array.
+   * Note: As it is derived from a Set, duplicates are inherently avoided.
+   */
+  public get allFilesArray(): string[] {
+    return Array.from(this.allFiles);
+  }
+
   public async analyzeFileIncremental(filePath: string): Promise<AnalysisResult> {
+    this.dirCache.clear();
     const absPath = path.resolve(filePath);
 
     // 1. Remove all existing nodes belonging to this file
@@ -136,26 +232,44 @@ export class CodeAnalyzer {
 
     // 3. Re-analyze only if file exists and is NOT ignored
     try {
-      if (fs.existsSync(absPath) && !this.isIgnored(absPath, false)) {
-        this.analyzeFile(absPath);
-        if (!this.allFiles.includes(absPath)) {
-          this.allFiles.push(absPath);
+      await fs.promises.stat(absPath);
+      if (!this.isIgnored(absPath, false)) {
+        const success = this.analyzeFile(absPath);
+        if (success) {
+          this.allFiles.add(absPath);
+        } else {
+          this.totalSkippedCount++;
         }
       } else {
-        // File was deleted or is ignored
-        this.allFiles = this.allFiles.filter(f => f !== absPath);
+        // File is ignored
+        this.allFiles.delete(absPath);
       }
-    } catch {
-      this.allFiles = this.allFiles.filter(f => f !== absPath);
+    } catch (err: unknown) {
+      const error = err as NodeJS.ErrnoException;
+      if (error && error.code === 'ENOENT') {
+        // File was explicitly deleted or is entirely missing, remove from tracking
+        this.allFiles.delete(absPath);
+      } else {
+        // Transient IO error or permissions issue - log it but keep it tracked
+        // so it can be re-analyzed later when available, rather than silently dropping it
+        this.handleFileError(err, absPath);
+      }
     }
 
     return this.buildAnalysisResult();
   }
 
   private buildAnalysisResult(): AnalysisResult {
+    // Calculate node degrees in O(E) instead of O(N*E) to improve buildAnalysisResult performance for large graphs
+    const nodeDegrees = new Map<string, number>();
+    for (const link of this.links) {
+      nodeDegrees.set(link.source, (nodeDegrees.get(link.source) || 0) + 1);
+      nodeDegrees.set(link.target, (nodeDegrees.get(link.target) || 0) + 1);
+    }
+
     // Add graph layout sizes based on relationships
     this.nodes.forEach(node => {
-      let degree = this.links.filter(l => l.source === node.id || l.target === node.id).length;
+      const degree = nodeDegrees.get(node.id) || 0;
       node.val = (node.type === 'module' ? 8 : (node.type === 'class' ? 6 : 4)) + Math.log1p(degree) * 2;
     });
 
@@ -172,12 +286,29 @@ export class CodeAnalyzer {
     const insights = this.generateAIInsights(graph);
     const circularDepsCount = this.detectCircularDeps();
 
+    // Calculate entity counts in a single pass over nodes instead of mapping/filtering multiple times
+    let modulesCount = 0;
+    let functionsCount = 0;
+    let classesCount = 0;
+    let variablesCount = 0;
+    for (const node of this.nodes.values()) {
+      if (node.type === 'module') modulesCount++;
+      else if (node.type === 'function') functionsCount++;
+      else if (node.type === 'class') classesCount++;
+      else if (node.type === 'variable') variablesCount++;
+    }
+
+    let dependenciesCount = 0;
+    for (const link of this.links) {
+      if (link.type === 'import') dependenciesCount++;
+    }
+
     const counts = {
-      modules: Array.from(this.nodes.values()).filter(n => n.type === 'module').length,
-      functions: Array.from(this.nodes.values()).filter(n => n.type === 'function').length,
-      classes: Array.from(this.nodes.values()).filter(n => n.type === 'class').length,
-      variables: Array.from(this.nodes.values()).filter(n => n.type === 'variable').length,
-      dependencies: this.links.filter(l => l.type === 'import').length,
+      modules: modulesCount,
+      functions: functionsCount,
+      classes: classesCount,
+      variables: variablesCount,
+      dependencies: dependenciesCount,
       circularDeps: circularDepsCount,
       deadCode: 0
     };
@@ -186,7 +317,7 @@ export class CodeAnalyzer {
       graph,
       insights,
       entityCounts: counts,
-      totalFilesAnalyzed: this.allFiles.length - this.totalSkippedCount,
+      totalFilesAnalyzed: this.allFiles.size - this.totalSkippedCount,
       totalFilesSkipped: this.totalSkippedCount
     };
   }
@@ -240,32 +371,29 @@ export class CodeAnalyzer {
     const nodeToFolder = new Map<string, string>();
     const crossLinks: GraphLink[] = [];
 
-    // Map each node to its folder
+    // ⚡ Bolt Optimization: Initialize chunks early and map nodes to folders
     for (const [folder, nodes] of folderNodeMap) {
       for (const node of nodes) {
         nodeToFolder.set(node.id, folder);
       }
-    }
-
-    // Within-chunk links keep the layout cohesive; cross-chunk edges become thin connectors.
-    for (const [folder, nodes] of folderNodeMap) {
-      const nodeIds = new Set(nodes.map(n => n.id));
-      const internalLinks = result.graph.links.filter(
-        link => nodeIds.has(link.source) && nodeIds.has(link.target)
-      );
       chunks.set(folder, {
         folderPath: folder,
         nodes,
-        links: internalLinks
+        links: []
       });
     }
 
-    // Collect cross-chunk links
+    // ⚡ Bolt Optimization: Single O(L) pass to distribute links instead of O(F*L) nested filtering
+    // Within-chunk links keep the layout cohesive; cross-chunk edges become thin connectors.
     for (const link of result.graph.links) {
       const srcFolder = nodeToFolder.get(link.source);
       const tgtFolder = nodeToFolder.get(link.target);
-      if (srcFolder && tgtFolder && srcFolder !== tgtFolder) {
-        crossLinks.push(link);
+      if (srcFolder && tgtFolder) {
+        if (srcFolder === tgtFolder) {
+          chunks.get(srcFolder)!.links.push(link);
+        } else {
+          crossLinks.push(link);
+        }
       }
     }
 
@@ -344,15 +472,32 @@ export class CodeAnalyzer {
         remaining -= chunk.nodes.length;
       } else {
         // Partial load: take module nodes first, then classes, then functions, then variables
-        const priorityOrder = ['module', 'class', 'function', 'variable'];
-        const sorted = [...chunk.nodes].sort((a, b) => {
-          const indexA = priorityOrder.indexOf(a.type);
-          const indexB = priorityOrder.indexOf(b.type);
-          // Unknown types go to the end
-          const priorityA = indexA === -1 ? priorityOrder.length : indexA;
-          const priorityB = indexB === -1 ? priorityOrder.length : indexB;
-          return priorityA - priorityB;
-        });
+        // ⚡ Bolt Optimization: Replace O(N log N) Array.sort + indexOf with O(N) bucket collection
+        const buckets: Record<string, GraphNode[]> = {
+          'module': [],
+          'class': [],
+          'function': [],
+          'variable': [],
+          'other': []
+        };
+
+        for (let i = 0, len = chunk.nodes.length; i < len; i++) {
+          const node = chunk.nodes[i];
+          if (buckets[node.type]) {
+            buckets[node.type].push(node);
+          } else {
+            buckets['other'].push(node);
+          }
+        }
+
+        const sorted = [
+          ...buckets['module'],
+          ...buckets['class'],
+          ...buckets['function'],
+          ...buckets['variable'],
+          ...buckets['other']
+        ];
+
         loadedNodes.push(...sorted.slice(0, remaining));
         loadedFolders.push(folderInfo.path);
         remaining = 0;
@@ -575,11 +720,13 @@ export class CodeAnalyzer {
       });
 
       let linkSourceId = moduleId;
-      if (func.indent && func.indent > 0) {
+      if (typeof func.indent === 'number' && func.indent > 0 && Array.isArray(reversedClasses) && reversedClasses.length > 0) {
         // Functions without an explicit parent class are assigned to the closest
-  // preceding class by line number. This handles PHP/Python file-scoped functions.
-        const parentClass = reversedClasses
-          .find(cls => cls.line < func.line);
+        // preceding class by line number. This handles PHP/Python file-scoped functions.
+        const parentClass = binarySearchClosestPrecedingClass(
+          reversedClasses as unknown as ClassReference[],
+          func.line
+        );
         if (parentClass) {
           linkSourceId = `class:${moduleId}:${parentClass.name}`;
         }
@@ -1043,29 +1190,48 @@ export class CodeAnalyzer {
         const extensions = this.fileExtensions;
         let matched = false;
 
-        if (fs.existsSync(absolutePath)) {
-          const stat = fs.statSync(absolutePath);
-          if (stat.isDirectory()) {
+        const dName = path.dirname(absolutePath);
+        const bName = path.basename(absolutePath);
+        const parentContents = this.getDirContents(dName);
+
+        if (parentContents) {
+          if (parentContents.has(bName)) {
+            try {
+              const entry = parentContents.get(bName);
+              let isDir = entry?.isDirectory() || false;
+              if (entry && !isDir && entry.isSymbolicLink()) {
+                try {
+                  isDir = fs.statSync(absolutePath).isDirectory();
+                } catch {
+                  // ignore broken symlink
+                }
+              }
+              if (isDir) {
+                const dirContents = this.getDirContents(absolutePath);
+                if (dirContents) {
+                  for (const ext of extensions) {
+                    if (dirContents.has(`index${ext}`)) {
+                      foundPath = path.join(absolutePath, `index${ext}`);
+                      matched = true;
+                      break;
+                    }
+                  }
+                }
+              } else {
+                matched = true;
+              }
+            } catch (e) {
+              // Ignore broken symlinks or missing files
+            }
+          }
+
+          if (!matched) {
             for (const ext of extensions) {
-              const indexPath = path.join(absolutePath, `index${ext}`);
-              if (fs.existsSync(indexPath)) {
-                foundPath = indexPath;
+              if (parentContents.has(`${bName}${ext}`)) {
+                foundPath = `${absolutePath}${ext}`;
                 matched = true;
                 break;
               }
-            }
-          } else {
-            matched = true;
-          }
-        }
-
-        if (!matched) {
-          for (const ext of extensions) {
-            const extPath = `${absolutePath}${ext}`;
-            if (fs.existsSync(extPath)) {
-              foundPath = extPath;
-              matched = true;
-              break;
             }
           }
         }
@@ -1104,13 +1270,18 @@ export class CodeAnalyzer {
     for (const baseDir of searchDirs) {
       const targetPath = path.join(baseDir, subPath);
 
-      const pyPath = `${targetPath}.py`;
-      if (fs.existsSync(pyPath)) {
+      const dName = path.dirname(targetPath);
+      const bName = path.basename(targetPath);
+      const parentContents = this.getDirContents(dName);
+
+      if (parentContents && parentContents.has(`${bName}.py`)) {
+        const pyPath = `${targetPath}.py`;
         return `module:${path.relative(this.workspaceRoot, pyPath).replace(/\\/g, '/')}`;
       }
 
-      const initPyPath = path.join(targetPath, '__init__.py');
-      if (fs.existsSync(initPyPath)) {
+      const dirContents = this.getDirContents(targetPath);
+      if (dirContents && dirContents.has('__init__.py')) {
+        const initPyPath = path.join(targetPath, '__init__.py');
         return `module:${path.relative(this.workspaceRoot, initPyPath).replace(/\\/g, '/')}`;
       }
     }
@@ -1147,33 +1318,43 @@ export class CodeAnalyzer {
 
     // Mock AI Insights generation based on simple heuristics
 
-    // 1. Large files / God objects
-    const modulesWithManyFunctions = Array.from(this.nodes.values()).filter(n => {
-      if (n.type !== 'module') return false;
-      const functionCount = graph.links.filter(l => l.source === n.id && l.type === 'contains' && l.target.startsWith('function')).length;
-      return functionCount > 10; // threshold
-    });
+    // Optimization: Combine multiple O(E) links traversals into a single pass
+    const moduleFunctionCounts = new Map<string, number>();
+    const moduleDependencies = new Map<string, number>();
 
-    if (modulesWithManyFunctions.length > 0) {
+    for (const l of graph.links) {
+      if (l.type === 'contains' && l.target.startsWith('function')) {
+        moduleFunctionCounts.set(l.source, (moduleFunctionCounts.get(l.source) || 0) + 1);
+      } else if (l.type === 'import' && l.source.startsWith('module:') && l.target.startsWith('module:')) {
+        moduleDependencies.set(l.source, (moduleDependencies.get(l.source) || 0) + 1);
+      }
+    }
+
+    // 1. Large files / God objects
+    const affectedModules: string[] = [];
+    for (const node of this.nodes.values()) {
+      if (node.type === 'module' && (moduleFunctionCounts.get(node.id) || 0) > 10) {
+        affectedModules.push(node.id);
+      }
+    }
+
+    if (affectedModules.length > 0) {
       insights.push({
         id: 'i-1',
         type: 'refactor',
         title: 'God Object Detected',
-        description: `Found ${modulesWithManyFunctions.length} modules containing a large number of functions. Consider splitting them.`,
+        description: `Found ${affectedModules.length} modules containing a large number of functions. Consider splitting them.`,
         severity: 'high',
-        affectedNodes: modulesWithManyFunctions.map(n => n.id)
+        affectedNodes: affectedModules
       });
     }
 
     // 2. High coupling
-    const moduleDependencies = new Map<string, number>();
-    graph.links.forEach(l => {
-      if (l.type === 'import' && l.source.startsWith('module:') && l.target.startsWith('module:')) {
-        moduleDependencies.set(l.source, (moduleDependencies.get(l.source) || 0) + 1);
-      }
-    });
+    const highlyCoupled: string[] = [];
+    for (const [id, count] of moduleDependencies.entries()) {
+      if (count > 15) highlyCoupled.push(id);
+    }
 
-    const highlyCoupled = Array.from(moduleDependencies.entries()).filter(([_, count]) => count > 15).map(([id]) => id);
     if (highlyCoupled.length > 0) {
       insights.push({
         id: 'i-2',
