@@ -78,8 +78,8 @@ export async function cmdSetupClaude(projectDir: string = process.cwd()): Promis
   // 1. Verify codeatlas CLI is available
   console.log(`\n${bold("1. Verifying CodeAtlas CLI")}`);
   try {
-    const { execSync } = await import("child_process");
-    const version = execSync("codeatlas-enterprise --version", { encoding: "utf-8", timeout: 5000 }).trim();
+    const { execFileSync } = await import("child_process");
+    const version = execFileSync("codeatlas-enterprise", ["--version"], { encoding: "utf-8", timeout: 5000, shell: false }).trim();
     console.log(`  ${ok()} CodeAtlas CLI version: ${version}`);
   } catch (e: any) {
     console.log(`  ${warn()} CodeAtlas CLI not found globally. Using npx/local path.`);
