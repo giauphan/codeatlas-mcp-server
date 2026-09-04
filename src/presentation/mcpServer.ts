@@ -535,7 +535,7 @@ export function registerTools(server: McpServer) {
 
         for (let i = 0, len = nodes.length; i < len; i++) {
           const node = nodes[i];
-          if (Object.hasOwn(buckets, node.type) && node.type !== 'other') {
+          if (Object.hasOwn(buckets, node.type) && node.type !== 'other' as string) {
             buckets[node.type].push(node);
           } else {
             buckets['other'].push(node);
