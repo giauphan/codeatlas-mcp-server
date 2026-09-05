@@ -94,8 +94,8 @@ export class SecurityScanner {
     }
 
     try {
-      // ⚡ Bolt Optimization: Use a for loop with early break instead of chaining .filter().slice(0, 5)
-      // This prevents full array traversal and intermediate array allocations when scanning large codebases.
+      // Use a for loop with early break instead of .filter().slice(0, 5)
+      // to avoid full array traversal and intermediate allocations on large codebases.
       const criticalFindings: SecurityFinding[] = [];
       for (const f of findings) {
         if (f.severity === "CRITICAL" || f.severity === "HIGH") {
