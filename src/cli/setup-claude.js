@@ -24,7 +24,7 @@ try {
 
   console.log('📄 Found setup script, executing...\n');
 
-  execFileSync("node", [SETUP_SCRIPT], {
+  execFileSync(process.execPath, [SETUP_SCRIPT], {
     stdio: 'inherit',
     cwd: REPO_ROOT,
     shell: false,
