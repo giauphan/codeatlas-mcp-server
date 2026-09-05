@@ -181,7 +181,7 @@ export function registerTools(server: McpServer) {
     {
       project: z.string().max(255).optional().describe("Project name or path (auto-detects if omitted)"),
       type: z.enum(["all", "module", "class", "function", "variable"]).optional().describe("Filter by entity type. Choose one of: all, module, class, function, variable"),
-      limit: z.number().optional().describe("Max results to return (default: 100)"),
+      limit: z.number().optional().describe("Max results to return (default: 500)"),
     },
     async ({ project, type, limit }: { project?: string; type?: string; limit?: number }) => {
       const auth = await checkAuth();
@@ -535,7 +535,7 @@ export function registerTools(server: McpServer) {
 
         for (let i = 0, len = nodes.length; i < len; i++) {
           const node = nodes[i];
-          if (Object.hasOwn(buckets, node.type) && node.type !== 'other' as string) {
+          if (Object.hasOwn(buckets, node.type) && (node.type as string) !== 'other') {
             buckets[node.type].push(node);
           } else {
             buckets['other'].push(node);
@@ -883,16 +883,16 @@ export function registerTools(server: McpServer) {
         const byType: Record<string, number> = {};
         const byProject: Record<string, number> = {};
         for (const d of allDreams) {
-          const typed = d as any;
-          const t = typed.memory_type || "UNKNOWN";
-          const p = typed.project || "unknown";
+          const typed = d as unknown as Record<string, unknown>;
+          const t = (typed.memory_type as string) || "UNKNOWN";
+          const p = (typed.project as string) || "unknown";
           byType[t] = (byType[t] || 0) + 1;
           byProject[p] = (byProject[p] || 0) + 1;
         }
 
         // Filter by type if requested
         if (type) {
-          allDreams = allDreams.filter((d: any) =>
+          allDreams = allDreams.filter((d: Record<string, any>) =>
             d.memory_type === type
           );
         }
@@ -914,11 +914,10 @@ export function registerTools(server: McpServer) {
         if (allDreams.length > 0) {
           lines.push(``);
           lines.push(`Most recent:`);
-          const sorted = [...allDreams].sort((a: any, b: any) =>
-            new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()
+          const sorted = [...allDreams].sort((a: Record<string, any>, b: Record<string, any>) =>
+            new Date(b.created_at as string || 0).getTime() - new Date(a.created_at as string || 0).getTime()
           );
-          for (const d of sorted.slice(0, 5)) {
-            const r = d as any;
+          for (const r of sorted.slice(0, 5)) {
             lines.push(`  [${r.memory_type}] ${(r.content as string || '').substring(0, 60)} (${r.project})`);
           }
         }
