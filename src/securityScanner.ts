@@ -94,7 +94,15 @@ export class SecurityScanner {
     }
 
     try {
-      const criticalFindings = findings.filter(f => f.severity === "CRITICAL" || f.severity === "HIGH").slice(0, 5);
+      // ⚡ Bolt Optimization: Use a for loop with early break instead of chaining .filter().slice(0, 5)
+      // This prevents full array traversal and intermediate array allocations when scanning large codebases.
+      const criticalFindings: SecurityFinding[] = [];
+      for (const f of findings) {
+        if (f.severity === "CRITICAL" || f.severity === "HIGH") {
+          criticalFindings.push(f);
+          if (criticalFindings.length >= 5) break;
+        }
+      }
       const codeContext = criticalFindings.map(f => {
         return "[" + f.severity + "] " + f.type + ": " + f.message + " (" + f.filePath + ":" + f.line + ")";
       }).join("\n");

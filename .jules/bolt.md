@@ -83,3 +83,6 @@
 **Learning:** Chaining array methods (e.g. `.filter(n => n.filePath).length`) and mapping over arrays separately to calculate simple metrics like counts or orphan entities wastes execution time and creates large intermediate array memory allocations.
 **Action:** When computing multiple simple metrics across a graph or dataset (e.g., node typing, relationships, existence of file paths), combine all checks into a single `for...of` loop with simple accumulators (`count++`, `Map.set`) to collapse multiple O(N) array loops into a single O(N) pass.
 >>>>>>> 819a139 (refactor: remove noisy bolt comment)
+## 2024-05-30 - Prevent Array Traversal Overhead on Large Data Sets
+**Learning:** Chaining array methods like `.filter(...).slice(0, N)` on potentially large datasets (like static analysis findings) forces a full O(N) traversal of the array and allocates intermediate arrays in memory, causing unnecessary GC pressure and CPU overhead, especially since we only need the first N elements.
+**Action:** Always replace `.filter(...).slice(0, N)` chains with a `for...of` loop containing an early `break` when a maximum threshold (e.g., `length >= N`) is met. This ensures the loop exits early, turning O(N) worst-case into O(1) best/average case depending on where matches are found.
