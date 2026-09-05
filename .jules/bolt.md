@@ -83,3 +83,7 @@
 **Learning:** Chaining array methods (e.g. `.filter(n => n.filePath).length`) and mapping over arrays separately to calculate simple metrics like counts or orphan entities wastes execution time and creates large intermediate array memory allocations.
 **Action:** When computing multiple simple metrics across a graph or dataset (e.g., node typing, relationships, existence of file paths), combine all checks into a single `for...of` loop with simple accumulators (`count++`, `Map.set`) to collapse multiple O(N) array loops into a single O(N) pass.
 >>>>>>> 819a139 (refactor: remove noisy bolt comment)
+
+## 2024-05-20 - Array.prototype.sort with indexOf Bottleneck
+**Learning:** Using `Array.prototype.sort()` combined with `Array.prototype.indexOf()` inside the comparator for prioritizing large collections of elements creates an O(N log N) performance bottleneck. The constant $O(K)$ lookup overhead of `indexOf` inside the $O(N \log N)$ sorting loop exacerbates the slowness, particularly in Node.js event loops when sorting thousands of items.
+**Action:** When categorizing or prioritizing elements into a predefined set of buckets, replace sorting with an O(N) bucket-collection strategy. Linearly iterate over the collection, allocate elements to their respective arrays in a dictionary, and concatenate the buckets to preserve stability and significantly improve execution speed. Always use prototype-safe key lookups (`Object.hasOwn`) when mapping dynamic properties to bucket dictionary keys.
