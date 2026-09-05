@@ -34,9 +34,11 @@ export class SecurityScanner {
         return;
       }
 
+      const safeLabel = node.label.length > 1000 ? node.label.substring(0, 1000) : node.label;
+
       // 1. Detect Hardcoded Secrets
       if (node.type === "variable") {
-        if (secretRegex.test(node.label)) {
+        if (secretRegex.test(safeLabel)) {
           findings.push({
             severity: "HIGH",
             type: "HARDCODED_SECRET",
@@ -49,7 +51,7 @@ export class SecurityScanner {
 
       // 2. Detect Unsafe Functions (eval, exec, etc.)
       else if (node.type === "function") {
-        if (unsafeRegex.test(node.label)) {
+        if (unsafeRegex.test(safeLabel)) {
           findings.push({
             severity: "CRITICAL",
             type: "UNSAFE_FUNCTION",
@@ -61,9 +63,9 @@ export class SecurityScanner {
 
         // 3. Detect Potential SQL Injection
         if (
-          (node.label.includes("Query") || node.label.includes("execute")) &&
-          node.label !== "execute" &&
-          !node.label.endsWith("UseCase")
+          (safeLabel.includes("Query") || safeLabel.includes("execute")) &&
+          safeLabel !== "execute" &&
+          !safeLabel.endsWith("UseCase")
         ) {
           findings.push({
             severity: "MEDIUM",
