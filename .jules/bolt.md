@@ -85,4 +85,4 @@
 >>>>>>> 819a139 (refactor: remove noisy bolt comment)
 ## 2024-05-30 - Prevent Array Traversal Overhead on Large Data Sets
 **Learning:** Chaining array methods like `.filter(...).slice(0, N)` on potentially large datasets (like static analysis findings) forces a full O(N) traversal of the array and allocates intermediate arrays in memory, causing unnecessary GC pressure and CPU overhead, especially since we only need the first N elements.
-**Action:** Always replace `.filter(...).slice(0, N)` chains with a `for...of` loop containing an early `break` when a maximum threshold (e.g., `length >= N`) is met. This ensures the loop exits early, turning O(N) worst-case into O(1) best/average case depending on where matches are found.
+**Action:** Prefer replacing `.filter(...).slice(0, N)` chains with a `for...of` loop containing an early `break` when a maximum threshold (e.g., `length >= N`) is met, especially for known hotspots or large data sets. This ensures the loop exits early, turning O(N) worst-case into O(1) best/average case depending on where matches are found. For trivially small arrays, the clarity of `.slice()` may still be acceptable.
