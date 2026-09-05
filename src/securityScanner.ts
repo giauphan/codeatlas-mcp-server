@@ -10,6 +10,8 @@ export interface SecurityFinding {
   snippet?: string;
 }
 
+const MAX_LABEL_LENGTH = 1000;
+
 export class SecurityScanner {
   /**
    * Scan an analyzed project for security vulnerabilities
@@ -34,7 +36,8 @@ export class SecurityScanner {
         return;
       }
 
-      const safeLabel = node.label.length > 1000 ? node.label.substring(0, 1000) : node.label;
+      const label = node.label || "";
+      const safeLabel = label.length > MAX_LABEL_LENGTH ? label.substring(0, MAX_LABEL_LENGTH) : label;
 
       // 1. Detect Hardcoded Secrets
       if (node.type === "variable") {
