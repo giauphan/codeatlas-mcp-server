@@ -67,7 +67,7 @@ export class SecurityScanner {
         }
 
         // 3. Detect Potential SQL Injection
-        // Note: label !== "execute" prevents false positives for the literal method name "execute" alone, which is too generic.
+        // Exclude the bare word "execute" as it is too generic and causes false positives.
         if (
           (label.includes("Query") || label.includes("execute")) &&
           label !== "execute" &&
