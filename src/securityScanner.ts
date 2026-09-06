@@ -37,11 +37,12 @@ export class SecurityScanner {
         return;
       }
 
+      // Centralized truncation: prevents ReDoS by ensuring all node types are sanitized before string operations
+      let label = node.label ?? "";
+      if (label.length > MAX_LABEL_LENGTH) label = label.slice(0, MAX_LABEL_LENGTH);
+
       // 1. Detect Hardcoded Secrets
       if (node.type === "variable") {
-        let label = node.label ?? "";
-        if (label.length > MAX_LABEL_LENGTH) label = label.slice(0, MAX_LABEL_LENGTH);
-
         if (secretRegex.test(label)) {
           findings.push({
             severity: "HIGH",
@@ -55,9 +56,6 @@ export class SecurityScanner {
 
       // 2. Detect Unsafe Functions (eval, exec, etc.)
       else if (node.type === "function") {
-        let label = node.label ?? "";
-        if (label.length > MAX_LABEL_LENGTH) label = label.slice(0, MAX_LABEL_LENGTH);
-
         if (unsafeRegex.test(label)) {
           findings.push({
             severity: "CRITICAL",
