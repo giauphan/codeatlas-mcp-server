@@ -10,7 +10,7 @@ export interface SecurityFinding {
   snippet?: string;
 }
 
-// Reasonable upper bound for AST node identifiers; mitigates DoS via unbounded strings
+// Reasonable upper bound for AST node labels; mitigates DoS via unbounded strings
 const MAX_LABEL_LENGTH = 1000;
 
 export class SecurityScanner {
