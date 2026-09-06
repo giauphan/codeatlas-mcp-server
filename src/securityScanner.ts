@@ -37,7 +37,7 @@ export class SecurityScanner {
         return;
       }
 
-      // Use string coercion to safely handle potential non-string labels from malformed ASTs
+      // Use nullish coalescing to prevent "undefined" stringification, and coerce to string for safety
       const safeLabel = String(node.label ?? "").slice(0, MAX_LABEL_LENGTH);
 
       // 1. Detect Hardcoded Secrets
