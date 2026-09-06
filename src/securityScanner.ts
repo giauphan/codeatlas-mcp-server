@@ -37,12 +37,12 @@ export class SecurityScanner {
         return;
       }
 
-      // Use nullish coalescing to prevent "undefined" stringification, and coerce to string for safety
-      const safeLabel = String(node.label ?? "").slice(0, MAX_LABEL_LENGTH);
-
       // 1. Detect Hardcoded Secrets
       if (node.type === "variable") {
-        if (secretRegex.test(safeLabel)) {
+        let label = node.label ?? "";
+        if (label.length > MAX_LABEL_LENGTH) label = label.slice(0, MAX_LABEL_LENGTH);
+
+        if (secretRegex.test(label)) {
           findings.push({
             severity: "HIGH",
             type: "HARDCODED_SECRET",
@@ -55,7 +55,10 @@ export class SecurityScanner {
 
       // 2. Detect Unsafe Functions (eval, exec, etc.)
       else if (node.type === "function") {
-        if (unsafeRegex.test(safeLabel)) {
+        let label = node.label ?? "";
+        if (label.length > MAX_LABEL_LENGTH) label = label.slice(0, MAX_LABEL_LENGTH);
+
+        if (unsafeRegex.test(label)) {
           findings.push({
             severity: "CRITICAL",
             type: "UNSAFE_FUNCTION",
@@ -66,11 +69,11 @@ export class SecurityScanner {
         }
 
         // 3. Detect Potential SQL Injection
-        // Note: safeLabel !== "execute" prevents false positives for bare function names, as "execute" alone is too generic
+        // Note: label !== "execute" prevents false positives for the literal method name "execute" alone, which is too generic.
         if (
-          (safeLabel.includes("Query") || safeLabel.includes("execute")) &&
-          safeLabel !== "execute" &&
-          !safeLabel.endsWith("UseCase")
+          (label.includes("Query") || label.includes("execute")) &&
+          label !== "execute" &&
+          !label.endsWith("UseCase")
         ) {
           findings.push({
             severity: "MEDIUM",
