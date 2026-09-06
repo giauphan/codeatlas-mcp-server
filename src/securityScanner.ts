@@ -10,6 +10,7 @@ export interface SecurityFinding {
   snippet?: string;
 }
 
+// Reasonable upper bound for AST node identifiers; prevents ReDoS/DoS via unbounded strings
 const MAX_LABEL_LENGTH = 1000;
 
 export class SecurityScanner {
@@ -36,8 +37,9 @@ export class SecurityScanner {
         return;
       }
 
-      const label = node.label || "";
-      const safeLabel = label.length > MAX_LABEL_LENGTH ? label.substring(0, MAX_LABEL_LENGTH) : label;
+      // Use string coercion to safely handle potential non-string labels from malformed ASTs
+      const label = typeof node.label === "string" ? node.label : "";
+      const safeLabel = label.slice(0, MAX_LABEL_LENGTH);
 
       // 1. Detect Hardcoded Secrets
       if (node.type === "variable") {
