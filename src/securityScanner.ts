@@ -10,7 +10,7 @@ export interface SecurityFinding {
   snippet?: string;
 }
 
-// Reasonable upper bound for AST node labels; mitigates DoS via unbounded strings
+// Reasonable upper bound for AST node labels; prevents resource starvation; limits future ReDoS exposure
 const MAX_LABEL_LENGTH = 1000;
 
 export class SecurityScanner {
@@ -39,7 +39,10 @@ export class SecurityScanner {
 
       // Centralized truncation: prevents ReDoS by ensuring all node types are sanitized before string operations
       let label = node.label ?? "";
-      if (label.length > MAX_LABEL_LENGTH) label = label.slice(0, MAX_LABEL_LENGTH);
+      if (label.length > MAX_LABEL_LENGTH) {
+        console.warn(`[SecurityScanner] Truncated excessively long AST node label in ${filePath || "unknown"} (length: ${label.length})`);
+        label = label.slice(0, MAX_LABEL_LENGTH);
+      }
 
       // 1. Detect Hardcoded Secrets
       if (node.type === "variable") {
