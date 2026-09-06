@@ -66,7 +66,7 @@ export class SecurityScanner {
         }
 
         // 3. Detect Potential SQL Injection
-        // Note: safeLabel !== "execute" prevents false positives for bare function names
+        // Note: safeLabel !== "execute" prevents false positives for bare function names, as "execute" alone is too generic
         if (
           (safeLabel.includes("Query") || safeLabel.includes("execute")) &&
           safeLabel !== "execute" &&
