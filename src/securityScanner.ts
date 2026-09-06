@@ -38,7 +38,8 @@ export class SecurityScanner {
       }
 
       // Use nullish coalescing to prevent "undefined" stringification, and coerce to string for safety
-      const safeLabel = String(node.label ?? "").slice(0, MAX_LABEL_LENGTH);
+      const rawLabel = String(node.label ?? "");
+      const safeLabel = rawLabel.length > MAX_LABEL_LENGTH ? rawLabel.slice(0, MAX_LABEL_LENGTH) : rawLabel;
 
       // 1. Detect Hardcoded Secrets
       if (node.type === "variable") {
