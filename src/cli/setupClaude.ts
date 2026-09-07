@@ -3,7 +3,7 @@ import * as path from "path";
 import * as os from "os";
 import { fileURLToPath } from "url";
 import { bold, ok, fail, warn } from "./commands.js";
-import { getZedSettingsPath, getZedConfigDir, writeFileSyncNoFollow } from "../utils/pathUtils.js";
+import { getZedSettingsPath, getZedConfigDir } from "../utils/pathUtils.js";
 
 function getSettingsPath(): string {
   const home = os.homedir();
@@ -24,20 +24,26 @@ function mergeSettings(existingSettings: any): any {
   if (!merged.hooks) merged.hooks = {};
   if (!merged.permissions) merged.permissions = {};
   if (!merged.permissions.allow) merged.permissions.allow = [];
-  if (!merged.permissions.additionalDirectories) merged.permissions.additionalDirectories = [];
+  if (!merged.permissions.additionalDirectories)
+    merged.permissions.additionalDirectories = [];
 
   // Use native codeatlas CLI commands instead of bash scripts
   const brainContextCmd = "codeatlas brain-context";
   const taskRouterCmd = "codeatlas task-router";
   const brainSaveCmd = "codeatlas brain-save";
 
-  function mergeCommandHook(event: string, command: string, matcher?: string): void {
+  function mergeCommandHook(
+    event: string,
+    command: string,
+    matcher?: string,
+  ): void {
     if (!Array.isArray(merged.hooks[event])) merged.hooks[event] = [];
 
     const groups = merged.hooks[event];
-    let group = matcher === undefined
-      ? groups.find((candidate: any) => !candidate?.matcher)
-      : groups.find((candidate: any) => candidate?.matcher === matcher);
+    let group =
+      matcher === undefined
+        ? groups.find((candidate: any) => !candidate?.matcher)
+        : groups.find((candidate: any) => candidate?.matcher === matcher);
 
     if (!group) {
       group = matcher === undefined ? { hooks: [] } : { matcher, hooks: [] };
@@ -45,7 +51,11 @@ function mergeSettings(existingSettings: any): any {
     }
     if (!Array.isArray(group.hooks)) group.hooks = [];
 
-    if (!group.hooks.some((hook: any) => hook?.type === "command" && hook?.command === command)) {
+    if (
+      !group.hooks.some(
+        (hook: any) => hook?.type === "command" && hook?.command === command,
+      )
+    ) {
       group.hooks.push({ type: "command", command });
     }
   }
@@ -71,7 +81,9 @@ function mergeSettings(existingSettings: any): any {
   return merged;
 }
 
-export async function cmdSetupClaude(projectDir: string = process.cwd()): Promise<void> {
+export async function cmdSetupClaude(
+  projectDir: string = process.cwd(),
+): Promise<void> {
   console.log(`\n${bold("CodeAtlas Claude Integration Setup")}`);
   console.log("=".repeat(50));
 
@@ -79,10 +91,15 @@ export async function cmdSetupClaude(projectDir: string = process.cwd()): Promis
   console.log(`\n${bold("1. Verifying CodeAtlas CLI")}`);
   try {
     const { execSync } = await import("child_process");
-    const version = execSync("codeatlas-enterprise --version", { encoding: "utf-8", timeout: 5000 }).trim();
+    const version = execSync("codeatlas-enterprise --version", {
+      encoding: "utf-8",
+      timeout: 5000,
+    }).trim();
     console.log(`  ${ok()} CodeAtlas CLI version: ${version}`);
   } catch (e: any) {
-    console.log(`  ${warn()} CodeAtlas CLI not found globally. Using npx/local path.`);
+    console.log(
+      `  ${warn()} CodeAtlas CLI not found globally. Using npx/local path.`,
+    );
   }
 
   // 2. Update ~/.claude/settings.json
@@ -95,10 +112,15 @@ export async function cmdSetupClaude(projectDir: string = process.cwd()): Promis
       const content = fs.readFileSync(settingsPath, "utf-8");
       existingSettings = JSON.parse(content || "{}");
     } catch (e: any) {
-      console.log(`  ${warn()} Could not parse existing settings.json: ${e.message}`);
+      console.log(
+        `  ${warn()} Could not parse existing settings.json: ${e.message}`,
+      );
       console.log(`  ${warn()} Creating backup and merging default settings.`);
       // Create backup
-        writeFileSyncNoFollow(`${settingsPath}.bak-${Date.now()}`, fs.readFileSync(settingsPath, "utf-8"));
+      fs.writeFileSync(
+        `${settingsPath}.bak-${Date.now()}`,
+        fs.readFileSync(settingsPath, "utf-8"),
+      );
       existingSettings = {};
     }
   } else {
@@ -107,7 +129,7 @@ export async function cmdSetupClaude(projectDir: string = process.cwd()): Promis
 
   try {
     const merged = mergeSettings(existingSettings);
-      writeFileSyncNoFollow(settingsPath, JSON.stringify(merged, null, 2));
+    fs.writeFileSync(settingsPath, JSON.stringify(merged, null, 2), "utf-8");
     console.log(`  ${ok()} Updated hooks in ${settingsPath}`);
     console.log(`  • UserPromptSubmit: codeatlas brain-context + task-router`);
     console.log(`  • PostToolUse: codeatlas brain-save (all tools)`);
@@ -144,33 +166,46 @@ export async function cmdSetupZed(): Promise<void> {
     try {
       settings = JSON.parse(fs.readFileSync(settingsPath, "utf-8"));
     } catch (e: any) {
-      console.log(`  ${fail()} Could not parse existing ${settingsPath}: ${e.message}`);
+      console.log(
+        `  ${fail()} Could not parse existing ${settingsPath}: ${e.message}`,
+      );
       return;
     }
   } else {
     console.log(`  ${warn()} ${settingsPath} not found — will create it.`);
   }
 
-  if (settings.context_servers && (typeof settings.context_servers !== "object" || Array.isArray(settings.context_servers))) {
-    console.log(`  ${fail()} settings.context_servers exists but is not an object. Aborting to avoid clobbering.`);
+  if (
+    settings.context_servers &&
+    (typeof settings.context_servers !== "object" ||
+      Array.isArray(settings.context_servers))
+  ) {
+    console.log(
+      `  ${fail()} settings.context_servers exists but is not an object. Aborting to avoid clobbering.`,
+    );
     return;
   }
 
-  const ctxServers = settings.context_servers = settings.context_servers || {};
+  const ctxServers = (settings.context_servers =
+    settings.context_servers || {});
   const env: Record<string, string> = {};
-  if (process.env.CODEATLAS_API_KEY) env.CODEATLAS_API_KEY = process.env.CODEATLAS_API_KEY;
-  if (process.env.CODEATLAS_API_URL) env.CODEATLAS_API_URL = process.env.CODEATLAS_API_URL;
+  if (process.env.CODEATLAS_API_KEY)
+    env.CODEATLAS_API_KEY = process.env.CODEATLAS_API_KEY;
+  if (process.env.CODEATLAS_API_URL)
+    env.CODEATLAS_API_URL = process.env.CODEATLAS_API_URL;
   ctxServers["codeatlas-mcp-server"] = {
     command: "npx",
     args: ["-y", "codeatlas-mcp-server"],
     env,
   };
 
-    writeFileSyncNoFollow(settingsPath, JSON.stringify(settings, null, 2));
+  fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2), "utf-8");
   console.log(`  ${ok()} Registered context server in ${settingsPath}`);
 
   console.log("=".repeat(50));
   console.log(`\n${bold("Zed integration setup complete!")}`);
   console.log(`  Restart Zed for the context server to load.`);
-  console.log(`  Then ask the AI to use 'brain_context' to load Second Brain memory.\n`);
+  console.log(
+    `  Then ask the AI to use 'brain_context' to load Second Brain memory.\n`,
+  );
 }
