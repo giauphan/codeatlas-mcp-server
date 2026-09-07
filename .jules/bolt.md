@@ -5,13 +5,13 @@
 ## 2024-05-19 - CodeAnalyzer AST Parsing Graph Build Bottleneck
 **Learning:** Found an O(N*E) bottleneck in `buildAnalysisResult` where calculating degree involved repeatedly filtering `this.links` array for each node.
 **Action:** Replace `this.links.filter` with a single `nodeDegrees` Map that tallies edges across `this.links` in O(E), improving huge graph generation times significantly. Also optimized `entityCounts` grouping to O(N) by collapsing multiple `Array.from().filter()` calls into a single loop.
-## 2026-07-26 - [Performance improvement] Array.find inside Array.map
+## 2024-07-26 - [Performance improvement] Array.find inside Array.map
 **Learning:** Found an O(L*N) bottleneck in `mcpServer.ts` (exporting artifact summary) and `e2e.test.ts` where `Array.prototype.find()` was called inside `Array.prototype.map()` for every graph link to find its source and target nodes. This is extremely slow for large AST graphs.
 **Action:** Always precompute a lookup Map (e.g., `Map<string, string>`) in O(N) time before the loop, and use `.get()` to look up elements in O(1) time. Also avoid chained `.filter().map().slice()` by combining them into a single early-exit `for` loop.
-## 2026-07-26 - [Performance improvement] Optimized O(N*E) generateAIInsights
+## 2024-07-26 - [Performance improvement] Optimized O(N*E) generateAIInsights
 **Learning:** Filtering a links array for every node using `graph.links.filter` creates an O(N*E) bottleneck when checking relationships (like finding modules with many functions).
 **Action:** When filtering or counting relationships between nodes, avoid nesting a links filter inside a nodes loop. Instead, do a single O(E) pass over the links array to precompute the required counts in a Map, enabling O(1) lookups during the subsequent O(N) nodes loop.
-## 2025-07-29 - [Performance improvement] Optimized O(N*L) array some during node filtering
+## 2024-07-29 - [Performance improvement] Optimized O(N*L) array some during node filtering
 **Learning:** Checking for node connections by using `nodes.filter` and inside it `links.some` is an O(N*L) operation which leads to a severe performance bottleneck for large graphs. Precomputing a Set with all `source` and `target` links takes O(L) space and time and makes the lookup O(1), bringing the total time complexity to O(N+L).
 **Action:** When filtering or counting relationships between nodes, avoid nesting a links `some` or `filter` or `find` inside a nodes loop. Instead, do a single O(L) pass over the links array to precompute a `Set` or `Map`, enabling O(1) lookups during the subsequent O(N) nodes loop.
 ## 2026-08-02 - [Performance improvement] Optimized O(N²) Jaccard Similarity Calculation
@@ -30,19 +30,19 @@
 **Learning:** During analysis of the `call_graph` component inside `mcpServer.ts`, an O(N*E) logic pattern was found within the diagram's order resolving logic where `dedupLinks` (Array of size E) was getting filtered repeatedly per node (N instances). In addition, O(N²) issues were discovered with `.filter((val, i, arr) => arr.indexOf(val) === i)` logic when generating execution/reading orders.
 **Action:** When filtering relationships based on node IDs in a loop, precompute a `Map<string, string[]>` of targets / sources to avoid `O(N*E)` operation. When deduplicating arrays, avoid `.indexOf(val) === i` on `.filter()` over large lists. Instead, utilize `Set` instances with loops to achieve `O(N)` scaling with `O(1)` time checks.
 
-## 2025-07-29 - [Performance improvement] Optimized O(N) array filtering and mapping
+## 2024-07-29 - [Performance improvement] Optimized O(N) array filtering and mapping
 **Learning:** Chained array methods like `.filter().map()` or `.filter().slice().map()` on large sets of graph nodes are inefficient. They enforce multiple O(N) traversals of all nodes and create intermediate array allocations.
 **Action:** When filtering and mapping a large collection, use a single `for...of` loop. Apply filter conditions inside the loop and `push` to the result array. Implement early exit conditions (e.g. `count < limit`) to avoid iterating the entire collection unnecessarily when a limited slice is desired.
 
-## 2025-07-29 - [Performance improvement] Optimized O(E) double link traversal
+## 2024-07-29 - [Performance improvement] Optimized O(E) double link traversal
 **Learning:** Traversing the same `links` array multiple times (e.g. using `links.forEach()` to count outgoing connections, then `links.forEach()` again to count incoming connections) wastes execution time.
 **Action:** When calculating multiple distinct graph metrics from links, combine them into a single O(E) loop that populates multiple Maps simultaneously.
 
-## 2026-07-26 - [Performance improvement] Optimized O(N*L) link filtering inside node mapping
+## 2024-07-26 - [Performance improvement] Optimized O(N*L) link filtering inside node mapping
 **Learning:** Checking for node connections by using `nodes.map` and inside it `links.filter` is an O(N*L) operation which leads to a severe performance bottleneck for large graphs. Precomputing Maps for incoming/outgoing links by iterating over the `links` array once takes O(L) time and makes the lookup O(1), bringing the total time complexity to O(N+L).
 **Action:** When mapping relationships for a subset of nodes, avoid nesting a links `filter` inside a nodes `map`. Instead, do a single O(L) pass over the links array to precompute a `Map`, enabling O(1) lookups during the subsequent O(N) nodes mapping.
 
-## 2026-07-30 - [Performance improvement] Optimized O(N^2) Set intersections
+## 2024-07-30 - [Performance improvement] Optimized O(N^2) Set intersections
 **Learning:** Checking Set intersection and Jaccard similarity inside an O(N^2) loop using `new Set([...a].filter(x => b.has(x)))` creates massive garbage collection pressure by constantly allocating new temporary Arrays and Sets. You can calculate the intersection size and union size for Jaccard similarity without allocating anything by iterating through one set and counting the matches (`if (b.has(x)) intersectionSize++`), then computing `unionSize = a.size + b.size - intersectionSize`. If the similarity threshold is very low and the loop body executes for many pairs, this change yields proportionally more benefit since the inner loop executes more often.
 **Action:** When computing Set sizes for similarity algorithms inside tight loops, avoid creating new Sets or using spread syntax (`...`). Instead, manually iterate and maintain counter variables to prevent memory spikes.
 
@@ -67,15 +67,15 @@
 **Action:** When hoisting global regexes out of loops (e.g., in `mcpServer.ts`), always explicitly set `regex.lastIndex = 0` immediately before the loop or matching block that reuses it.
 
 <<<<<<< HEAD
-## 2026-08-19 - [Performance improvement] Optimized O(N) array filtering with string allocations when full traversal is necessary
+## 2024-08-19 - [Performance improvement] Optimized O(N) array filtering with string allocations when full traversal is necessary
 **Learning:** In the `manage_skills` query action, checking for case-insensitive matches using `s.description.toLowerCase().includes(q)` combined with chained `.filter().slice().map()` created massive garbage collection pressure by constantly allocating new temporary string, arrays, and objects for every element. Even when full array traversal is strictly required (e.g. to return the total `matchCount`), we can still dramatically reduce memory bloat.
 **Action:** When filtering through large string fields inside an array where full traversal is needed to count matches, avoid `.toLowerCase().includes()`. Instead, use a precompiled regular expression (`new RegExp(escapeRegExp(q), 'i')`) and `regex.test()`. Combine the filtering, counting, slicing, and mapping logic into a single `for...of` loop to completely eliminate intermediate array allocations.
 
-## 2026-08-27 - [Performance improvement] Optimized O(N) array `.find` with O(log N) binary search
+## 2024-08-27 - [Performance improvement] Optimized O(N) array `.find` with O(log N) binary search
 **Learning:** Checking for the closest preceding parent element by using `Array.prototype.find()` on an array that is already sorted (e.g., `reversedClasses` sorted descending by line number) is an O(N) operation inside another loop, leading to O(N*C) complexity.
 **Action:** When searching for an element based on a comparative condition (e.g. `line < func.line`) within a sorted array, always use a binary search to reduce the time complexity from O(N) to O(log N).
 
-## 2026-08-27 - [Performance improvement] Optimized multiple array allocations by avoiding `.slice().filter().slice()`
+## 2024-08-27 - [Performance improvement] Optimized multiple array allocations by avoiding `.slice().filter().slice()`
 **Learning:** Chaining array methods like `ls.slice().filter().slice()` creates multiple intermediate arrays, causing significant GC overhead, especially when parsing large text blocks (like git commit logs).
 **Action:** When extracting a small subset of elements from a large array based on a condition, avoid chained array methods. Instead, use a single `for` loop, conditionally push elements, and break early when the limit is reached.
 ## 2024-05-24 - [Performance improvement] Optimized O(N) chained array .filter() operations across multiple metrics
