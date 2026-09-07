@@ -1,10 +1,15 @@
 import chokidar from 'chokidar';
 import * as path from 'path';
 import * as https from 'https';
+import * as http from 'http';
 import { loadAnalysisAsync, registerOnProjectLoaded, getWorkspaceFromAncestors, getResolvedApiKey, isSystemIdeDirectory } from './projectService.js';
 
 export const httpsWrapper = {
-  request: https.request
+  request: (options: any, callback: (res: any) => void) => {
+    const isHttps = options.protocol === "https:" || options.port === 443;
+    const client = isHttps ? https : http;
+    return client.request(options, callback);
+  }
 };
 
 export let indexTimeout: NodeJS.Timeout | null = null;
@@ -30,9 +35,9 @@ export async function isIndexingEnabledForProject(projectName: string): Promise<
         }
       };
 
-      const req = httpsWrapper.request(options, (res) => {
+      const req = httpsWrapper.request(options, (res: any) => {
         let data = "";
-        res.on("data", (chunk) => { data += chunk; });
+        res.on("data", (chunk: any) => { data += chunk; });
         res.on("end", () => {
           if (res.statusCode && res.statusCode >= 200 && res.statusCode < 300) {
             try {
