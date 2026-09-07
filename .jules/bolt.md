@@ -83,3 +83,7 @@
 **Learning:** Chaining array methods (e.g. `.filter(n => n.filePath).length`) and mapping over arrays separately to calculate simple metrics like counts or orphan entities wastes execution time and creates large intermediate array memory allocations.
 **Action:** When computing multiple simple metrics across a graph or dataset (e.g., node typing, relationships, existence of file paths), combine all checks into a single `for...of` loop with simple accumulators (`count++`, `Map.set`) to collapse multiple O(N) array loops into a single O(N) pass.
 >>>>>>> 819a139 (refactor: remove noisy bolt comment)
+
+## 2024-11-20 - [Performance improvement] Optimized O(N) array filtering with slice using for loop
+**Learning:** Chaining `.filter()` followed by `.slice()` creates full O(N) traversals and intermediate array allocations, even if only a few elements are needed. This is an anti-pattern when extracting a small, bounded subset from a large dataset like `findings` in `src/securityScanner.ts`.
+**Action:** When extracting a subset of elements up to a limit, replace `.filter().slice()` with a single `for...of` loop. Accumulate matches into an array and use `if (result.length >= limit) break;` for an early exit.
