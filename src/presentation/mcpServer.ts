@@ -3,6 +3,7 @@ import { z } from "zod";
 import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
+import * as child_process from "child_process";
 import { getHomePath, getHermesConfigPath, getHermesPluginDir, getClaudeConfigPath, writeFileSyncNoFollow } from "../utils/pathUtils.js";
 import { jaccardSimilarity } from "../utils/mathUtils.js";
 import { checkAuth, logActivity } from "../services/authService.js";
@@ -10,6 +11,7 @@ import {
   discoverProjectsAsync,
   isPathInAuthorizedProjects,
   loadAnalysisAsync,
+  registerProject,
   getStats,
   fileExists,
   syncAnalysisToServer,
@@ -121,8 +123,11 @@ export function registerTools(server: McpServer) {
         const analyzer = new CodeAnalyzer(projectPath, maxFiles || 5000);
         const result = await analyzer.analyzeProject();
 
+        // Register the project globally so subsequent tools can find it
+        registerProject(resolvedPath);
+
         // Save in-memory cache
-        inMemoryAnalysisCache.set(path.resolve(projectPath), result);
+        inMemoryAnalysisCache.set(resolvedPath, result);
 
         // Sync to cloud server
         try {
@@ -2267,7 +2272,7 @@ export function registerTools(server: McpServer) {
 
       const maxC = Math.max(1, Math.min(commits || 5, 20));
       const result: any = { project: loaded.projectName };
-      const cp = require("child_process");
+      const cp = child_process;
 
       const execGit = (args: string[], maxBuffer?: number) => {
         // Security: Use strict allowlist for Git arguments instead of denylist
