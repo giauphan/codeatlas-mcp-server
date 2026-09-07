@@ -94,13 +94,13 @@ export class SecurityScanner {
     }
 
     try {
-      // ⚡ Bolt Optimization: Use a single loop with early exit to avoid full O(N) array traversal and intermediate allocations.
-      // Critical findings are typically rare, so we can break early to avoid unnecessary work.
+      // ⚡ Bolt Optimization: Use a single loop with early exit to avoid full O(N) traversal and intermediate array allocations.
+      // This is significantly faster for large findings arrays (e.g., in extensive scans) and avoids creating intermediate arrays.
       const criticalFindings: SecurityFinding[] = [];
       for (const f of findings) {
         if (f.severity === "CRITICAL" || f.severity === "HIGH") {
           criticalFindings.push(f);
-          if (criticalFindings.length >= 5) break;
+          if (criticalFindings.length >= 5) break; // Early exit when we have enough findings
         }
       }
 
