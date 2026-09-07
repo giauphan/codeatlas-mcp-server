@@ -3299,7 +3299,7 @@ def register(ctx):
         const q = query || "";
         let count = 0;
         const limitVal = limit || 20;
-        const results = [];
+        const results: Array<{ name: string; description: string; source: string }> = [];
 
         // ⚡ Bolt Optimization: Use precompiled regex and early loop exit instead of chaining .filter().slice()
         // and avoid .toLowerCase() intermediate string allocations across thousands of items.
