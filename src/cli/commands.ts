@@ -195,13 +195,46 @@ export async function cmdDoctor(): Promise<void> {
 export function isCLICommand(argv: string[]): boolean {
   const cmd = argv[2];
   if (!cmd) return false;
-  return ["init", "setup", "setup-hook", "setup-hooks", "validate-hook", "validate-hooks", "doctor", "--help", "-h"].includes(cmd);
+  return [
+    "init",
+    "setup",
+    "setup-hook",
+    "setup-hooks",
+    "validate-hook",
+    "validate-hooks",
+    "doctor",
+    "brain-context",
+    "brain-save",
+    "task-router",
+    "hook",
+    "hooks",
+    "--help",
+    "-h"
+  ].includes(cmd);
 }
-  
+
 export async function runCLI(): Promise<void> {
   const cmd = process.argv[2];
   if (cmd === "doctor") {
     await cmdDoctor();
+  } else if (cmd === "brain-context") {
+    await cmdBrainContext();
+  } else if (cmd === "brain-save") {
+    await cmdBrainSave();
+  } else if (cmd === "task-router") {
+    await cmdTaskRouter();
+  } else if (cmd === "hook" || cmd === "hooks") {
+    const subCmd = process.argv[3];
+    if (subCmd === "brain-context") {
+      await cmdBrainContext();
+    } else if (subCmd === "brain-save") {
+      await cmdBrainSave();
+    } else if (subCmd === "task-router") {
+      await cmdTaskRouter();
+    } else {
+      console.error(`Unknown hook: ${subCmd}`);
+      process.exit(1);
+    }
   } else if (cmd === "init" || cmd === "setup") {
     if (process.argv[3] === "claude") {
       const prefix = "--projectDir=";
