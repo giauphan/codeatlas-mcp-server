@@ -78,11 +78,9 @@
 ## 2026-08-27 - [Performance improvement] Optimized multiple array allocations by avoiding `.slice().filter().slice()`
 **Learning:** Chaining array methods like `ls.slice().filter().slice()` creates multiple intermediate arrays, causing significant GC overhead, especially when parsing large text blocks (like git commit logs).
 **Action:** When extracting a small subset of elements from a large array based on a condition, avoid chained array methods. Instead, use a single `for` loop, conditionally push elements, and break early when the limit is reached.
-=======
 ## 2024-05-24 - [Performance improvement] Optimized O(N) chained array .filter() operations across multiple metrics
 **Learning:** Chaining array methods (e.g. `.filter(n => n.filePath).length`) and mapping over arrays separately to calculate simple metrics like counts or orphan entities wastes execution time and creates large intermediate array memory allocations.
 **Action:** When computing multiple simple metrics across a graph or dataset (e.g., node typing, relationships, existence of file paths), combine all checks into a single `for...of` loop with simple accumulators (`count++`, `Map.set`) to collapse multiple O(N) array loops into a single O(N) pass.
->>>>>>> 819a139 (refactor: remove noisy bolt comment)
 
 ## 2024-11-20 - [Performance improvement] Optimized O(N) array filtering with slice using for loop
 **Learning:** Chaining `.filter()` followed by `.slice()` creates full O(N) traversals and intermediate array allocations, even if only a few elements are needed. This inflates time complexity from O(K) or O(min(N, K)) to a full O(N), and creates unnecessary memory pressure from intermediate allocations. This is an anti-pattern when extracting a small, bounded subset from a large dataset like `findings` (which can grow very large in extensive scans) in `src/securityScanner.ts`.
