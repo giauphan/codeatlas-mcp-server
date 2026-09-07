@@ -65,7 +65,7 @@ try {
     '  brain-context) exec "$HOOKS_DIR/brain-context.sh" ;;',
     '  brain-save) exec "$HOOKS_DIR/brain-save.sh" ;;',
     '  task-router) exec "$HOOKS_DIR/task-router.sh" ;;',
-    '  *) echo "unknown codeatlas hook: ${2:-}" >&2; exit 2 ;;',
+    '  *) echo "Unknown hook: ${2:-}" >&2; exit 2 ;;',
     'esac',
     ''
   ];
