@@ -47,3 +47,19 @@ export function writeFileSyncNoFollow(filePath: string, content: string, mode: n
     fs.closeSync(fd);
   }
 }
+
+export function appendFileSyncNoFollow(filePath: string, content: string, mode: number = 0o600): void {
+  const fd = fs.openSync(
+    filePath,
+    fs.constants.O_CREAT |   // Create file if it doesn't exist
+    fs.constants.O_WRONLY |  // Open for writing
+    fs.constants.O_APPEND |  // Append to file content if it exists
+    fs.constants.O_NOFOLLOW, // Prevent symlink following
+    mode
+  );
+  try {
+    fs.appendFileSync(fd, content);
+  } finally {
+    fs.closeSync(fd);
+  }
+}
