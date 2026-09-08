@@ -85,5 +85,8 @@
 >>>>>>> 819a139 (refactor: remove noisy bolt comment)
 
 ## 2024-05-30 - [Performance improvement] Optimized O(N) chained array .slice().map().filter() operations in hot path searches
+
+**Learning:** In text searching algorithms (like `code_search`), extracting subsets of lines using chained array methods (e.g., `lines.slice(...).map(...).filter(Boolean)`) inside the main loop creates significant intermediate array allocations and causes GC spikes, even if the final array size is small.
+**Action:** When extracting a subset of items for context mapping in a tight loop, replace chained `.slice().map().filter()` with a single `for` loop that iterates only over the target index bounds, manually evaluating, transforming (e.g., `trim()`), and conditionally `push`ing to the result array.
 **Learning:** In text searching algorithms (like `code_search`), extracting subsets of lines using chained array methods (e.g., `lines.slice(...).map(...).filter(Boolean)`) inside the main loop creates significant intermediate array allocations and causes GC spikes, even if the final array size is small.
 **Action:** When extracting a subset of items for context mapping in a tight loop, replace chained `.slice().map().filter()` with a single `for` loop that iterates only over the target index bounds, manually evaluating, transforming (e.g., `trim()`), and conditionally `push`ing to the result array.
