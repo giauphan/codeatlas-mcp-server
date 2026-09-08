@@ -1779,12 +1779,28 @@ export function registerTools(server: McpServer) {
           for (let i = 0; i < lines.length; i++) {
             if (results.length >= maxRes) break;
             if (searchRegex.test(lines[i])) {
+              // ⚡ Bolt Optimization: Use single loops instead of chained .slice().map().filter()
+              // to prevent intermediate array allocations during hot path file content searches.
+              const contextBefore: string[] = [];
+              const startIdx = Math.max(0, i - ctx);
+              for (let j = startIdx; j < i; j++) {
+                const trimmed = lines[j].trim();
+                if (trimmed) contextBefore.push(trimmed);
+              }
+
+              const contextAfter: string[] = [];
+              const endIdx = Math.min(lines.length, i + 1 + ctx);
+              for (let j = i + 1; j < endIdx; j++) {
+                const trimmed = lines[j].trim();
+                if (trimmed) contextAfter.push(trimmed);
+              }
+
               results.push({
                 file: path.relative(loaded.projectDir, filePath),
                 line: i + 1,
                 content: lines[i].trim(),
-                contextBefore: lines.slice(Math.max(0, i - ctx), i).map(l => l.trim()).filter(Boolean),
-                contextAfter: lines.slice(i + 1, i + 1 + ctx).map(l => l.trim()).filter(Boolean),
+                contextBefore,
+                contextAfter,
               });
             }
           }
