@@ -80,7 +80,3 @@
 ## 2024-05-24 - [Performance improvement] Optimized O(N) chained array .filter() operations across multiple metrics
 **Learning:** Chaining array methods (e.g. `.filter(n => n.filePath).length`) and mapping over arrays separately to calculate simple metrics like counts or orphan entities wastes execution time and creates large intermediate array memory allocations.
 **Action:** When computing multiple simple metrics across a graph or dataset (e.g., node typing, relationships, existence of file paths), combine all checks into a single `for...of` loop with simple accumulators (`count++`, `Map.set`) to collapse multiple O(N) array loops into a single O(N) pass.
-
-## 2026-09-08 - [Performance improvement] Optimized O(N) string allocation inside loop
-**Learning:** Checking for case-insensitive matches using `s.description.toLowerCase().includes(q)` combined with chained `.filter().slice().map()` creates massive garbage collection pressure by constantly allocating new temporary string, arrays, and objects for every element.
-**Action:** When filtering through large string fields inside an array, avoid `.toLowerCase().includes()`. Instead, use a precompiled regular expression (`new RegExp(q, 'i')`) and `regex.test()`. Combine the filtering, counting, slicing, and mapping logic into a single `for...of` loop to eliminate intermediate array allocations.
