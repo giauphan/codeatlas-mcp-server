@@ -1112,6 +1112,16 @@ export function registerTools(server: McpServer) {
       }
 
       if (seedNodes.size === 0) {
+        // ⚡ Bolt Optimization: Use a single O(N) loop with early exit instead of chained .filter().map().slice()
+        // to avoid allocating large intermediate arrays and unnecessarily traversing the entire node graph.
+        const suggestions: string[] = [];
+        for (const n of nodes) {
+          if (n.type === "module" && n.filePath) {
+            suggestions.push(n.label);
+            if (suggestions.length >= 10) break;
+          }
+        }
+
         return {
           content: [
             {
@@ -1120,10 +1130,7 @@ export function registerTools(server: McpServer) {
                 keyword,
                 matchCount: 0,
                 message: `No entities found matching '${keyword}'. Try a broader keyword.`,
-                suggestions: nodes
-                  .filter((n) => n.type === "module" && n.filePath)
-                  .map((n) => n.label)
-                  .slice(0, 10),
+                suggestions,
               }, null, 2),
             },
           ],
