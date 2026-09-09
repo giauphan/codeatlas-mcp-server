@@ -21,19 +21,25 @@ export function getApiUrl(): string {
   const normalizedUrl = url.trim().replace(/\/+$/, "");
   try {
     const parsedUrl = new URL(normalizedUrl);
+    // Security: Only allow safe protocols to prevent SSRF and unsafe deep links
     if (parsedUrl.protocol !== "https:") {
+      // Allow file: for local development
+      if (parsedUrl.protocol === "file:") {
+        return normalizedUrl;
+      }
+
+      // Allow unencrypted HTTP strictly for local network development
       if (parsedUrl.protocol === "http:") {
         if (parsedUrl.hostname !== "localhost" && parsedUrl.hostname !== "127.0.0.1") {
-          throw new Error("unsupported protocol"); // Sanitize error message, do not leak hostname
+          throw new Error("unsupported protocol"); // Sanitize error message, do not leak external hostnames
         }
       } else {
         throw new Error("unsupported protocol");
       }
     }
-  } catch {
+  } catch (err) {
     throw new Error(
-      "CODEATLAS_API_URL must be a valid HTTP or HTTPS URL. " +
-      "Please check your configuration."
+      `CODEATLAS_API_URL must be a valid HTTP, HTTPS, or FILE URL. Invalid URL: ${err instanceof Error ? err.message : String(err)}`
     );
   }
   return normalizedUrl;

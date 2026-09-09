@@ -28,16 +28,21 @@ describe("getApiUrl", () => {
 
   it("throws when CODEATLAS_API_URL is malformed or uses an unsupported protocol", () => {
     process.env.CODEATLAS_API_URL = "not a URL";
-    assert.throws(() => getApiUrl(), /must be a valid HTTP or HTTPS URL/);
+    assert.throws(() => getApiUrl(), /must be a valid HTTP, HTTPS, or FILE URL/);
     process.env.CODEATLAS_API_URL = "ftp://example.test";
-    assert.throws(() => getApiUrl(), /must be a valid HTTP or HTTPS URL/);
+    assert.throws(() => getApiUrl(), /must be a valid HTTP, HTTPS, or FILE URL/);
   });
 
   it("throws when CODEATLAS_API_URL is HTTP and hostname is not localhost or 127.0.0.1", () => {
     process.env.CODEATLAS_API_URL = "http://example.com";
-    assert.throws(() => getApiUrl(), /must be a valid HTTP or HTTPS URL/);
+    assert.throws(() => getApiUrl(), /must be a valid HTTP, HTTPS, or FILE URL/);
     process.env.CODEATLAS_API_URL = "http://192.168.1.1";
-    assert.throws(() => getApiUrl(), /must be a valid HTTP or HTTPS URL/);
+    assert.throws(() => getApiUrl(), /must be a valid HTTP, HTTPS, or FILE URL/);
+  });
+
+  it("returns the configured URL for the file: protocol", () => {
+    process.env.CODEATLAS_API_URL = "file:///tmp/local-data";
+    assert.strictEqual(getApiUrl(), "file:///tmp/local-data");
   });
 
   it("returns the configured URL for localhost and 127.0.0.1 on HTTP", () => {
