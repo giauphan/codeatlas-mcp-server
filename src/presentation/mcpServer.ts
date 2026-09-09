@@ -1118,6 +1118,7 @@ export function registerTools(server: McpServer) {
         for (const n of nodes) {
           if (n.type === "module" && n.filePath) {
             suggestions.push(n.label);
+            // Cap at 10 suggestions to prevent overwhelming the LLM context window while providing enough useful alternatives
             if (suggestions.length >= 10) break;
           }
         }
