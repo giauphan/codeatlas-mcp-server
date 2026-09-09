@@ -10,6 +10,9 @@ export interface SecurityFinding {
   snippet?: string;
 }
 
+// Reasonable upper bound for AST node labels; prevents resource starvation; limits future ReDoS exposure
+const MAX_LABEL_LENGTH = 1000;
+
 export class SecurityScanner {
   /**
    * Scan an analyzed project for security vulnerabilities
@@ -21,7 +24,7 @@ export class SecurityScanner {
     // ⚡ Bolt Optimization: Use precompiled regexes to avoid intermediate string allocations (e.g. .toLowerCase())
     const secretRegex = /api_key|secret|password|token|private_key|access_key/i;
     const unsafeRegex = /^(?:eval|exec|system|child_process|spawn|shell_exec)$/i;
-    const testMockDiagnosticRegex = /(?:[\/\\](?:tests?|__tests__|mocks?|scratch|diagnostic)[\/\\]|\.(?:test|spec)\.)/i;
+    const testMockDiagnosticRegex = /(?:^|[\/\\])(?:tests?|__tests__|mocks?|scratch|diagnostic)[\/\\]|\.(?:test|spec)\./i;
 
     // Helper to identify test, mock or diagnostic files
     const isTestOrMockFile = (filePath: string): boolean => {
@@ -34,13 +37,20 @@ export class SecurityScanner {
         return;
       }
 
+      // Centralized truncation: prevents ReDoS by ensuring all node types are sanitized before string operations
+      let label = node.label ?? "";
+      if (label.length > MAX_LABEL_LENGTH) {
+        console.warn(`[SecurityScanner] Truncated excessively long AST node label in ${filePath || "unknown"} (length: ${label.length})`);
+        label = label.slice(0, MAX_LABEL_LENGTH);
+      }
+
       // 1. Detect Hardcoded Secrets
       if (node.type === "variable") {
-        if (secretRegex.test(node.label)) {
+        if (secretRegex.test(label)) {
           findings.push({
             severity: "HIGH",
             type: "HARDCODED_SECRET",
-            message: `Potential hardcoded secret found in variable: ${node.label}`,
+            message: `Potential hardcoded secret found in variable: ${label}`,
             filePath: filePath || "unknown",
             line: node.line || null
           });
@@ -49,26 +59,27 @@ export class SecurityScanner {
 
       // 2. Detect Unsafe Functions (eval, exec, etc.)
       else if (node.type === "function") {
-        if (unsafeRegex.test(node.label)) {
+        if (unsafeRegex.test(label)) {
           findings.push({
             severity: "CRITICAL",
             type: "UNSAFE_FUNCTION",
-            message: `Use of potentially dangerous function: ${node.label}`,
+            message: `Use of potentially dangerous function: ${label}`,
             filePath: filePath || "unknown",
             line: node.line || null
           });
         }
 
         // 3. Detect Potential SQL Injection
+        // Exclude the bare word "execute" as it is too generic and causes false positives.
         if (
-          (node.label.includes("Query") || node.label.includes("execute")) &&
-          node.label !== "execute" &&
-          !node.label.endsWith("UseCase")
+          (label.includes("Query") || label.includes("execute")) &&
+          label !== "execute" &&
+          !label.endsWith("UseCase")
         ) {
           findings.push({
             severity: "MEDIUM",
             type: "SQL_INJECTION_RISK",
-            message: `Potential SQL Injection risk in database call: ${node.label}. Ensure parameterized queries are used.`,
+            message: `Potential SQL Injection risk in database call: ${label}. Ensure parameterized queries are used.`,
             filePath: filePath || "unknown",
             line: node.line || null
           });
@@ -94,7 +105,16 @@ export class SecurityScanner {
     }
 
     try {
-      const criticalFindings = findings.filter(f => f.severity === "CRITICAL" || f.severity === "HIGH").slice(0, 5);
+      const MAX_CRITICAL_FINDINGS = 5;
+      const criticalFindings: SecurityFinding[] = [];
+      for (const f of findings) {
+        if (f.severity === "CRITICAL" || f.severity === "HIGH") {
+          criticalFindings.push(f);
+        }
+        if (criticalFindings.length >= MAX_CRITICAL_FINDINGS) {
+          break;
+        }
+      }
       const codeContext = criticalFindings.map(f => {
         return "[" + f.severity + "] " + f.type + ": " + f.message + " (" + f.filePath + ":" + f.line + ")";
       }).join("\n");
