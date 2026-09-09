@@ -22,6 +22,8 @@ export function getApiUrl(): string {
   try {
     const parsedUrl = new URL(normalizedUrl);
     // Security: Only allow safe protocols to prevent SSRF and unsafe deep links
+    // Note: file: protocol is allowed for local development only. In production,
+    // this should be configured with a proper HTTPS endpoint.
     if (parsedUrl.protocol !== "https:") {
       // Allow file: for local development.
       // This is safe and necessary because the CodeAtlas MCP server often runs locally
@@ -31,7 +33,7 @@ export function getApiUrl(): string {
         return normalizedUrl;
       }
 
-      // Allow unencrypted HTTP strictly for local network development
+      // Allow unencrypted HTTP strictly for localhost
       if (parsedUrl.protocol === "http:") {
         if (parsedUrl.hostname !== "localhost" && parsedUrl.hostname !== "127.0.0.1") {
           throw new Error("unsupported protocol"); // Sanitize error message, do not leak external hostnames
