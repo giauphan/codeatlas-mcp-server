@@ -1114,6 +1114,7 @@ export function registerTools(server: McpServer) {
       if (seedNodes.size === 0) {
         // ⚡ Bolt Optimization: Use a single O(N) loop with early exit instead of chained .filter().map().slice()
         // to avoid allocating large intermediate arrays and unnecessarily traversing the entire node graph.
+        // This optimization is particularly important for large codebases with thousands of nodes.
         const suggestions: string[] = [];
         for (const n of nodes) {
           if (n.type === "module" && n.filePath) {
