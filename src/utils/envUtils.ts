@@ -21,30 +21,14 @@ export function getApiUrl(): string {
   const normalizedUrl = url.trim().replace(/\/+$/, "");
   try {
     const parsedUrl = new URL(normalizedUrl);
-    // Security: Only allow safe protocols to prevent SSRF and unsafe deep links
-    // Note: file: protocol is allowed for local development only. In production,
-    // this should be configured with a proper HTTPS endpoint.
-    if (parsedUrl.protocol !== "https:") {
-      // Allow file: for local development.
-      // This is safe and necessary because the CodeAtlas MCP server often runs locally
-      // (e.g., within Claude Code or Zed) and may need to resolve local configuration
-      // or manifest files via the file protocol in an enterprise context.
-      if (parsedUrl.protocol === "file:") {
-        return normalizedUrl;
-      }
-
-      // Allow unencrypted HTTP strictly for localhost
-      if (parsedUrl.protocol === "http:") {
-        if (parsedUrl.hostname !== "localhost" && parsedUrl.hostname !== "127.0.0.1") {
-          throw new Error("unsupported protocol"); // Sanitize error message, do not leak external hostnames
-        }
-      } else {
-        throw new Error("unsupported protocol");
-      }
+    const isLoopbackHttp = parsedUrl.protocol === "http:" && ["localhost", "127.0.0.1", "[::1]"].includes(parsedUrl.hostname);
+    if (parsedUrl.protocol !== "https:" && !isLoopbackHttp) {
+      throw new Error("unsupported protocol");
     }
-  } catch (err) {
+  } catch {
     throw new Error(
-      `CODEATLAS_API_URL must be a valid HTTP, HTTPS, or FILE URL. Invalid URL: ${err instanceof Error ? err.message : String(err)}`
+      "CODEATLAS_API_URL must be a valid HTTPS URL or local HTTP URL. " +
+      "Please check your configuration."
     );
   }
   return normalizedUrl;
