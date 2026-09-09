@@ -21,8 +21,14 @@ export function getApiUrl(): string {
   const normalizedUrl = url.trim().replace(/\/+$/, "");
   try {
     const parsedUrl = new URL(normalizedUrl);
-    if (parsedUrl.protocol !== "http:" && parsedUrl.protocol !== "https:") {
-      throw new Error("unsupported protocol");
+    if (parsedUrl.protocol !== "https:") {
+      if (parsedUrl.protocol === "http:") {
+        if (parsedUrl.hostname !== "localhost" && parsedUrl.hostname !== "127.0.0.1") {
+          throw new Error("unsupported protocol"); // Sanitize error message, do not leak hostname
+        }
+      } else {
+        throw new Error("unsupported protocol");
+      }
     }
   } catch {
     throw new Error(

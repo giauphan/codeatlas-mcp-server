@@ -33,9 +33,25 @@ describe("getApiUrl", () => {
     assert.throws(() => getApiUrl(), /must be a valid HTTP or HTTPS URL/);
   });
 
-  it("returns the configured URL", () => {
+  it("throws when CODEATLAS_API_URL is HTTP and hostname is not localhost or 127.0.0.1", () => {
+    process.env.CODEATLAS_API_URL = "http://example.com";
+    assert.throws(() => getApiUrl(), /must be a valid HTTP or HTTPS URL/);
+    process.env.CODEATLAS_API_URL = "http://192.168.1.1";
+    assert.throws(() => getApiUrl(), /must be a valid HTTP or HTTPS URL/);
+  });
+
+  it("returns the configured URL for localhost and 127.0.0.1 on HTTP", () => {
     process.env.CODEATLAS_API_URL = "http://127.0.0.1:3381";
     assert.strictEqual(getApiUrl(), "http://127.0.0.1:3381");
+    process.env.CODEATLAS_API_URL = "http://localhost:3381";
+    assert.strictEqual(getApiUrl(), "http://localhost:3381");
+  });
+
+  it("returns the configured URL for any domain on HTTPS", () => {
+    process.env.CODEATLAS_API_URL = "https://example.com";
+    assert.strictEqual(getApiUrl(), "https://example.com");
+    process.env.CODEATLAS_API_URL = "https://127.0.0.1:3381";
+    assert.strictEqual(getApiUrl(), "https://127.0.0.1:3381");
   });
 
   it("trims whitespace and strips trailing slashes", () => {
