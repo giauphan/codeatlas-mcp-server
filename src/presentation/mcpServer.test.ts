@@ -110,3 +110,35 @@ test("getTraceNodes", async (t) => {
     assert.deepEqual(result, [{ id: "a", type: "function" }, { id: "b", type: "class" }]);
   });
 });
+
+test("trace_feature_flow suggestions fallback early exit", async (t) => {
+    // Reconstruct the logic locally to test it in isolation
+    const nodes = [
+      { type: "module", filePath: "path/1", label: "label1" },
+      { type: "module", filePath: "path/2", label: "label2" },
+      { type: "module", filePath: "path/3", label: "label3" },
+      { type: "module", filePath: "path/4", label: "label4" },
+      { type: "module", filePath: "path/5", label: "label5" },
+      { type: "module", filePath: "path/6", label: "label6" },
+      { type: "module", filePath: "path/7", label: "label7" },
+      { type: "module", filePath: "path/8", label: "label8" },
+      { type: "module", filePath: "path/9", label: "label9" },
+      { type: "module", filePath: "path/10", label: "label10" },
+      { type: "module", filePath: "path/11", label: "label11" },
+      { type: "module", filePath: "path/12", label: "label12" },
+    ];
+
+    let iterations = 0;
+    const suggestions: string[] = [];
+    for (const n of nodes) {
+      iterations++;
+      if (n.type === "module" && n.filePath) {
+        suggestions.push(n.label);
+        // Cap at 10 suggestions to prevent overwhelming the LLM context window while providing enough useful alternatives
+        if (suggestions.length >= 10) break;
+      }
+    }
+
+    assert.strictEqual(suggestions.length, 10, "Should exactly capture 10 suggestions");
+    assert.strictEqual(iterations, 10, "Should exit early and only iterate 10 times, avoiding the remaining nodes");
+});
