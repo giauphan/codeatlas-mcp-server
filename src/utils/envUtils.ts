@@ -23,7 +23,10 @@ export function getApiUrl(): string {
     const parsedUrl = new URL(normalizedUrl);
     // Security: Only allow safe protocols to prevent SSRF and unsafe deep links
     if (parsedUrl.protocol !== "https:") {
-      // Allow file: for local development
+      // Allow file: for local development.
+      // This is safe and necessary because the CodeAtlas MCP server often runs locally
+      // (e.g., within Claude Code or Zed) and may need to resolve local configuration
+      // or manifest files via the file protocol in an enterprise context.
       if (parsedUrl.protocol === "file:") {
         return normalizedUrl;
       }
