@@ -1112,7 +1112,6 @@ export function registerTools(server: McpServer) {
       }
 
       if (seedNodes.size === 0) {
-        // Collect up to 10 module suggestions without allocating intermediate arrays
         const suggestions: string[] = [];
         for (const n of nodes) {
           if (n.type === "module" && n.filePath) {
