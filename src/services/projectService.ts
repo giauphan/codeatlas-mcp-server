@@ -1,6 +1,7 @@
 import * as fs from "fs";
 import * as path from "path";
 import * as https from "https";
+import * as http from "http";
 import * as os from "os";
 import { getHomePath } from "../utils/pathUtils.js";
 import { CodeAnalyzer } from "../analyzer/parser.js";
@@ -1105,7 +1106,8 @@ export async function syncAnalysisToServer(projectName: string, analysis: any, b
         }
       };
 
-      const req = https.request(options, (res) => {
+      const requester = serverUrl.protocol === "https:" ? https : http;
+      const req = requester.request(options, (res) => {
         let data = "";
         res.on("data", (chunk) => { data += chunk; });
         res.on("end", () => {
@@ -1164,7 +1166,8 @@ export async function getEpisodicMemoriesFromServer(projectName: string, eventTy
         }
       };
 
-      const req = https.request(options, (res) => {
+      const requester = serverUrl.protocol === "https:" ? https : http;
+      const req = requester.request(options, (res) => {
         let data = "";
         res.on("data", (chunk) => { data += chunk; });
         res.on("end", () => {

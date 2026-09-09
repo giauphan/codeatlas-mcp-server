@@ -195,13 +195,46 @@ export async function cmdDoctor(): Promise<void> {
 export function isCLICommand(argv: string[]): boolean {
   const cmd = argv[2];
   if (!cmd) return false;
-  return ["init", "setup", "doctor", "--help", "-h"].includes(cmd);
+  return [
+    "init",
+    "setup",
+    "setup-hook",
+    "setup-hooks",
+    "validate-hook",
+    "validate-hooks",
+    "doctor",
+    "brain-context",
+    "brain-save",
+    "task-router",
+    "hook",
+    "hooks",
+    "--help",
+    "-h"
+  ].includes(cmd);
 }
-  
+
 export async function runCLI(): Promise<void> {
   const cmd = process.argv[2];
   if (cmd === "doctor") {
     await cmdDoctor();
+  } else if (cmd === "brain-context") {
+    await cmdBrainContext();
+  } else if (cmd === "brain-save") {
+    await cmdBrainSave();
+  } else if (cmd === "task-router") {
+    await cmdTaskRouter();
+  } else if (cmd === "hook" || cmd === "hooks") {
+    const subCmd = process.argv[3];
+    if (subCmd === "brain-context") {
+      await cmdBrainContext();
+    } else if (subCmd === "brain-save") {
+      await cmdBrainSave();
+    } else if (subCmd === "task-router") {
+      await cmdTaskRouter();
+    } else {
+      console.error(`Unknown hook: ${subCmd}`);
+      process.exit(1);
+    }
   } else if (cmd === "init" || cmd === "setup") {
     if (process.argv[3] === "claude") {
       const prefix = "--projectDir=";
@@ -221,19 +254,44 @@ export async function runCLI(): Promise<void> {
     } else {
       await cmdSetup();
     }
+  } else if (cmd === "setup-hook" || cmd === "setup-hooks" || (cmd === "setup" && process.argv[3] === "hook")) {
+    // Install Claude hooks using the setup-hooks script
+    console.log("🚀 Installing CodeAtlas hooks for Claude CLI...");
+    try {
+      // Run from repo root so scripts/setup-hooks.js resolves correctly
+      const { execFileSync } = await import("child_process");
+      execFileSync("node", ["scripts/setup-hooks.js"], { stdio: "inherit", cwd: process.cwd(), shell: false });
+      console.log("✅ Hooks installed successfully!");
+    } catch (error) {
+      console.error(`${fail()} Failed to install hooks: ${error}`);
+      process.exit(1);
+    }
+  } else if (cmd === "validate-hook" || cmd === "validate-hooks" || (cmd === "setup" && process.argv[3] === "hook" && (process.argv[4] === "--validate" || process.argv[4] === "-v"))) {
+    // Validate Claude hooks installation
+    console.log("🔍 Validating CodeAtlas hooks installation...");
+    const { execFileSync } = await import("child_process");
+    try {
+      execFileSync("node", ["scripts/validate-hooks.js"], { stdio: "inherit", cwd: process.cwd(), shell: false });
+      console.log("✅ Hooks validation completed successfully!");
+    } catch (error) {
+      console.error(`${fail()} Hooks validation failed: ${error}`);
+      process.exit(1);
+    }
   } else if (cmd === "--help" || cmd === "-h") {
     console.log(`
 Usage: codeatlas-enterprise <command>
 
 Commands:
-  init           Interactive Second Brain setup wizard
-  setup          Same as init
-  setup claude   Install Claude hooks and configs
-  setup zed      Register CodeAtlas as a Zed MCP context
-  doctor         Health check & diagnostics
-  brain-context  Load Second Brain context for current task
-  brain-save     Save dream memory to Second Brain
-  task-router    Route task to appropriate model
+  init              Interactive Second Brain setup wizard
+  setup             Same as init
+  setup claude      Install Claude hooks and configs
+  setup hook        Install CodeAtlas hooks for Claude CLI
+  setup validate     Validate hooks installation
+  setup zed         Register CodeAtlas as a Zed MCP context
+  doctor            Health check & diagnostics
+  brain-context     Load Second Brain context for current task
+  brain-save        Save dream memory to Second Brain
+  task-router       Route task to appropriate model
 
 Without a command, runs the MCP server.
 `);
