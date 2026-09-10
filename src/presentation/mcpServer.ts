@@ -186,7 +186,7 @@ export function registerTools(server: McpServer) {
     {
       project: z.string().max(255).optional().describe("Project name or path (auto-detects if omitted)"),
       type: z.enum(["all", "module", "class", "function", "variable"]).optional().describe("Filter by entity type. Choose one of: all, module, class, function, variable"),
-      limit: z.number().optional().describe("Max results to return (default: 100)"),
+      limit: z.number().optional().describe("Max results to return (default: 500)"),
     },
     async ({ project, type, limit }: { project?: string; type?: string; limit?: number }) => {
       const auth = await checkAuth();
@@ -529,13 +529,24 @@ export function registerTools(server: McpServer) {
 
       // Truncate if too many nodes
       if (nodes.length > max) {
-        const priorityOrder = ["module", "class", "function", "variable"];
-        nodes.sort((a, b) => {
-          const ia = priorityOrder.indexOf(a.type);
-          const ib = priorityOrder.indexOf(b.type);
-          return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
-        });
-        nodes = nodes.slice(0, max);
+        const buckets: Record<string, typeof nodes> = {
+          module: [],
+          class: [],
+          function: [],
+          variable: [],
+          other: [],
+        };
+        for (const node of nodes) {
+          if (Object.hasOwn(buckets, node.type) && (node.type as string) !== 'other') {
+            buckets[node.type].push(node);
+          } else {
+            buckets.other.push(node);
+          }
+        }
+        const sortedNodes = [
+          ...buckets.module, ...buckets.class, ...buckets.function, ...buckets.variable, ...buckets.other
+        ];
+        nodes = sortedNodes.slice(0, max);
       }
 
       const finalNodeIds = createNodeIdSet(nodes);
