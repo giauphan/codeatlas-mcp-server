@@ -472,15 +472,14 @@ export class CodeAnalyzer {
         remaining -= chunk.nodes.length;
       } else {
         // Partial load: take module nodes first, then classes, then functions, then variables
-        const priorityOrder = ['module', 'class', 'function', 'variable'];
-        const sorted = [...chunk.nodes].sort((a, b) => {
-          const indexA = priorityOrder.indexOf(a.type);
-          const indexB = priorityOrder.indexOf(b.type);
-          // Unknown types go to the end
-          const priorityA = indexA === -1 ? priorityOrder.length : indexA;
-          const priorityB = indexB === -1 ? priorityOrder.length : indexB;
-          return priorityA - priorityB;
-        });
+        // ⚡ Bolt Optimization: Replace O(N log N) sorting + indexOf with an O(N) bucket-collection strategy
+        const buckets: Record<string, typeof chunk.nodes> = { module: [], class: [], function: [], variable: [] };
+        const other: typeof chunk.nodes = [];
+        for (const n of chunk.nodes) {
+          if (Object.hasOwn(buckets, n.type)) buckets[n.type].push(n);
+          else other.push(n);
+        }
+        const sorted = [...buckets.module, ...buckets.class, ...buckets.function, ...buckets.variable, ...other];
         loadedNodes.push(...sorted.slice(0, remaining));
         loadedFolders.push(folderInfo.path);
         remaining = 0;
