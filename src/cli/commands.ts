@@ -258,6 +258,7 @@ export async function runCLI(): Promise<void> {
     // Install Claude hooks using the setup-hooks script
     console.log("🚀 Installing CodeAtlas hooks for Claude CLI...");
     try {
+      // Security: See .jules/sentinel.md (2024-05-30) for why we use spawnSync over execSync here
       // Run from repo root so scripts/setup-hooks.js resolves correctly
       const cwd = process.cwd();
       const { spawnSync } = await import("child_process");
@@ -280,6 +281,7 @@ export async function runCLI(): Promise<void> {
     // Validate Claude hooks installation
     console.log("🔍 Validating CodeAtlas hooks installation...");
     try {
+      // Security: See .jules/sentinel.md (2024-05-30) for why we use spawnSync over execSync here
       const cwd = process.cwd();
       const { spawnSync } = await import("child_process");
       const res = spawnSync(process.execPath, ["scripts/validate-hooks.js"], { stdio: "inherit", cwd, shell: false });
