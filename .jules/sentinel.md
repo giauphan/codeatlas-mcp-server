@@ -39,5 +39,5 @@
 
 ## 2024-05-18 - Fix Command Injection in Setup Script
 **Vulnerability:** Command Injection in `src/cli/setup-claude.js` via `execSync` which invokes a shell allowing metacharacter exploitation.
-**Learning:** `spawnSync` with `shell: false` is the secure alternative, but care must be taken to manually handle exit statuses (as `spawnSync` doesn't throw on non-zero exit codes like `execSync`) and avoid redundant path validation (e.g., blocking `\`) that inadvertently breaks Windows support.
+**Learning:** `spawnSync` is the secure alternative as it defaults to `shell: false` and inherently prevents command injection by passing arguments directly rather than evaluating them through a shell. Care must be taken to manually handle exit statuses as `spawnSync` doesn't throw on non-zero exit codes like `execSync`.
 **Prevention:** Always prefer `spawnSync` with array arguments over `execSync` for dynamic script execution. When migrating, explicitly handle `result.error` and `result.status !== 0`.

@@ -26,8 +26,7 @@ try {
 
   const result = spawnSync('node', [SETUP_SCRIPT], {
     stdio: 'inherit',
-    cwd: REPO_ROOT,
-    shell: false
+    cwd: REPO_ROOT
   });
 
   if (result.error) {
