@@ -5,7 +5,7 @@
 
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
-import { execFileSync } from 'child_process';
+import { execSync } from 'child_process';
 import { existsSync } from 'fs';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -24,10 +24,9 @@ try {
 
   console.log('📄 Found setup script, executing...\n');
 
-  execFileSync("node", [SETUP_SCRIPT], {
+  execSync(`node ${SETUP_SCRIPT}`, {
     stdio: 'inherit',
     cwd: REPO_ROOT,
-    shell: false
   });
 
   console.log('\n✅ All done!');

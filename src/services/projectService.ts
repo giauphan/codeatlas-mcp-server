@@ -1,4 +1,3 @@
-import { getApiUrl } from "../utils/envUtils.js";
 import * as fs from "fs";
 import * as path from "path";
 import * as https from "https";
@@ -1091,7 +1090,9 @@ export async function syncAnalysisToServer(projectName: string, analysis: any, b
   return new Promise((resolve, reject) => {
     try {
       const payload = JSON.stringify({ projectName, analysis, businessRule, changeDescription });
-      const serverUrl = new URL(getApiUrl());
+      const serverUrlStr = process.env.CODEATLAS_API_URL;
+      if (!serverUrlStr) throw new Error("CODEATLAS_API_URL not set");
+      const serverUrl = new URL(serverUrlStr);
       
       const options = {
         hostname: serverUrl.hostname,
@@ -1146,7 +1147,9 @@ export async function getEpisodicMemoriesFromServer(projectName: string, eventTy
 
   return new Promise((resolve, reject) => {
     try {
-      const serverUrl = new URL(getApiUrl());
+      const serverUrlStr = process.env.CODEATLAS_API_URL;
+      if (!serverUrlStr) throw new Error("CODEATLAS_API_URL not set");
+      const serverUrl = new URL(serverUrlStr);
       
       let pathStr = `/api/projects/memory?projectName=${encodeURIComponent(projectName)}`;
       if (eventType) {

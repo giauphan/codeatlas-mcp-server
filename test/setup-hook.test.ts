@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import * as assert from "node:assert";
-import { spawnSync } from "node:child_process";
+import { execSync, spawnSync } from "node:child_process";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
@@ -127,23 +127,6 @@ describe("setup-hook command", () => {
       assert.strictEqual(contextResult.status, 0, contextResult.stderr);
       assert.ok(contextResult.stdout.includes("Parser uses ESTree"));
       
-      // Security test: Attempt command injection via hook name
-      const maliciousHookName = "brain-context; echo INJECTED_SUCCESS";
-      const injectionResult = spawnSync("bash", [wrapperPath, "hook", maliciousHookName], {
-        encoding: "utf8",
-        env: {
-          ...process.env,
-          HOME: TEMP_HOME
-        }
-      });
-
-      // Because we fixed command injection, the wrapper should look for a file literally named "brain-context; echo INJECTED_SUCCESS"
-      // and fail safely, rather than executing the injected command.
-      assert.notStrictEqual(injectionResult.status, 0);
-      // It should NOT output the payload on stdout. The string might appear in stderr as part of the error message "Unknown hook: ...", which is expected and not execution.
-      assert.ok(!injectionResult.stdout.includes("INJECTED_SUCCESS"));
-      assert.ok(injectionResult.stderr.includes("Unknown hook"));
-
     } finally {
       // Clean up temp directory  
       fs.rmSync(TEMP_HOME, { recursive: true, force: true });

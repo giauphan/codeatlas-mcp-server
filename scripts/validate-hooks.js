@@ -14,7 +14,7 @@
 import { existsSync, readFileSync, statSync } from 'fs';
 import { homedir } from 'os';
 import { join } from 'path';
-import { execFileSync } from 'child_process';
+import { execSync } from 'child_process';
 
 const CLAUDE_HOOKS_DIR = join(homedir(), '.claude', 'hooks');
 const SETTINGS_FILE = join(homedir(), '.claude', 'settings.json');
@@ -102,7 +102,7 @@ check('codeatlas wrapper shows correct usage', () => {
   if (!existsSync(wrapperPath)) return false;
   
   try {
-    const output = execFileSync("bash", [wrapperPath], { encoding: 'utf8', timeout: 5000, shell: false });
+    const output = execSync(`bash ${wrapperPath}`, { encoding: 'utf8', timeout: 5000 });
     return false; // Should exit with error and show usage
   } catch (error) {
     // Expected to fail with usage message - check stderr or stdout
@@ -118,7 +118,7 @@ for (const hook of ['brain-save.sh', 'brain-context.sh', 'task-router.sh']) {
     if (!existsSync(hookPath)) return false;
     
     try {
-      execFileSync("bash", ["-n", hookPath], { timeout: 5000, shell: false });
+      execSync(`bash -n ${hookPath}`, { timeout: 5000 });
       return true;
     } catch (error) {
       return false;
@@ -132,10 +132,9 @@ check('brain-context.sh works in test mode', () => {
   if (!existsSync(hookPath)) return false;
   
   try {
-    const output = execFileSync("bash", [hookPath], {
+    const output = execSync(`bash ${hookPath}`, {
       encoding: 'utf8',
       timeout: 5000,
-      shell: false,
       env: {
         ...process.env,
         CODEATLAS_INJECT_BRAIN_CONTEXT: '1',
@@ -154,11 +153,9 @@ check('brain-save.sh exits cleanly without API URL', () => {
   if (!existsSync(hookPath)) return false;
   
   try {
-    const output = execFileSync("bash", [hookPath], {
-      input: '{"test":"data"}',
+    const output = execSync(`echo '{"test":"data"}' | bash ${hookPath}`, {
       encoding: 'utf8',
       timeout: 5000,
-      shell: false,
       env: {
         PATH: process.env.PATH || '',
         HOME: process.env.HOME || '',
