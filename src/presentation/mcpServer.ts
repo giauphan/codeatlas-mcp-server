@@ -2381,6 +2381,8 @@ export function registerTools(server: McpServer) {
             fs.mkdirSync(codeatlasDir, { recursive: true, mode: 0o700 });
           }
 
+          // Prevent path traversal by strictly validating that the resolved .codeatlas directory
+          // resides exactly within the resolved home directory, preventing symlink bypasses.
           const realCodeatlasDir = fs.realpathSync(codeatlasDir);
           const realHomeDir = fs.realpathSync(homeDir);
           const expectedCodeatlasDir = path.join(realHomeDir, ".codeatlas");
