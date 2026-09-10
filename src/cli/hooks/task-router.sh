@@ -36,7 +36,7 @@ def main():
     input_str = sys.argv[1]
     try:
         data = json.loads(input_str)
-    except json.JSONDecodeError:
+    except (json.JSONDecodeError, TypeError, RecursionError, ValueError):
         data = {}
     
     tool = data.get("tool") or data.get("tool_name", "")
