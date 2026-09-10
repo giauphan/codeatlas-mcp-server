@@ -36,3 +36,9 @@
 **Vulnerability:** The `export_team_artifact` tool used `fs.writeFileSync` to write `artifact-summary.json` and `artifact.json`. Despite comments indicating an intention to "Prevent symlink following on the output file itself", `fs.writeFileSync` intrinsically follows symlinks, leaving the application vulnerable to symlink-based TOCTOU (Time-of-Check to Time-of-Use) attacks where an attacker could overwrite arbitrary system files by pre-creating symlinks.
 **Learning:** Comments indicating security intent are not sufficient if the underlying API does not support the required semantics. `fs.writeFileSync` cannot be instructed to ignore symlinks via string flags like `"w"`.
 **Prevention:** To prevent TOCTOU and symlink following vulnerabilities when writing files, avoid `fs.writeFileSync(..., { flag: "w" })`. Instead, obtain a secure file descriptor using `fs.openSync` with the explicit `fs.constants.O_NOFOLLOW` flag alongside `O_CREAT | O_WRONLY | O_TRUNC`, write to the descriptor, and ensure it is reliably closed (e.g., using a `try...finally` block).
+
+## 2024-05-27 - Fix Path Traversal via symlink bypasses in fs.realpathSync string boundary checks
+
+**Vulnerability:** Path traversal check relying on `startsWith()` against resolved paths from `fs.realpathSync()` can be circumvented. For instance, `/home/user/.codeatlas_malicious` starts with `/home/user`.
+**Learning:** Using `startsWith()` for path boundary enforcement is inadequate and vulnerable to partial string matches.
+**Prevention:** Use exact path matching where the full path is deterministic (e.g. `=== path.join(resolvedHome, '.codeatlas')`), or guarantee boundary integrity using the OS path separator for non-deterministic paths.

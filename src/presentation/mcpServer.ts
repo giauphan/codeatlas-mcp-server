@@ -2380,7 +2380,16 @@ export function registerTools(server: McpServer) {
           if (!fs.existsSync(codeatlasDir)) {
             fs.mkdirSync(codeatlasDir, { recursive: true, mode: 0o700 });
           }
-          const envPath = path.join(codeatlasDir, ".env");
+
+          const realCodeatlasDir = fs.realpathSync(codeatlasDir);
+          const realHomeDir = fs.realpathSync(homeDir);
+          const expectedCodeatlasDir = path.join(realHomeDir, ".codeatlas");
+
+          if (realCodeatlasDir !== expectedCodeatlasDir) {
+            throw new Error("Path traversal detected: .codeatlas directory must be exactly inside home directory");
+          }
+
+          const envPath = path.join(realCodeatlasDir, ".env");
           let envContent = "";
           let fileExists = false;
           try {
@@ -2398,10 +2407,9 @@ export function registerTools(server: McpServer) {
             } else {
               envContent = envContent.replace(/CODEATLAS_API_KEY=.*(\r?\n|$)/g, () => `CODEATLAS_API_KEY=${key}\n`);
             }
-            // Use writeFileSync with temp file to avoid race conditions (partial mitigate)
-            fs.writeFileSync(envPath, envContent, { mode: 0o600 });
+            writeFileSyncNoFollow(envPath, envContent, 0o600);
           } else {
-            fs.writeFileSync(envPath, `CODEATLAS_API_KEY=${key}\n`, { mode: 0o600 });
+            writeFileSyncNoFollow(envPath, `CODEATLAS_API_KEY=${key}\n`, 0o600);
           }
         }
       } catch (err: any) {
