@@ -2386,7 +2386,7 @@ export function registerTools(server: McpServer) {
           const expectedCodeatlasDir = path.join(realHomeDir, ".codeatlas");
 
           if (realCodeatlasDir !== expectedCodeatlasDir) {
-            throw new Error("Path traversal detected: .codeatlas directory must be exactly inside home directory");
+            throw new Error(`Path traversal detected: .codeatlas directory must be exactly inside home directory. Expected: ${expectedCodeatlasDir}, Actual: ${realCodeatlasDir}`);
           }
 
           const envPath = path.join(realCodeatlasDir, ".env");
