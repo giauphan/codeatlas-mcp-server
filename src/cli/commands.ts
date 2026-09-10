@@ -727,9 +727,20 @@ export async function runCLI(): Promise<void> {
     // Install Claude hooks using the setup-hooks script
     console.log("🚀 Installing CodeAtlas hooks for Claude CLI...");
     try {
+      // Security: See .jules/sentinel.md (2024-05-30) for why we use spawnSync over execSync here
       // Run from repo root so scripts/setup-hooks.js resolves correctly
-      const { execSync } = await import("child_process");
-      execSync("node scripts/setup-hooks.js", { stdio: "inherit", cwd: process.cwd() });
+      const cwd = process.cwd();
+      const { spawnSync } = await import("child_process");
+      const res = spawnSync(process.execPath, ["scripts/setup-hooks.js"], { stdio: "inherit", cwd, shell: false });
+      if (res.error) {
+        throw res.error;
+      }
+      if (res.signal) {
+        throw new Error(`Process was killed by signal ${res.signal}`);
+      }
+      if (res.status !== 0) {
+        throw new Error(`Process exited with status ${res.status}`);
+      }
       console.log("✅ Hooks installed successfully!");
     } catch (error) {
       console.error(`${fail()} Failed to install hooks: ${error}`);
@@ -738,9 +749,20 @@ export async function runCLI(): Promise<void> {
   } else if (cmd === "validate-hook" || cmd === "validate-hooks" || (cmd === "setup" && process.argv[3] === "hook" && (process.argv[4] === "--validate" || process.argv[4] === "-v"))) {
     // Validate Claude hooks installation
     console.log("🔍 Validating CodeAtlas hooks installation...");
-    const { execSync } = await import("child_process");
     try {
-      execSync("node scripts/validate-hooks.js", { stdio: "inherit", cwd: process.cwd() });
+      // Security: See .jules/sentinel.md (2024-05-30) for why we use spawnSync over execSync here
+      const cwd = process.cwd();
+      const { spawnSync } = await import("child_process");
+      const res = spawnSync(process.execPath, ["scripts/validate-hooks.js"], { stdio: "inherit", cwd, shell: false });
+      if (res.error) {
+        throw res.error;
+      }
+      if (res.signal) {
+        throw new Error(`Process was killed by signal ${res.signal}`);
+      }
+      if (res.status !== 0) {
+        throw new Error(`Process exited with status ${res.status}`);
+      }
       console.log("✅ Hooks validation completed successfully!");
     } catch (error) {
       console.error(`${fail()} Hooks validation failed: ${error}`);
