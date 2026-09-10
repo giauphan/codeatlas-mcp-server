@@ -260,8 +260,7 @@ export async function runCLI(): Promise<void> {
     try {
       // Run from repo root so scripts/setup-hooks.js resolves correctly
       const { spawnSync } = await import("child_process");
-
-      const result = spawnSync(process.execPath, ["scripts/setup-hooks.js"], { stdio: "inherit", cwd: process.cwd(), shell: false });
+      const result = spawnSync(process.execPath, ["scripts/setup-hooks.js"], { stdio: "inherit", shell: false });
       if (result.error) throw result.error;
       if (result.status !== 0) throw new Error(`Process exited with status ${result.status}`);
       console.log("✅ Hooks installed successfully!");
@@ -274,8 +273,7 @@ export async function runCLI(): Promise<void> {
     console.log("🔍 Validating CodeAtlas hooks installation...");
     const { spawnSync } = await import("child_process");
     try {
-
-      const result = spawnSync(process.execPath, ["scripts/validate-hooks.js"], { stdio: "inherit", cwd: process.cwd(), shell: false });
+      const result = spawnSync(process.execPath, ["scripts/validate-hooks.js"], { stdio: "inherit", shell: false });
       if (result.error) throw result.error;
       if (result.status !== 0) throw new Error(`Process exited with status ${result.status}`);
       console.log("✅ Hooks validation completed successfully!");
