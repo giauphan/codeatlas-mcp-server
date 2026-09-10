@@ -161,6 +161,7 @@ trap 'rm -f "$LOCK"' EXIT
 # ── Extract last N user+assistant message pairs from project session file ──
 TRANSCRIPT=$(python3 - "$CONVO" <<'PY'
 import json, sys
+# Prevent stack overflow (DoS) on deeply nested malicious JSON payloads
 sys.setrecursionlimit(2000)
 
 filepath = sys.argv[1]
