@@ -36,7 +36,7 @@ payload = {}
 if raw:
     try:
         payload = json.loads(raw)
-    except Exception:
+    except (json.JSONDecodeError, TypeError, RecursionError, ValueError):
         pass
 
 cwd = payload.get("cwd", "")
@@ -94,7 +94,7 @@ payload = {}
 if raw:
     try:
         payload = json.loads(raw)
-    except Exception:
+    except (json.JSONDecodeError, TypeError, RecursionError, ValueError):
         pass
 
 cwd = payload.get("cwd") or os.environ.get("CLAUDE_PROJECT_DIR") or os.getcwd()
@@ -161,6 +161,7 @@ trap 'rm -f "$LOCK"' EXIT
 # ── Extract last N user+assistant message pairs from project session file ──
 TRANSCRIPT=$(python3 - "$CONVO" <<'PY'
 import json, sys
+sys.setrecursionlimit(2000)
 
 filepath = sys.argv[1]
 messages = []
@@ -175,7 +176,7 @@ try:
                 continue
             try:
                 line = json.loads(raw)
-            except Exception:
+            except (json.JSONDecodeError, TypeError, RecursionError, ValueError):
                 continue
 
             if line.get('isMeta'):
@@ -210,7 +211,7 @@ try:
                 continue
 
             messages.append({'role': role, 'content': text.strip()})
-except Exception:
+except (json.JSONDecodeError, TypeError, RecursionError, ValueError):
     pass
 
 msgs = messages[-8:] if len(messages) > 8 else messages

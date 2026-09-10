@@ -40,4 +40,4 @@
 ## 2025-02-28 - [Insecure JSON Parsing DoS Vulnerability in Bash Hooks]
 **Vulnerability:** Python-based JSON parsing in bash hooks (e.g., `task-router.sh`, `brain-save.sh`) previously used `except json.JSONDecodeError:` to handle parsing errors.
 **Learning:** Using a specific exception like `json.JSONDecodeError` for untrusted JSON input leaves the script vulnerable to crashes (Denial of Service) from other unhandled exceptions such as `TypeError` or `RecursionError` caused by malformed or maliciously crafted payloads.
-**Prevention:** When using `json.loads()` on untrusted input in shell scripts or integration hooks, always use a broad `except Exception:` block to ensure all potential parsing and structural errors are caught gracefully, preventing application crashes.
+**Prevention:** When using `json.loads()` on untrusted input in shell scripts or integration hooks, always use a broad `except (json.JSONDecodeError, TypeError, RecursionError, ValueError):` block to ensure all potential parsing and structural errors are caught gracefully, preventing application crashes.

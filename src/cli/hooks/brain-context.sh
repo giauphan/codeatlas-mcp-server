@@ -36,7 +36,7 @@ readarray -t HOOK_FIELDS < <(python3 -c '
 import json, os, sys
 try:
     payload = json.loads(os.environ.get("HOOK_INPUT", ""))
-except Exception:
+except (json.JSONDecodeError, TypeError, RecursionError, ValueError):
     payload = {}
 print(payload.get("prompt", "session context"))
 print(payload.get("cwd") or os.environ.get("CLAUDE_PROJECT_DIR") or os.getcwd())
@@ -72,7 +72,7 @@ import os
 def load(name):
     try:
         return json.loads(os.environ.get(name, ""))
-    except Exception:
+    except (json.JSONDecodeError, TypeError, RecursionError, ValueError):
         return {}
 
 
