@@ -36,3 +36,8 @@
 **Vulnerability:** The `export_team_artifact` tool used `fs.writeFileSync` to write `artifact-summary.json` and `artifact.json`. Despite comments indicating an intention to "Prevent symlink following on the output file itself", `fs.writeFileSync` intrinsically follows symlinks, leaving the application vulnerable to symlink-based TOCTOU (Time-of-Check to Time-of-Use) attacks where an attacker could overwrite arbitrary system files by pre-creating symlinks.
 **Learning:** Comments indicating security intent are not sufficient if the underlying API does not support the required semantics. `fs.writeFileSync` cannot be instructed to ignore symlinks via string flags like `"w"`.
 **Prevention:** To prevent TOCTOU and symlink following vulnerabilities when writing files, avoid `fs.writeFileSync(..., { flag: "w" })`. Instead, obtain a secure file descriptor using `fs.openSync` with the explicit `fs.constants.O_NOFOLLOW` flag alongside `O_CREAT | O_WRONLY | O_TRUNC`, write to the descriptor, and ensure it is reliably closed (e.g., using a `try...finally` block).
+
+## 2024-05-18 - Fix Command Injection in Setup Script
+**Vulnerability:** Command Injection in `src/cli/setup-claude.js` via `execSync` which invokes a shell allowing metacharacter exploitation.
+**Learning:** `spawnSync` with `shell: false` is the secure alternative, but care must be taken to manually handle exit statuses (as `spawnSync` doesn't throw on non-zero exit codes like `execSync`) and avoid redundant path validation (e.g., blocking `\`) that inadvertently breaks Windows support.
+**Prevention:** Always prefer `spawnSync` with array arguments over `execSync` for dynamic script execution. When migrating, explicitly handle `result.error` and `result.status !== 0`.
