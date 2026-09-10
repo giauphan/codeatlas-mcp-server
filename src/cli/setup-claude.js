@@ -34,7 +34,7 @@ try {
   }
 
   if (result.status !== 0) {
-    throw new Error(`Setup script exited with code ${result.status}`);
+    throw new Error(`Setup script failed with exit code ${result.status}: ${SETUP_SCRIPT}`);
   }
 
   console.log('\n✅ All done!');
