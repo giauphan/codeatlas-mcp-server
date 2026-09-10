@@ -18,6 +18,40 @@ export function getClaudeConfigPath(): string {
   return path.join(getHomePath(), ".claude", "claude.json");
 }
 
+export function getClaudeSettingsPath(): string {
+  return path.join(getHomePath(), ".claude", "settings.json");
+}
+
+export function getClaudeJsonPath(): string {
+  return path.join(getHomePath(), ".claude.json");
+}
+
+export function getClaudeHooksDir(): string {
+  return path.join(getHomePath(), ".claude", "hooks");
+}
+
+export function getClaudeDesktopConfigPath(): string {
+  if (process.platform === "darwin") {
+    return path.join(getHomePath(), "Library", "Application Support", "Claude", "claude_desktop_config.json");
+  }
+  if (process.platform === "win32") {
+    return path.join(process.env.APPDATA || getHomePath(), "Claude", "claude_desktop_config.json");
+  }
+  return path.join(getHomePath(), ".config", "Claude", "claude_desktop_config.json");
+}
+
+export function getGeminiSettingsPath(): string {
+  return path.join(getHomePath(), ".gemini", "settings.json");
+}
+
+export function getGeminiConfigPath(): string {
+  return path.join(getHomePath(), ".gemini", "config.json");
+}
+
+export function getCursorMcpPath(): string {
+  return path.join(getHomePath(), ".cursor", "mcp.json");
+}
+
 export function getZedConfigDir(): string {
   if (process.platform === "win32") {
     return path.join(process.env.APPDATA || getHomePath(), "zed");
