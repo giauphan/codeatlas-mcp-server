@@ -66,6 +66,10 @@ export function getZedSettingsPath(): string {
   return path.join(getZedConfigDir(), "settings.json");
 }
 
+/**
+ * Writes content to a file securely without following symlinks.
+ * Mitigates Time-of-Check to Time-of-Use (TOCTOU) symlink vulnerabilities.
+ */
 export function writeFileSyncNoFollow(filePath: string, content: string, mode: number = 0o600): void {
   const fd = fs.openSync(
     filePath,
