@@ -265,6 +265,9 @@ export async function runCLI(): Promise<void> {
       if (res.error) {
         throw res.error;
       }
+      if (res.signal) {
+        throw new Error(`Process was killed by signal ${res.signal}`);
+      }
       if (res.status !== 0) {
         throw new Error(`Process exited with status ${res.status}`);
       }
@@ -282,6 +285,9 @@ export async function runCLI(): Promise<void> {
       const res = spawnSync(process.execPath, ["scripts/validate-hooks.js"], { stdio: "inherit", cwd, shell: false });
       if (res.error) {
         throw res.error;
+      }
+      if (res.signal) {
+        throw new Error(`Process was killed by signal ${res.signal}`);
       }
       if (res.status !== 0) {
         throw new Error(`Process exited with status ${res.status}`);
