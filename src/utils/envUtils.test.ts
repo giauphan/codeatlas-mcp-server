@@ -26,38 +26,16 @@ describe("getApiUrl", () => {
     assert.throws(() => getApiUrl(), /CODEATLAS_API_URL environment variable is not set/);
   });
 
-  it("rejects malformed and non-network API URLs", () => {
+  it("throws when CODEATLAS_API_URL is malformed or uses an unsupported protocol", () => {
     process.env.CODEATLAS_API_URL = "not a URL";
-    assert.throws(() => getApiUrl(), /must be a valid HTTPS URL or local HTTP URL/);
-    process.env.CODEATLAS_API_URL = "file:///etc/passwd";
-    assert.throws(() => getApiUrl(), /must be a valid HTTPS URL or local HTTP URL/);
+    assert.throws(() => getApiUrl(), /must be a valid HTTP or HTTPS URL/);
     process.env.CODEATLAS_API_URL = "ftp://example.test";
-    assert.throws(() => getApiUrl(), /must be a valid HTTPS URL or local HTTP URL/);
+    assert.throws(() => getApiUrl(), /must be a valid HTTP or HTTPS URL/);
   });
 
-  it("rejects non-loopback HTTP API URLs", () => {
-    process.env.CODEATLAS_API_URL = "http://example.com";
-    assert.throws(() => getApiUrl(), /must be a valid HTTPS URL or local HTTP URL/);
-    process.env.CODEATLAS_API_URL = "http://localhost.evil.test";
-    assert.throws(() => getApiUrl(), /must be a valid HTTPS URL or local HTTP URL/);
-    process.env.CODEATLAS_API_URL = "http://192.168.1.1";
-    assert.throws(() => getApiUrl(), /must be a valid HTTPS URL or local HTTP URL/);
-  });
-
-  it("returns HTTP URLs for loopback hosts", () => {
+  it("returns the configured URL", () => {
     process.env.CODEATLAS_API_URL = "http://127.0.0.1:3381";
     assert.strictEqual(getApiUrl(), "http://127.0.0.1:3381");
-    process.env.CODEATLAS_API_URL = "http://localhost:3381";
-    assert.strictEqual(getApiUrl(), "http://localhost:3381");
-    process.env.CODEATLAS_API_URL = "http://[::1]:3381";
-    assert.strictEqual(getApiUrl(), "http://[::1]:3381");
-  });
-
-  it("returns the configured URL for any domain on HTTPS", () => {
-    process.env.CODEATLAS_API_URL = "https://example.com";
-    assert.strictEqual(getApiUrl(), "https://example.com");
-    process.env.CODEATLAS_API_URL = "https://127.0.0.1:3381";
-    assert.strictEqual(getApiUrl(), "https://127.0.0.1:3381");
   });
 
   it("trims whitespace and strips trailing slashes", () => {

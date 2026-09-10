@@ -1,11 +1,10 @@
-import { getApiUrl } from "../utils/envUtils.js";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
 import * as child_process from "child_process";
-import { getHomePath, getHermesConfigPath, getHermesPluginDir, getClaudeConfigPath, writeFileSyncNoFollow, appendFileSyncNoFollow } from "../utils/pathUtils.js";
+import { getHomePath, getHermesConfigPath, getHermesPluginDir, getClaudeConfigPath, writeFileSyncNoFollow } from "../utils/pathUtils.js";
 import { jaccardSimilarity } from "../utils/mathUtils.js";
 import { checkAuth, logActivity } from "../services/authService.js";
 import {
@@ -187,7 +186,7 @@ export function registerTools(server: McpServer) {
     {
       project: z.string().max(255).optional().describe("Project name or path (auto-detects if omitted)"),
       type: z.enum(["all", "module", "class", "function", "variable"]).optional().describe("Filter by entity type. Choose one of: all, module, class, function, variable"),
-      limit: z.number().optional().describe("Max results to return (default: 500)"),
+      limit: z.number().optional().describe("Max results to return (default: 100)"),
     },
     async ({ project, type, limit }: { project?: string; type?: string; limit?: number }) => {
       const auth = await checkAuth();
@@ -530,24 +529,13 @@ export function registerTools(server: McpServer) {
 
       // Truncate if too many nodes
       if (nodes.length > max) {
-        const buckets: Record<string, typeof nodes> = {
-          module: [],
-          class: [],
-          function: [],
-          variable: [],
-          other: [],
-        };
-        for (const node of nodes) {
-          if (Object.hasOwn(buckets, node.type) && (node.type as string) !== 'other') {
-            buckets[node.type].push(node);
-          } else {
-            buckets.other.push(node);
-          }
-        }
-        const sortedNodes = [
-          ...buckets.module, ...buckets.class, ...buckets.function, ...buckets.variable, ...buckets.other
-        ];
-        nodes = sortedNodes.slice(0, max);
+        const priorityOrder = ["module", "class", "function", "variable"];
+        nodes.sort((a, b) => {
+          const ia = priorityOrder.indexOf(a.type);
+          const ib = priorityOrder.indexOf(b.type);
+          return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
+        });
+        nodes = nodes.slice(0, max);
       }
 
       const finalNodeIds = createNodeIdSet(nodes);
@@ -948,7 +936,8 @@ export function registerTools(server: McpServer) {
       const auth = await checkAuth();
       await logActivity(auth, "search_genome", { query: query.substring(0, 100), project, limit });
       try {
-        const serverUrl = getApiUrl();
+        const serverUrl = process.env.CODEATLAS_API_URL;
+        if (!serverUrl) throw new Error("CODEATLAS_API_URL not set");
         const apiKey = process.env.CODEATLAS_API_KEY;
         if (!apiKey) throw new Error("CODEATLAS_API_KEY not set");
 
@@ -982,7 +971,8 @@ export function registerTools(server: McpServer) {
       const auth = await checkAuth();
       await logActivity(auth, "get_gene", { geneId });
       try {
-        const serverUrl = getApiUrl();
+        const serverUrl = process.env.CODEATLAS_API_URL;
+        if (!serverUrl) throw new Error("CODEATLAS_API_URL not set");
         const apiKey = process.env.CODEATLAS_API_KEY;
         if (!apiKey) throw new Error("CODEATLAS_API_KEY not set");
 
@@ -1017,7 +1007,8 @@ export function registerTools(server: McpServer) {
       const auth = await checkAuth();
       await logActivity(auth, "scan_immune_genes", { problem: problem.substring(0, 100), project });
       try {
-        const serverUrl = getApiUrl();
+        const serverUrl = process.env.CODEATLAS_API_URL;
+        if (!serverUrl) throw new Error("CODEATLAS_API_URL not set");
         const apiKey = process.env.CODEATLAS_API_KEY;
         if (!apiKey) throw new Error("CODEATLAS_API_KEY not set");
 
@@ -1054,7 +1045,8 @@ export function registerTools(server: McpServer) {
       const auth = await checkAuth();
       await logActivity(auth, "save_immune_gene", { problem: problem.substring(0, 50), failure: failure.substring(0, 50), project });
       try {
-        const serverUrl = getApiUrl();
+        const serverUrl = process.env.CODEATLAS_API_URL;
+        if (!serverUrl) throw new Error("CODEATLAS_API_URL not set");
         const apiKey = process.env.CODEATLAS_API_KEY;
         if (!apiKey) throw new Error("CODEATLAS_API_KEY not set");
 
@@ -1120,14 +1112,6 @@ export function registerTools(server: McpServer) {
       }
 
       if (seedNodes.size === 0) {
-        const suggestions: string[] = [];
-        for (const n of nodes) {
-          if (n.type === "module" && n.filePath) {
-            suggestions.push(n.label);
-            if (suggestions.length >= 10) break;
-          }
-        }
-
         return {
           content: [
             {
@@ -1136,7 +1120,10 @@ export function registerTools(server: McpServer) {
                 keyword,
                 matchCount: 0,
                 message: `No entities found matching '${keyword}'. Try a broader keyword.`,
-                suggestions,
+                suggestions: nodes
+                  .filter((n) => n.type === "module" && n.filePath)
+                  .map((n) => n.label)
+                  .slice(0, 10),
               }, null, 2),
             },
           ],
@@ -2412,9 +2399,9 @@ export function registerTools(server: McpServer) {
               envContent = envContent.replace(/CODEATLAS_API_KEY=.*(\r?\n|$)/g, () => `CODEATLAS_API_KEY=${key}\n`);
             }
             // Use writeFileSync with temp file to avoid race conditions (partial mitigate)
-            writeFileSyncNoFollow(envPath, envContent, 0o600);
+            fs.writeFileSync(envPath, envContent, { mode: 0o600 });
           } else {
-            writeFileSyncNoFollow(envPath, `CODEATLAS_API_KEY=${key}\n`, 0o600);
+            fs.writeFileSync(envPath, `CODEATLAS_API_KEY=${key}\n`, { mode: 0o600 });
           }
         }
       } catch (err: any) {
@@ -2438,15 +2425,15 @@ export function registerTools(server: McpServer) {
               results.push({ client: "hermes", action: "mcp_config", status });
             } else if (cfg.includes("mcp_servers:")) {
               cfg = cfg.replace("mcp_servers:", () => "mcp_servers:\n" + mcpEntry);
-              writeFileSyncNoFollow(hermesCfg, cfg);
+              fs.writeFileSync(hermesCfg, cfg);
               results.push({ client: "hermes", action: "mcp_config", status: "updated" });
             } else {
-              appendFileSyncNoFollow(hermesCfg, "\nmcp_servers:\n" + mcpEntry);
+              fs.writeFileSync(hermesCfg, "\nmcp_servers:\n" + mcpEntry, { flag: "a" });
               results.push({ client: "hermes", action: "mcp_config", status: "appended" });
             }
           } else {
             fs.mkdirSync(path.dirname(hermesCfg), { recursive: true });
-            writeFileSyncNoFollow(hermesCfg, "mcp_servers:\n" + mcpEntry);
+            fs.writeFileSync(hermesCfg, "mcp_servers:\n" + mcpEntry);
             results.push({ client: "hermes", action: "mcp_config", status: "created" });
           }
         } catch (err: any) {
@@ -2516,8 +2503,8 @@ def register(ctx):
     log.info("Second Brain auto plugin active")
 `;
             const pluginYaml = `name: codeatlas_second_brain\nversion: "1.0"\ndescription: Automatic Second Brain activation\nhooks:\n  - pre_llm_call\n  - post_llm_call\nenabled: true\n`;
-            writeFileSyncNoFollow(path.join(pluginDir, "__init__.py"), pluginInit);
-            writeFileSyncNoFollow(path.join(pluginDir, "plugin.yaml"), pluginYaml);
+            fs.writeFileSync(path.join(pluginDir, "__init__.py"), pluginInit);
+            fs.writeFileSync(path.join(pluginDir, "plugin.yaml"), pluginYaml);
             results.push({ client: "hermes", action: "auto_plugin", status: "installed" });
           } catch (err: any) {
             results.push({ client: "hermes", action: "auto_plugin", status: "error", error: err.message });
@@ -2551,11 +2538,11 @@ def register(ctx):
             }
 
             existing.mcpServers = { ...existing.mcpServers, ...claudeEntry.mcpServers };
-            writeFileSyncNoFollow(claudeCfg, JSON.stringify(existing, null, 2));
+            fs.writeFileSync(claudeCfg, JSON.stringify(existing, null, 2));
             results.push({ client: "claude", action: "mcp_config", status: "updated" });
           } else {
             fs.mkdirSync(path.dirname(claudeCfg), { recursive: true });
-            writeFileSyncNoFollow(claudeCfg, JSON.stringify(claudeEntry, null, 2));
+            fs.writeFileSync(claudeCfg, JSON.stringify(claudeEntry, null, 2));
             results.push({ client: "claude", action: "mcp_config", status: "created" });
           }
         } catch (err: any) {
@@ -2606,7 +2593,8 @@ def register(ctx):
 
       // Cloud connectivity
       try {
-        const apiUrl = getApiUrl();
+        const apiUrl = process.env.CODEATLAS_API_URL;
+                if (!apiUrl) throw new Error("CODEATLAS_API_URL not set");
                 const resp = await fetch(`${apiUrl}/api/genome/search?limit=1`, {
           headers: { "x-api-key": process.env.CODEATLAS_API_KEY || "", "User-Agent": "codeatlas-enterprise/2.0" },
         });
@@ -3190,7 +3178,7 @@ def register(ctx):
         if (fs.existsSync(gitignorePath)) {
           const gi = fs.readFileSync(gitignorePath, "utf-8");
           if (!gi.includes(".codeatlas/")) {
-            appendFileSyncNoFollow(gitignorePath, "\n# CodeAtlas artifact (shared with team)\n!.codeatlas/\n.codeatlas/!artifact*.json\n");
+            fs.appendFileSync(gitignorePath, "\n# CodeAtlas artifact (shared with team)\n!.codeatlas/\n.codeatlas/!artifact*.json\n");
           }
         }
 
@@ -3301,9 +3289,8 @@ def register(ctx):
         const limitVal = limit || 20;
         const results: Array<{ name: string; description: string; source: string }> = [];
 
-        // ⚡ Bolt Optimization: Use precompiled regex and early loop exit instead of chaining .filter().slice()
-        // and avoid .toLowerCase() intermediate string allocations across thousands of items.
-        // Expected impact: ~75% faster execution time for skill queries with lower GC pressure.
+        // ⚡ Bolt Optimization: Use precompiled regex to avoid .toLowerCase() intermediate string allocations
+        // and replace chained .filter().slice().map() with a single loop to reduce GC pressure.
         if (q) {
           const searchRegex = new RegExp(escapeRegExp(q), 'i');
           for (const s of skills) {
@@ -3336,7 +3323,7 @@ def register(ctx):
         skills,
         bySource: skills.reduce((acc, s) => { acc[s.source] = (acc[s.source] || 0) + 1; return acc; }, {} as Record<string, number>),
       };
-      writeFileSyncNoFollow(BRAIN_SKILLS_PATH, JSON.stringify(inventory, null, 2));
+      fs.writeFileSync(BRAIN_SKILLS_PATH, JSON.stringify(inventory, null, 2));
 
       // Save a compact summary as dream memory for cross-session recall
       try {

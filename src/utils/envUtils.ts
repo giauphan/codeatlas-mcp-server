@@ -21,13 +21,12 @@ export function getApiUrl(): string {
   const normalizedUrl = url.trim().replace(/\/+$/, "");
   try {
     const parsedUrl = new URL(normalizedUrl);
-    const isLoopbackHttp = parsedUrl.protocol === "http:" && ["localhost", "127.0.0.1", "[::1]"].includes(parsedUrl.hostname);
-    if (parsedUrl.protocol !== "https:" && !isLoopbackHttp) {
+    if (parsedUrl.protocol !== "http:" && parsedUrl.protocol !== "https:") {
       throw new Error("unsupported protocol");
     }
   } catch {
     throw new Error(
-      "CODEATLAS_API_URL must be a valid HTTPS URL or local HTTP URL. " +
+      "CODEATLAS_API_URL must be a valid HTTP or HTTPS URL. " +
       "Please check your configuration."
     );
   }
