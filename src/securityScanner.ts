@@ -93,18 +93,6 @@ export class SecurityScanner {
       return findings;
     }
 
-    // 🛡️ Ensure destination matches the intended AI provider service to prevent credential exfiltration
-    try {
-      const parsedUrl = new URL(aiUrl);
-      if (parsedUrl.protocol !== "https:" && parsedUrl.hostname !== "localhost" && parsedUrl.hostname !== "127.0.0.1") {
-        console.warn("[SecurityScanner] Insecure AI scan URL protocol rejected");
-        return findings;
-      }
-    } catch {
-      console.warn("[SecurityScanner] Invalid AI scan URL rejected");
-      return findings;
-    }
-
     try {
       const criticalFindings = findings.filter(f => f.severity === "CRITICAL" || f.severity === "HIGH").slice(0, 5);
       const codeContext = criticalFindings.map(f => {
@@ -140,10 +128,7 @@ export class SecurityScanner {
 
       return [...findings, ...aiFindings];
     } catch (err) {
-      const rawMsg = err instanceof Error ? err.message : String(err);
-      // Redact potential secrets from log output
-      const sanitizedMsg = rawMsg.split(aiKey).join("[REDACTED]");
-      console.warn("[SecurityScanner] AI scan failed:", sanitizedMsg);
+      console.warn("[SecurityScanner] AI scan failed:", err instanceof Error ? err.message : String(err));
       return findings;
     }
   }
