@@ -34,7 +34,7 @@ cat > "$CLAUDE_HOOKS_DIR/codeatlas" << 'WRAPPER_EOF'
 set -euo pipefail
 HOOKS_DIR="/home/ubuntu/.claude/hooks"
 export CODEATLAS_INJECT_BRAIN_CONTEXT="${CODEATLAS_INJECT_BRAIN_CONTEXT:-1}"
-export CODEATLAS_API_URL="${CODEATLAS_API_URL:-http://localhost:3381}"
+export CODEATLAS_API_URL="${CODEATLAS_API_URL:-}"
 CMD="${1:-}"
 if [ "$CMD" = "hook" ]; then
   CMD="${2:-}"
