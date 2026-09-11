@@ -57,15 +57,17 @@ try {
     '#!/bin/bash',
     'set -euo pipefail',
     `HOOKS_DIR="${CLAUDE_HOOKS_DIR}"`,
-    'if [ "${1:-}" != "hook" ]; then',
-    '  echo "usage: codeatlas hook <brain-context|brain-save|task-router>" >&2',
-    '  exit 2',
+    'export CODEATLAS_INJECT_BRAIN_CONTEXT="${CODEATLAS_INJECT_BRAIN_CONTEXT:-1}"',
+    'export CODEATLAS_API_URL="${CODEATLAS_API_URL:-http://localhost:3381}"',
+    'CMD="${1:-}"',
+    'if [ "$CMD" = "hook" ]; then',
+    '  CMD="${2:-}"',
     'fi',
-    'case "${2:-}" in',
+    'case "$CMD" in',
     '  brain-context) exec "$HOOKS_DIR/brain-context.sh" ;;',
     '  brain-save) exec "$HOOKS_DIR/brain-save.sh" ;;',
     '  task-router) exec "$HOOKS_DIR/task-router.sh" ;;',
-    '  *) echo "unknown codeatlas hook: ${2:-}" >&2; exit 2 ;;',
+    '  *) echo "usage: codeatlas hook <brain-context|brain-save|task-router>" >&2; exit 2 ;;',
     'esac',
     ''
   ];
@@ -162,11 +164,18 @@ try {
   setHooksArray('PreToolUse', preToolUseHooks);
 
   const sessionStartHooks = getHooksArray('SessionStart');
-  const hasBrainContext = sessionStartHooks.some(h => h.command === 'codeatlas' && h.args?.includes('brain-context'));
-  if (!hasBrainContext) {
+  const hasBrainContextSS = sessionStartHooks.some(h => h.command === 'codeatlas' && h.args?.includes('brain-context'));
+  if (!hasBrainContextSS) {
     sessionStartHooks.push({ type: 'command', command: 'codeatlas', args: ['hook', 'brain-context'] });
   }
   setHooksArray('SessionStart', sessionStartHooks);
+
+  const userPromptSubmitHooks = getHooksArray('UserPromptSubmit');
+  const hasBrainContextUPS = userPromptSubmitHooks.some(h => h.command === 'codeatlas' && h.args?.includes('brain-context'));
+  if (!hasBrainContextUPS) {
+    userPromptSubmitHooks.push({ type: 'command', command: 'codeatlas', args: ['hook', 'brain-context'] });
+  }
+  setHooksArray('UserPromptSubmit', userPromptSubmitHooks);
 
   const postToolUseHooks = getHooksArray('PostToolUse');
   const hasBrainSave = postToolUseHooks.some(h => h.command === 'codeatlas' && h.args?.includes('brain-save'));
@@ -174,6 +183,13 @@ try {
     postToolUseHooks.push({ type: 'command', command: 'codeatlas', args: ['hook', 'brain-save'] });
   }
   setHooksArray('PostToolUse', postToolUseHooks);
+
+  const postToolUseFailureHooks = getHooksArray('PostToolUseFailure');
+  const hasBrainSaveFail = postToolUseFailureHooks.some(h => h.command === 'codeatlas' && h.args?.includes('brain-save'));
+  if (!hasBrainSaveFail) {
+    postToolUseFailureHooks.push({ type: 'command', command: 'codeatlas', args: ['hook', 'brain-save'] });
+  }
+  setHooksArray('PostToolUseFailure', postToolUseFailureHooks);
 
   // Save updated settings
   writeFileSync(SETTINGS_FILE, JSON.stringify(settings, null, 2) + '\n');
