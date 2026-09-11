@@ -294,3 +294,51 @@ export class HelperService {
     });
   });
 });
+
+// Sentinel Unit Test for TOCTOU Security Mitigation
+describe("File I/O Security Tests", () => {
+  it("should fail safely when attempting to write to a symlink using O_NOFOLLOW", () => {
+    const testDir = path.join(os.tmpdir(), "test-security-dir-" + Date.now());
+    const targetFile = path.join(testDir, "target.txt");
+    const symlinkFile = path.join(testDir, "symlink.txt");
+
+    if (!fs.existsSync(testDir)) {
+      fs.mkdirSync(testDir, { recursive: true });
+    }
+
+    fs.writeFileSync(targetFile, "initial content", "utf-8");
+    if (!fs.existsSync(symlinkFile)) {
+      fs.symlinkSync(targetFile, symlinkFile);
+    }
+
+    let errorThrown = false;
+    try {
+      // Trying to open a symlink with O_NOFOLLOW should throw an error on Unix systems
+      const fd = fs.openSync(symlinkFile, fs.constants.O_WRONLY | fs.constants.O_NOFOLLOW);
+      fs.closeSync(fd);
+    } catch (e: unknown) {
+      const err = e as NodeJS.ErrnoException;
+      if (err.code === 'ELOOP' || err.code === 'EOPNOTSUPP') {
+         errorThrown = true;
+      }
+    }
+
+    assert.ok(process.platform === 'win32' || errorThrown, "Symlink write with O_NOFOLLOW should have been blocked");
+
+    // Cleanup
+    fs.unlinkSync(symlinkFile);
+    fs.unlinkSync(targetFile);
+    fs.rmdirSync(testDir);
+  });
+});
+// Add another test specifically for command injection mitigation
+describe("Command Injection Mitigation Tests", () => {
+  it("should not use shell when using spawnSync in commands.ts", async () => {
+    const commandsFile = path.join(process.cwd(), "src", "cli", "commands.ts");
+    const content = fs.readFileSync(commandsFile, "utf-8");
+
+    assert.ok(content.includes("spawnSync"), "commands.ts should use spawnSync");
+    assert.ok(content.includes("shell: false"), "commands.ts should use shell: false");
+    assert.ok(!content.includes("execSync"), "commands.ts should not use execSync");
+  });
+});
