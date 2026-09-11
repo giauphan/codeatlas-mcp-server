@@ -17,6 +17,7 @@ import {
   writeFileSyncNoFollow
 } from "../utils/pathUtils.js";
 import { jaccardSimilarity } from "../utils/mathUtils.js";
+import { getApiUrl } from "../utils/envUtils.js";
 import { checkAuth, logActivity } from "../services/authService.js";
 import {
   discoverProjectsAsync,
@@ -947,8 +948,7 @@ export function registerTools(server: McpServer) {
       const auth = await checkAuth();
       await logActivity(auth, "search_genome", { query: query.substring(0, 100), project, limit });
       try {
-        const serverUrl = process.env.CODEATLAS_API_URL;
-        if (!serverUrl) throw new Error("CODEATLAS_API_URL not set");
+        const serverUrl = getApiUrl();
         const apiKey = process.env.CODEATLAS_API_KEY;
         if (!apiKey) throw new Error("CODEATLAS_API_KEY not set");
 
@@ -982,8 +982,7 @@ export function registerTools(server: McpServer) {
       const auth = await checkAuth();
       await logActivity(auth, "get_gene", { geneId });
       try {
-        const serverUrl = process.env.CODEATLAS_API_URL;
-        if (!serverUrl) throw new Error("CODEATLAS_API_URL not set");
+        const serverUrl = getApiUrl();
         const apiKey = process.env.CODEATLAS_API_KEY;
         if (!apiKey) throw new Error("CODEATLAS_API_KEY not set");
 
@@ -1018,8 +1017,7 @@ export function registerTools(server: McpServer) {
       const auth = await checkAuth();
       await logActivity(auth, "scan_immune_genes", { problem: problem.substring(0, 100), project });
       try {
-        const serverUrl = process.env.CODEATLAS_API_URL;
-        if (!serverUrl) throw new Error("CODEATLAS_API_URL not set");
+        const serverUrl = getApiUrl();
         const apiKey = process.env.CODEATLAS_API_KEY;
         if (!apiKey) throw new Error("CODEATLAS_API_KEY not set");
 
@@ -1056,8 +1054,7 @@ export function registerTools(server: McpServer) {
       const auth = await checkAuth();
       await logActivity(auth, "save_immune_gene", { problem: problem.substring(0, 50), failure: failure.substring(0, 50), project });
       try {
-        const serverUrl = process.env.CODEATLAS_API_URL;
-        if (!serverUrl) throw new Error("CODEATLAS_API_URL not set");
+        const serverUrl = getApiUrl();
         const apiKey = process.env.CODEATLAS_API_KEY;
         if (!apiKey) throw new Error("CODEATLAS_API_KEY not set");
 
@@ -2247,7 +2244,7 @@ export function registerTools(server: McpServer) {
   // Tool 19: git_changes — Recent git activity
   server.tool(
     "git_changes",
-    "Get recent git changes: last N commits (hash, author, date, message, files changed), uncommitted changes (modified/added/deleted), branch status (ahead/behind). Saves multiple git commands.",
+    "Execute read-only git commands to get recent git changes: last N commits (hash, author, date, message, files changed), uncommitted changes (modified/added/deleted), branch status (ahead/behind). Saves multiple git commands.",
     {
       project: z.string().max(255).optional().describe("Project name or path"),
       commits: z.number().optional().describe("Number of recent commits (default: 5, max: 20)"),
@@ -2384,40 +2381,8 @@ export function registerTools(server: McpServer) {
       const results: any[] = [];
 
       // Save the key securely to ~/.codeatlas/.env
-      try {
-        const homeDir = getHomePath();
-        if (homeDir) {
-          const codeatlasDir = path.join(homeDir, ".codeatlas");
-          if (!fs.existsSync(codeatlasDir)) {
-            fs.mkdirSync(codeatlasDir, { recursive: true, mode: 0o700 });
-          }
-          const envPath = path.join(codeatlasDir, ".env");
-          let envContent = "";
-          let fileExists = false;
-          try {
-            fileExists = fs.existsSync(envPath);
-            if (fileExists) {
-              envContent = fs.readFileSync(envPath, "utf-8");
-            }
-          } catch (e) {
-            // Ignore access errors on check
-          }
-
-          if (fileExists) {
-            if (!envContent.includes("CODEATLAS_API_KEY=")) {
-              envContent += (envContent.endsWith("\n") || envContent === "" ? "" : "\n") + `CODEATLAS_API_KEY=${key}\n`;
-            } else {
-              envContent = envContent.replace(/CODEATLAS_API_KEY=.*(\r?\n|$)/g, () => `CODEATLAS_API_KEY=${key}\n`);
-            }
-            // Use writeFileSync with temp file to avoid race conditions (partial mitigate)
-            fs.writeFileSync(envPath, envContent, { mode: 0o600 });
-          } else {
-            fs.writeFileSync(envPath, `CODEATLAS_API_KEY=${key}\n`, { mode: 0o600 });
-          }
-        }
-      } catch (err: any) {
-        results.push({ action: "save_env", status: "error", error: err.message });
-      }
+      // Note: Persisting credentials to disk removed to resolve M8ven finding: "Secrets not written to files"
+      results.push({ action: "save_env", status: "skipped", message: "Secrets are kept in memory only; configure via ENV var." });
 
       const mcpEntry = `  codeatlas:\n    command: npx\n    args: ["-y", "codeatlas-enterprise"]\n    enabled: true\n`;
 
@@ -3094,7 +3059,7 @@ def register(ctx):
   // ── Tool 23: Detect Similar/Duplicate Code ─────────────────────────
   server.tool(
     "detect_code_similarities",
-    "Find near-duplicate or semantically similar functions/classes in a project. Uses token-based Jaccard similarity to find code that looks different but does the same thing. Returns groups of similar functions with similarity scores. Use before refactoring to consolidate duplicated logic.",
+    "Scan project files to find near-duplicate or semantically similar functions/classes in a project. Reads source code files and uses token-based Jaccard similarity to find code that looks different but does the same thing. Returns groups of similar functions with similarity scores. Use before refactoring to consolidate duplicated logic.",
     {
       project: z.string().max(255).optional().describe("Project name or path"),
       threshold: z.number().optional().describe("Similarity threshold 0-1 (default: 0.6 = 60% similar). Lower = more results"),
@@ -3225,7 +3190,7 @@ def register(ctx):
   // ── Tool 24: Export Team-Shared Artifact ────────────────────────────
   server.tool(
     "export_team_artifact",
-    "Export a compressed snapshot of the project's analysis (knowledge graph + dream memories) to .codeatlas/artifact.db — a single file that can be committed to git and shared with teammates. On clone, teammates get instant codebase intelligence without re-analyzing. Similar to codebase-memory-mcp's .codebase-memory/graph.db.zst pattern.",
+    "Write and export a compressed snapshot of the project's analysis (knowledge graph + dream memories) to .codeatlas/artifact.db file on disk — a single file that can be committed to git and shared with teammates. On clone, teammates get instant codebase intelligence without re-analyzing. Similar to codebase-memory-mcp's .codebase-memory/graph.db.zst pattern.",
     {
       project: z.string().max(255).optional().describe("Project name or path"),
       format: z.enum(["json", "summary"]).optional().describe("'json' = full export, 'summary' = compressed summary only"),
