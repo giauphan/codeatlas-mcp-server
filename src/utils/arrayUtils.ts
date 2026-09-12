@@ -34,3 +34,27 @@ export function binarySearchClosestPrecedingClass(
   }
   return parentClass;
 }
+
+/**
+ * Partitions nodes into priority buckets (module, class, function, variable)
+ * while maintaining their relative insertion order. Unrecognized types are placed at the end.
+ */
+export function partitionByPriority<T extends { type: string }>(nodes: T[]): T[] {
+  const buckets: Record<string, T[]> = {
+    module: [], class: [], function: [], variable: [], other: []
+  };
+  for (const n of nodes) {
+    if (Object.hasOwn(buckets, n.type)) {
+      buckets[n.type].push(n);
+    } else {
+      buckets["other"].push(n);
+    }
+  }
+  return [
+    ...buckets["module"],
+    ...buckets["class"],
+    ...buckets["function"],
+    ...buckets["variable"],
+    ...buckets["other"]
+  ];
+}
