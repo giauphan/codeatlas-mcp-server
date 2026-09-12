@@ -34,3 +34,30 @@ export function binarySearchClosestPrecedingClass(
   }
   return parentClass;
 }
+
+/**
+ * ⚡ Bolt Optimization: Replace O(N log N) chunk.nodes.sort() with an O(N) bucket collection
+ * to prevent sorting bottlenecks on large datasets while preserving stability.
+ */
+export function partitionByPriority<T extends { type: string }>(nodes: T[]): T[] {
+  // Use a fallback guard to handle environments where Object.hasOwn might be unavailable (Node < 16.9)
+  const hasOwn = Object.hasOwn || ((obj, prop) => Object.prototype.hasOwnProperty.call(obj, prop));
+
+  const buckets: Record<string, T[]> = {
+    module: [], class: [], function: [], variable: [], other: []
+  };
+  for (const n of nodes) {
+    if (hasOwn(buckets, n.type)) {
+      buckets[n.type].push(n);
+    } else {
+      buckets["other"].push(n);
+    }
+  }
+  return [
+    ...buckets["module"],
+    ...buckets["class"],
+    ...buckets["function"],
+    ...buckets["variable"],
+    ...buckets["other"]
+  ];
+}

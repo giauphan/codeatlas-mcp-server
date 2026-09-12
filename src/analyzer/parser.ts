@@ -5,7 +5,7 @@ import ignore from 'ignore';
 import { GraphData, GraphNode, GraphLink, AnalysisResult, AIInsight, AnalysisManifest, FolderInfo, ChunkData, CrossChunkLinks } from './types.js';
 import { PythonParser } from './pythonParser.js';
 import { PhpParser } from './phpParser.js';
-import { binarySearchClosestPrecedingClass, ClassReference } from '../utils/arrayUtils.js';
+import { binarySearchClosestPrecedingClass, ClassReference, partitionByPriority } from '../utils/arrayUtils.js';
 
 export class CodeAnalyzer {
   private workspaceRoot: string;
@@ -474,24 +474,7 @@ export class CodeAnalyzer {
         // Partial load: take module nodes first, then classes, then functions, then variables
         // ⚡ Bolt Optimization: Replace O(N log N) chunk.nodes.sort() with an O(N) bucket collection
         // to prevent sorting bottlenecks on large datasets while preserving stability.
-        const buckets: Record<string, typeof chunk.nodes> = {
-          "module": [], "class": [], "function": [], "variable": [], "other": []
-        };
-        for (const n of chunk.nodes) {
-          if (Object.hasOwn(buckets, n.type)) {
-            buckets[n.type].push(n);
-          } else {
-            buckets["other"].push(n);
-          }
-        }
-        const sorted = [
-          ...buckets["module"],
-          ...buckets["class"],
-          ...buckets["function"],
-          ...buckets["variable"],
-          ...buckets["other"]
-        ];
-
+        const sorted = partitionByPriority(chunk.nodes);
         loadedNodes.push(...sorted.slice(0, remaining));
         loadedFolders.push(folderInfo.path);
         remaining = 0;
