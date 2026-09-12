@@ -36,8 +36,8 @@ export function binarySearchClosestPrecedingClass(
 }
 
 /**
- * ⚡ Bolt Optimization: Replace O(N log N) chunk.nodes.sort() with an O(N) bucket collection
- * to prevent sorting bottlenecks on large datasets while preserving stability.
+ * Partitions nodes into priority buckets (module, class, function, variable)
+ * while maintaining their relative insertion order. Unrecognized types are placed at the end.
  */
 export function partitionByPriority<T extends { type: string }>(nodes: T[]): T[] {
   const buckets: Record<string, T[]> = {
