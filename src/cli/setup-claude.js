@@ -5,7 +5,7 @@
 
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
-import { execSync } from 'child_process';
+import { spawnSync } from 'child_process';
 import { existsSync } from 'fs';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -24,10 +24,14 @@ try {
 
   console.log('📄 Found setup script, executing...\n');
 
-  execSync(`node ${SETUP_SCRIPT}`, {
+  const result = spawnSync(process.execPath, [SETUP_SCRIPT], {
     stdio: 'inherit',
     cwd: REPO_ROOT,
+    shell: false
   });
+
+  if (result.error) throw result.error;
+  if (result.status !== 0) throw new Error(`Process exited with status ${result.status}`);
 
   console.log('\n✅ All done!');
 } catch (error) {

@@ -14,7 +14,7 @@
 import { existsSync, readFileSync, statSync } from 'fs';
 import { homedir } from 'os';
 import { join } from 'path';
-import { execSync } from 'child_process';
+import { spawnSync } from 'child_process';
 
 const CLAUDE_HOOKS_DIR = join(homedir(), '.claude', 'hooks');
 const SETTINGS_FILE = join(homedir(), '.claude', 'settings.json');
@@ -101,14 +101,12 @@ check('codeatlas wrapper shows correct usage', () => {
   const wrapperPath = join(CLAUDE_HOOKS_DIR, 'codeatlas');
   if (!existsSync(wrapperPath)) return false;
   
-  try {
-    const output = execSync(`bash ${wrapperPath}`, { encoding: 'utf8', timeout: 5000 });
-    return false; // Should exit with error and show usage
-  } catch (error) {
-    // Expected to fail with usage message - check stderr or stdout
-    const errorOutput = error.stderr || error.stdout || '';
-    return errorOutput.includes('usage: codeatlas hook') || errorOutput.includes('codeatlas hook <');
-  }
+  const result = spawnSync('bash', [wrapperPath], { encoding: 'utf8', timeout: 5000, shell: false });
+  if (result.status === 0) return false; // Should exit with error and show usage
+
+  // Expected to fail with usage message - check stderr or stdout
+  const errorOutput = result.stderr || result.stdout || '';
+  return errorOutput.includes('usage: codeatlas hook') || errorOutput.includes('codeatlas hook <');
 });
 
 // 6. Test hook scripts syntax
@@ -117,12 +115,8 @@ for (const hook of ['brain-save.sh', 'brain-context.sh', 'task-router.sh']) {
     const hookPath = join(CLAUDE_HOOKS_DIR, hook);
     if (!existsSync(hookPath)) return false;
     
-    try {
-      execSync(`bash -n ${hookPath}`, { timeout: 5000 });
-      return true;
-    } catch (error) {
-      return false;
-    }
+    const result = spawnSync('bash', ['-n', hookPath], { timeout: 5000, shell: false });
+    return result.status === 0;
   });
 }
 
@@ -131,20 +125,18 @@ check('brain-context.sh works in test mode', () => {
   const hookPath = join(CLAUDE_HOOKS_DIR, 'brain-context.sh');
   if (!existsSync(hookPath)) return false;
   
-  try {
-    const output = execSync(`bash ${hookPath}`, {
-      encoding: 'utf8',
-      timeout: 5000,
-      env: {
-        ...process.env,
-        CODEATLAS_INJECT_BRAIN_CONTEXT: '1',
-        CODEATLAS_TEST_MODE: '1'
-      }
-    });
-    return output.includes('Parser uses ESTree');
-  } catch (error) {
-    return false;
-  }
+  const result = spawnSync('bash', [hookPath], {
+    encoding: 'utf8',
+    timeout: 5000,
+    shell: false,
+    env: {
+      ...process.env,
+      CODEATLAS_INJECT_BRAIN_CONTEXT: '1',
+      CODEATLAS_TEST_MODE: '1'
+    }
+  });
+  if (result.error || result.status !== 0) return false;
+  return result.stdout.includes('Parser uses ESTree');
 });
 
 // 8. Test brain-save.sh exits cleanly without API
@@ -152,21 +144,19 @@ check('brain-save.sh exits cleanly without API URL', () => {
   const hookPath = join(CLAUDE_HOOKS_DIR, 'brain-save.sh');
   if (!existsSync(hookPath)) return false;
   
-  try {
-    const output = execSync(`echo '{"test":"data"}' | bash ${hookPath}`, {
-      encoding: 'utf8',
-      timeout: 5000,
-      env: {
-        PATH: process.env.PATH || '',
-        HOME: process.env.HOME || '',
-        CODEATLAS_API_KEY: 'test-key'
-        // No CODEATLAS_API_URL set
-      }
-    });
-    return true; // Should exit cleanly
-  } catch (error) {
-    return error.status === 0; // Exit code 0 is success
-  }
+  const result = spawnSync('bash', [hookPath], {
+    encoding: 'utf8',
+    timeout: 5000,
+    input: '{"test":"data"}',
+    shell: false,
+    env: {
+      PATH: process.env.PATH || '',
+      HOME: process.env.HOME || '',
+      CODEATLAS_API_KEY: 'test-key'
+      // No CODEATLAS_API_URL set
+    }
+  });
+  return result.status === 0; // Exit code 0 is success
 });
 
 // Summary
