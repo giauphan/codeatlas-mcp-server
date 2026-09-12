@@ -4,6 +4,7 @@ import * as os from "os";
 import { fileURLToPath } from "url";
 import { bold, ok, fail, warn } from "./commands.js";
 import { getZedSettingsPath, getZedConfigDir } from "../utils/pathUtils.js";
+import { checkSpawnResult } from "../utils/processUtils.js";
 
 function getSettingsPath(): string {
   const home = os.homedir();
@@ -81,8 +82,7 @@ export async function cmdSetupClaude(projectDir: string = process.cwd()): Promis
     const { spawnSync } = await import("child_process");
     // Use shell: process.platform === "win32" to allow spawning .cmd wrappers on Windows while avoiding shell injection on Unix
     const result = spawnSync("codeatlas-enterprise", ["--version"], { encoding: "utf-8", timeout: 5000, shell: process.platform === "win32" });
-    if (result.error) throw result.error;
-    if (result.status !== 0) throw new Error(`Process exited with status ${result.status}`);
+    checkSpawnResult(result);
     const version = (result.stdout?.trim() ?? "");
     console.log(`  ${ok()} CodeAtlas CLI version: ${version}`);
   } catch (e: any) {
