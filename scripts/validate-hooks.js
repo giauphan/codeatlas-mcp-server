@@ -102,7 +102,7 @@ check('codeatlas wrapper shows correct usage', () => {
   if (!existsSync(wrapperPath)) return false;
   
   const result = spawnSync('bash', [wrapperPath], { encoding: 'utf8', timeout: 5000, shell: false });
-  if (result.status === 0) return false; // Should exit with error and show usage
+  if (result.error || result.status === 0) return false; // Should exit with error and show usage
 
   // Expected to fail with usage message - check stderr or stdout
   const errorOutput = result.stderr || result.stdout || '';
