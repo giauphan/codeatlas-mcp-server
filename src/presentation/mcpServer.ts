@@ -541,13 +541,25 @@ export function registerTools(server: McpServer) {
 
       // Truncate if too many nodes
       if (nodes.length > max) {
-        const priorityOrder = ["module", "class", "function", "variable"];
-        nodes.sort((a, b) => {
-          const ia = priorityOrder.indexOf(a.type);
-          const ib = priorityOrder.indexOf(b.type);
-          return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
-        });
-        nodes = nodes.slice(0, max);
+        // ⚡ Bolt Optimization: Replace O(N log N) nodes.sort() with an O(N) bucket collection
+        // to prevent sorting bottlenecks on large sets of nodes while preserving order stability.
+        const buckets: Record<string, typeof nodes> = {
+          "module": [], "class": [], "function": [], "variable": [], "other": []
+        };
+        for (const n of nodes) {
+          if (Object.hasOwn(buckets, n.type)) {
+            buckets[n.type].push(n);
+          } else {
+            buckets["other"].push(n);
+          }
+        }
+        nodes = [
+          ...buckets["module"],
+          ...buckets["class"],
+          ...buckets["function"],
+          ...buckets["variable"],
+          ...buckets["other"]
+        ].slice(0, max);
       }
 
       const finalNodeIds = createNodeIdSet(nodes);

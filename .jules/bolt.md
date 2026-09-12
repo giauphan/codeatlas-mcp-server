@@ -80,3 +80,7 @@
 ## 2024-05-24 - [Performance improvement] Optimized O(N) chained array .filter() operations across multiple metrics
 **Learning:** Chaining array methods (e.g. `.filter(n => n.filePath).length`) and mapping over arrays separately to calculate simple metrics like counts or orphan entities wastes execution time and creates large intermediate array memory allocations.
 **Action:** When computing multiple simple metrics across a graph or dataset (e.g., node typing, relationships, existence of file paths), combine all checks into a single `for...of` loop with simple accumulators (`count++`, `Map.set`) to collapse multiple O(N) array loops into a single O(N) pass.
+
+## 2024-05-24 - [Performance improvement] Optimized O(N log N) sorting using O(N) bucket collection
+**Learning:** Using `Array.prototype.sort()` with an internal `indexOf` check to group elements into a predefined set of categories (like 'module', 'class', 'function', 'variable') causes an O(N log N) time complexity combined with O(K) lookup overhead inside the comparator. This is a severe bottleneck for very large lists of nodes in graph applications.
+**Action:** Replace `nodes.sort(...)` logic used for strict categorization with an O(N) bucket collection strategy. Initialize a dictionary of arrays (`buckets`), execute a single `for...of` loop over the nodes pushing each into its corresponding bucket, and then concatenate the buckets to form the final array. This provides stable categorization significantly faster.
