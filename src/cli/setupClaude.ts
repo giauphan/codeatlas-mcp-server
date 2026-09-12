@@ -79,10 +79,11 @@ export async function cmdSetupClaude(projectDir: string = process.cwd()): Promis
   console.log(`\n${bold("1. Verifying CodeAtlas CLI")}`);
   try {
     const { spawnSync } = await import("child_process");
-    const result = spawnSync("codeatlas-enterprise", ["--version"], { encoding: "utf-8", timeout: 5000, shell: false });
+    // Use shell: process.platform === "win32" to allow spawning .cmd wrappers on Windows while avoiding shell injection on Unix
+    const result = spawnSync("codeatlas-enterprise", ["--version"], { encoding: "utf-8", timeout: 5000, shell: process.platform === "win32" });
     if (result.error) throw result.error;
     if (result.status !== 0) throw new Error(`Process exited with status ${result.status}`);
-    const version = (result.stdout as string).trim();
+    const version = (result.stdout?.trim() ?? "");
     console.log(`  ${ok()} CodeAtlas CLI version: ${version}`);
   } catch (e: any) {
     console.log(`  ${warn()} CodeAtlas CLI not found globally. Using npx/local path.`);

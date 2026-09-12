@@ -661,6 +661,8 @@ export async function cmdDoctor(): Promise<void> {
 // ── Main CLI router ──────────────────────────────────────────────
 // ──────────────────────────────────────────────────────────────────────
   
+import { checkSpawnResult } from "../utils/processUtils.js";
+
 export function isCLICommand(argv: string[]): boolean {
   const cmd = argv[2];
   if (!cmd) return false;
@@ -730,8 +732,7 @@ export async function runCLI(): Promise<void> {
       // Run from repo root so scripts/setup-hooks.js resolves correctly
       const { spawnSync } = await import("child_process");
       const result = spawnSync(process.execPath, ["scripts/setup-hooks.js"], { stdio: "inherit", cwd: process.cwd(), shell: false });
-      if (result.error) throw result.error;
-      if (result.status !== 0) throw new Error(`Process exited with status ${result.status}`);
+      checkSpawnResult(result);
       console.log("✅ Hooks installed successfully!");
     } catch (error) {
       console.error(`${fail()} Failed to install hooks: ${error}`);
@@ -743,8 +744,7 @@ export async function runCLI(): Promise<void> {
     const { spawnSync } = await import("child_process");
     try {
       const result = spawnSync(process.execPath, ["scripts/validate-hooks.js"], { stdio: "inherit", cwd: process.cwd(), shell: false });
-      if (result.error) throw result.error;
-      if (result.status !== 0) throw new Error(`Process exited with status ${result.status}`);
+      checkSpawnResult(result);
       console.log("✅ Hooks validation completed successfully!");
     } catch (error) {
       console.error(`${fail()} Hooks validation failed: ${error}`);

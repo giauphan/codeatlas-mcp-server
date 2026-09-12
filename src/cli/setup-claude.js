@@ -30,6 +30,7 @@ try {
     shell: false
   });
 
+  // Note: we're directly using inline checks because we can't easily import TS processUtils into JS script
   if (result.error) throw result.error;
   if (result.status !== 0) throw new Error(`Process exited with status ${result.status}`);
 
