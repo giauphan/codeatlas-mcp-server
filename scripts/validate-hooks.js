@@ -116,6 +116,7 @@ for (const hook of ['brain-save.sh', 'brain-context.sh', 'task-router.sh']) {
     if (!existsSync(hookPath)) return false;
     
     const result = spawnSync('bash', ['-n', hookPath], { timeout: 5000, shell: false });
+    if (result.error) return false;
     return result.status === 0;
   });
 }

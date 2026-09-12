@@ -32,7 +32,10 @@ try {
 
   // Note: we're directly using inline checks because we can't easily import TS processUtils into JS script
   if (result.error) throw result.error;
-  if (result.status !== 0) throw new Error(`Process exited with status ${result.status}`);
+  if (result.status !== 0) {
+    if (result.status === null) throw new Error(`Process terminated by ${result.signal ?? "unknown signal"}`);
+    throw new Error(`Process exited with status ${result.status}`);
+  }
 
   console.log('\n✅ All done!');
 } catch (error) {
