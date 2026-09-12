@@ -40,14 +40,11 @@ export function binarySearchClosestPrecedingClass(
  * to prevent sorting bottlenecks on large datasets while preserving stability.
  */
 export function partitionByPriority<T extends { type: string }>(nodes: T[]): T[] {
-  // Use a fallback guard to handle environments where Object.hasOwn might be unavailable (Node < 16.9)
-  const hasOwn = Object.hasOwn || ((obj, prop) => Object.prototype.hasOwnProperty.call(obj, prop));
-
   const buckets: Record<string, T[]> = {
     module: [], class: [], function: [], variable: [], other: []
   };
   for (const n of nodes) {
-    if (hasOwn(buckets, n.type)) {
+    if (Object.hasOwn(buckets, n.type)) {
       buckets[n.type].push(n);
     } else {
       buckets["other"].push(n);

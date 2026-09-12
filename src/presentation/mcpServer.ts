@@ -542,8 +542,6 @@ export function registerTools(server: McpServer) {
 
       // Truncate if too many nodes
       if (nodes.length > max) {
-        // ⚡ Bolt Optimization: Replace O(N log N) nodes.sort() with an O(N) bucket collection
-        // to prevent sorting bottlenecks on large sets of nodes while preserving order stability.
         nodes = partitionByPriority(nodes).slice(0, max);
       }
 

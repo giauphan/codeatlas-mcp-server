@@ -472,8 +472,6 @@ export class CodeAnalyzer {
         remaining -= chunk.nodes.length;
       } else {
         // Partial load: take module nodes first, then classes, then functions, then variables
-        // ⚡ Bolt Optimization: Replace O(N log N) chunk.nodes.sort() with an O(N) bucket collection
-        // to prevent sorting bottlenecks on large datasets while preserving stability.
         const sorted = partitionByPriority(chunk.nodes);
         loadedNodes.push(...sorted.slice(0, remaining));
         loadedFolders.push(folderInfo.path);
