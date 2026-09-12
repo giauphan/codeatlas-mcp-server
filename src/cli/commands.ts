@@ -11,6 +11,7 @@ import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
 import * as readline from "readline";
+import { checkSpawnResult } from "../utils/processUtils.js";
 import {
   getHomePath,
   getHermesConfigPath,
@@ -661,8 +662,6 @@ export async function cmdDoctor(): Promise<void> {
 // ── Main CLI router ──────────────────────────────────────────────
 // ──────────────────────────────────────────────────────────────────────
   
-import { checkSpawnResult } from "../utils/processUtils.js";
-
 export function isCLICommand(argv: string[]): boolean {
   const cmd = argv[2];
   if (!cmd) return false;
