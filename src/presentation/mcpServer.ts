@@ -1120,12 +1120,12 @@ export function registerTools(server: McpServer) {
       }
 
       if (seedNodes.size === 0) {
-        // ⚡ Bolt Optimization: Replace chained .filter().map().slice() with a single loop and early exit
         const suggestions: string[] = [];
+        const MAX_SUGGESTIONS = 10;
         for (const n of nodes) {
           if (n.type === "module" && n.filePath) {
             suggestions.push(n.label);
-            if (suggestions.length >= 10) break;
+            if (suggestions.length >= MAX_SUGGESTIONS) break;
           }
         }
 
@@ -1790,30 +1790,25 @@ export function registerTools(server: McpServer) {
           if (!searchRegex.test(content)) continue;
 
           const lines = content.split("\n");
+
+          const collectContext = (start: number, end: number) => {
+            const ctxLines: string[] = [];
+            for (let j = Math.max(0, start); j < Math.min(lines.length, end); j++) {
+              const trimmed = lines[j].trim();
+              if (trimmed) ctxLines.push(trimmed);
+            }
+            return ctxLines;
+          };
+
           for (let i = 0; i < lines.length; i++) {
             if (results.length >= maxRes) break;
             if (searchRegex.test(lines[i])) {
-              // ⚡ Bolt Optimization: Use single loop instead of chained .slice().map().filter() for context lines
-              const contextBefore: string[] = [];
-              const startIdx = Math.max(0, i - ctx);
-              for (let j = startIdx; j < i; j++) {
-                const trimmed = lines[j].trim();
-                if (trimmed) contextBefore.push(trimmed);
-              }
-
-              const contextAfter: string[] = [];
-              const endIdx = Math.min(lines.length, i + 1 + ctx);
-              for (let j = i + 1; j < endIdx; j++) {
-                const trimmed = lines[j].trim();
-                if (trimmed) contextAfter.push(trimmed);
-              }
-
               results.push({
                 file: path.relative(loaded.projectDir, filePath),
                 line: i + 1,
                 content: lines[i].trim(),
-                contextBefore,
-                contextAfter,
+                contextBefore: collectContext(i - ctx, i),
+                contextAfter: collectContext(i + 1, i + 1 + ctx),
               });
             }
           }
