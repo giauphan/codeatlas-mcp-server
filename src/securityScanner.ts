@@ -106,10 +106,15 @@ export class SecurityScanner {
     }
 
     try {
-      const criticalFindings = findings.filter(f => f.severity === "CRITICAL" || f.severity === "HIGH").slice(0, 5);
-      const codeContext = criticalFindings.map(f => {
-        return "[" + f.severity + "] " + f.type + ": " + f.message + " (" + f.filePath + ":" + f.line + ")";
-      }).join("\n");
+      // ⚡ Bolt Optimization: Replaced chained array methods with a single for...of loop and early exit
+      const criticalFindings: string[] = [];
+      for (const f of findings) {
+        if (f.severity === "CRITICAL" || f.severity === "HIGH") {
+          criticalFindings.push("[" + f.severity + "] " + f.type + ": " + f.message + " (" + f.filePath + ":" + f.line + ")");
+          if (criticalFindings.length >= 5) break;
+        }
+      }
+      const codeContext = criticalFindings.join("\n");
 
       const response = await fetch(aiUrl, {
         method: "POST",
