@@ -106,15 +106,14 @@ export class SecurityScanner {
     }
 
     try {
-      // ⚡ Bolt Optimization: Replaced chained array methods with a single for...of loop and early exit
-      const criticalFindings: string[] = [];
+      const criticalFindingMessages: string[] = [];
       for (const f of findings) {
         if (f.severity === "CRITICAL" || f.severity === "HIGH") {
-          criticalFindings.push("[" + f.severity + "] " + f.type + ": " + f.message + " (" + f.filePath + ":" + f.line + ")");
-          if (criticalFindings.length >= 5) break;
+          criticalFindingMessages.push("[" + f.severity + "] " + f.type + ": " + f.message + " (" + f.filePath + ":" + f.line + ")");
+          if (criticalFindingMessages.length >= 5) break;
         }
       }
-      const codeContext = criticalFindings.join("\n");
+      const codeContext = criticalFindingMessages.join("\n");
 
       const response = await fetch(aiUrl, {
         method: "POST",
