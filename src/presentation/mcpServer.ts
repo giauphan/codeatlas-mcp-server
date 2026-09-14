@@ -2138,7 +2138,11 @@ export function registerTools(server: McpServer) {
       // Top files
       const fc = new Map<string, number>();
       for (const n of loaded.analysis.graph.nodes) if (n.filePath && !n.id.startsWith("external:")) fc.set(n.filePath, (fc.get(n.filePath) || 0) + 1);
-      ctx.topFiles = Array.from(fc.entries()).sort((a, b) => b[1] - a[1]).slice(0, 10).map(([f, c]) => ({ file: f, entities: c }));
+      const sortedEntries = Array.from(fc.entries()).sort((a, b) => b[1] - a[1]);
+      ctx.topFiles = [];
+      for (let i = 0; i < Math.min(10, sortedEntries.length); i++) {
+        ctx.topFiles.push({ file: sortedEntries[i][0], entities: sortedEntries[i][1] });
+      }
 
       ctx.testFramework = ctx.configFiles.vitest ? "vitest" : ctx.configFiles.jest ? "jest" : ctx.configFiles.playwright ? "playwright" : "unknown";
 

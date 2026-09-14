@@ -106,10 +106,14 @@ export class SecurityScanner {
     }
 
     try {
-      const criticalFindings = findings.filter(f => f.severity === "CRITICAL" || f.severity === "HIGH").slice(0, 5);
-      const codeContext = criticalFindings.map(f => {
-        return "[" + f.severity + "] " + f.type + ": " + f.message + " (" + f.filePath + ":" + f.line + ")";
-      }).join("\n");
+      const criticalFindingsFormatted: string[] = [];
+      for (const f of findings) {
+        if (f.severity === "CRITICAL" || f.severity === "HIGH") {
+          criticalFindingsFormatted.push("[" + f.severity + "] " + f.type + ": " + f.message + " (" + f.filePath + ":" + f.line + ")");
+          if (criticalFindingsFormatted.length >= 5) break;
+        }
+      }
+      const codeContext = criticalFindingsFormatted.join("\n");
 
       const response = await fetch(aiUrl, {
         method: "POST",
