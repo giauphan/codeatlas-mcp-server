@@ -16,7 +16,7 @@ if (!process.platform.startsWith('win')) {
   // Copy hooks
   cpSync(SRC, DEST, { recursive: true });
   for (const name of readdirSync(DEST)) {
-    if (name.endsWith('.sh')) {
+    if (name.endsWith('.sh') || name.endsWith('.py')) {
       chmodSync(join(DEST, name), 0o755);
     }
   }

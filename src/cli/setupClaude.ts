@@ -4,6 +4,7 @@ import * as os from "os";
 import { fileURLToPath } from "url";
 import { bold, ok, fail, warn } from "./commands.js";
 import { getZedSettingsPath, getZedConfigDir } from "../utils/pathUtils.js";
+import { checkSpawnResult } from "../utils/processUtils.js";
 
 function getSettingsPath(): string {
   const home = os.homedir();
@@ -78,8 +79,11 @@ export async function cmdSetupClaude(projectDir: string = process.cwd()): Promis
   // 1. Verify codeatlas CLI is available
   console.log(`\n${bold("1. Verifying CodeAtlas CLI")}`);
   try {
-    const { execSync } = await import("child_process");
-    const version = execSync("codeatlas-enterprise --version", { encoding: "utf-8", timeout: 5000 }).trim();
+    const { spawnSync } = await import("child_process");
+    // Use shell: process.platform === "win32" to allow spawning .cmd wrappers on Windows while avoiding shell injection on Unix
+    const result = spawnSync("codeatlas-enterprise", ["--version"], { encoding: "utf-8", timeout: 5000, shell: process.platform === "win32" });
+    checkSpawnResult(result);
+    const version = (result.stdout?.trim() ?? "");
     console.log(`  ${ok()} CodeAtlas CLI version: ${version}`);
   } catch (e: any) {
     console.log(`  ${warn()} CodeAtlas CLI not found globally. Using npx/local path.`);
