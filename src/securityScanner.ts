@@ -10,6 +10,8 @@ export interface SecurityFinding {
   snippet?: string;
 }
 
+const MAX_FINDINGS_IN_PROMPT = 5;
+
 export class SecurityScanner {
   /**
    * Scan an analyzed project for security vulnerabilities
@@ -106,10 +108,14 @@ export class SecurityScanner {
     }
 
     try {
-      const criticalFindings = findings.filter(f => f.severity === "CRITICAL" || f.severity === "HIGH").slice(0, 5);
-      const codeContext = criticalFindings.map(f => {
-        return "[" + f.severity + "] " + f.type + ": " + f.message + " (" + f.filePath + ":" + f.line + ")";
-      }).join("\n");
+      const criticalFindingMessages: string[] = [];
+      for (const f of findings) {
+        if (f.severity === "CRITICAL" || f.severity === "HIGH") {
+          criticalFindingMessages.push(`[${f.severity}] ${f.type}: ${f.message} (${f.filePath}:${f.line})`);
+          if (criticalFindingMessages.length >= MAX_FINDINGS_IN_PROMPT) break;
+        }
+      }
+      const codeContext = criticalFindingMessages.join("\n");
 
       const response = await fetch(aiUrl, {
         method: "POST",
