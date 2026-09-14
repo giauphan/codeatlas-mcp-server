@@ -10,6 +10,8 @@ export interface SecurityFinding {
   snippet?: string;
 }
 
+const MAX_FINDINGS_IN_PROMPT = 5;
+
 export class SecurityScanner {
   /**
    * Scan an analyzed project for security vulnerabilities
@@ -106,7 +108,6 @@ export class SecurityScanner {
     }
 
     try {
-      const MAX_FINDINGS_IN_PROMPT = 5;
       const criticalFindingMessages: string[] = [];
       for (const f of findings) {
         if (f.severity === "CRITICAL" || f.severity === "HIGH") {
