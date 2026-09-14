@@ -36,3 +36,13 @@
 **Vulnerability:** The `export_team_artifact` tool used `fs.writeFileSync` to write `artifact-summary.json` and `artifact.json`. Despite comments indicating an intention to "Prevent symlink following on the output file itself", `fs.writeFileSync` intrinsically follows symlinks, leaving the application vulnerable to symlink-based TOCTOU (Time-of-Check to Time-of-Use) attacks where an attacker could overwrite arbitrary system files by pre-creating symlinks.
 **Learning:** Comments indicating security intent are not sufficient if the underlying API does not support the required semantics. `fs.writeFileSync` cannot be instructed to ignore symlinks via string flags like `"w"`.
 **Prevention:** To prevent TOCTOU and symlink following vulnerabilities when writing files, avoid `fs.writeFileSync(..., { flag: "w" })`. Instead, obtain a secure file descriptor using `fs.openSync` with the explicit `fs.constants.O_NOFOLLOW` flag alongside `O_CREAT | O_WRONLY | O_TRUNC`, write to the descriptor, and ensure it is reliably closed (e.g., using a `try...finally` block).
+## 2024-05-30 - Fix Arbitrary Command Execution via setup-hooks.js
+
+**Vulnerability:**
+The `src/cli/commands.ts` file used `execSync` to execute local node scripts (`setup-hooks.js` and `validate-hooks.js`). The `execSync` function runs commands within a shell environment. If the current working directory (`process.cwd()`) contained malicious shell metacharacters, it could potentially lead to an indirect command injection attack when the shell initialized.
+
+**Learning:**
+While using `spawnSync` with `{ shell: false }` effectively prevents shell execution, ensuring the exact same binary is invoked without relying on the system `PATH` is another critical layer of defense. Using `process.execPath` instead of the `"node"` literal guarantees that the identical Node.js runtime executing the CLI is securely reused for the child process. Furthermore, when converting from `execSync` to `spawnSync`, it is crucial to manually handle the error states because `spawnSync` does not automatically throw an exception on non-zero exit codes.
+
+**Prevention:**
+Always use `spawnSync` with `{ shell: false }` instead of `execSync` for executing local scripts. Use `process.execPath` instead of relying on `"node"` string literal resolution from the `PATH` environment variable. Explicitly check `result.error` and `result.status !== 0` to maintain robust error handling equivalent to `execSync`.
