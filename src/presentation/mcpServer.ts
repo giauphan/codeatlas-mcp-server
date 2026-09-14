@@ -1120,6 +1120,15 @@ export function registerTools(server: McpServer) {
       }
 
       if (seedNodes.size === 0) {
+        const suggestions: string[] = [];
+        const MAX_SUGGESTIONS = 10;
+        for (const n of nodes) {
+          if (n.type === "module" && n.filePath) {
+            suggestions.push(n.label);
+            if (suggestions.length >= MAX_SUGGESTIONS) break;
+          }
+        }
+
         return {
           content: [
             {
@@ -1128,10 +1137,7 @@ export function registerTools(server: McpServer) {
                 keyword,
                 matchCount: 0,
                 message: `No entities found matching '${keyword}'. Try a broader keyword.`,
-                suggestions: nodes
-                  .filter((n) => n.type === "module" && n.filePath)
-                  .map((n) => n.label)
-                  .slice(0, 10),
+                suggestions,
               }, null, 2),
             },
           ],
@@ -1784,6 +1790,16 @@ export function registerTools(server: McpServer) {
           if (!searchRegex.test(content)) continue;
 
           const lines = content.split("\n");
+
+          const collectContext = (start: number, end: number) => {
+            const ctxLines: string[] = [];
+            for (let j = Math.max(0, start); j < Math.min(lines.length, end); j++) {
+              const trimmed = lines[j].trim();
+              if (trimmed) ctxLines.push(trimmed);
+            }
+            return ctxLines;
+          };
+
           for (let i = 0; i < lines.length; i++) {
             if (results.length >= maxRes) break;
             if (searchRegex.test(lines[i])) {
@@ -1791,8 +1807,8 @@ export function registerTools(server: McpServer) {
                 file: path.relative(loaded.projectDir, filePath),
                 line: i + 1,
                 content: lines[i].trim(),
-                contextBefore: lines.slice(Math.max(0, i - ctx), i).map(l => l.trim()).filter(Boolean),
-                contextAfter: lines.slice(i + 1, i + 1 + ctx).map(l => l.trim()).filter(Boolean),
+                contextBefore: collectContext(i - ctx, i),
+                contextAfter: collectContext(i + 1, i + 1 + ctx),
               });
             }
           }
