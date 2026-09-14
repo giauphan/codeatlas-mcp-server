@@ -106,11 +106,12 @@ export class SecurityScanner {
     }
 
     try {
+      const MAX_FINDINGS_IN_PROMPT = 5;
       const criticalFindingMessages: string[] = [];
       for (const f of findings) {
         if (f.severity === "CRITICAL" || f.severity === "HIGH") {
-          criticalFindingMessages.push("[" + f.severity + "] " + f.type + ": " + f.message + " (" + f.filePath + ":" + f.line + ")");
-          if (criticalFindingMessages.length >= 5) break;
+          criticalFindingMessages.push(`[${f.severity}] ${f.type}: ${f.message} (${f.filePath}:${f.line})`);
+          if (criticalFindingMessages.length >= MAX_FINDINGS_IN_PROMPT) break;
         }
       }
       const codeContext = criticalFindingMessages.join("\n");
