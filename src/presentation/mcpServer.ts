@@ -4,8 +4,20 @@ import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
 import * as child_process from "child_process";
-import { getHomePath, getHermesConfigPath, getHermesPluginDir, getClaudeConfigPath, writeFileSyncNoFollow } from "../utils/pathUtils.js";
+import {
+  getHomePath,
+  getHermesConfigPath,
+  getHermesPluginDir,
+  getClaudeConfigPath,
+  getClaudeSettingsPath,
+  getClaudeJsonPath,
+  getClaudeDesktopConfigPath,
+  getGeminiSettingsPath,
+  getZedSettingsPath,
+  writeFileSyncNoFollow
+} from "../utils/pathUtils.js";
 import { jaccardSimilarity } from "../utils/mathUtils.js";
+import { getApiUrl } from "../utils/envUtils.js";
 import { checkAuth, logActivity } from "../services/authService.js";
 import {
   discoverProjectsAsync,
@@ -936,8 +948,7 @@ export function registerTools(server: McpServer) {
       const auth = await checkAuth();
       await logActivity(auth, "search_genome", { query: query.substring(0, 100), project, limit });
       try {
-        const serverUrl = process.env.CODEATLAS_API_URL;
-        if (!serverUrl) throw new Error("CODEATLAS_API_URL not set");
+        const serverUrl = getApiUrl();
         const apiKey = process.env.CODEATLAS_API_KEY;
         if (!apiKey) throw new Error("CODEATLAS_API_KEY not set");
 
@@ -971,8 +982,7 @@ export function registerTools(server: McpServer) {
       const auth = await checkAuth();
       await logActivity(auth, "get_gene", { geneId });
       try {
-        const serverUrl = process.env.CODEATLAS_API_URL;
-        if (!serverUrl) throw new Error("CODEATLAS_API_URL not set");
+        const serverUrl = getApiUrl();
         const apiKey = process.env.CODEATLAS_API_KEY;
         if (!apiKey) throw new Error("CODEATLAS_API_KEY not set");
 
@@ -1007,8 +1017,7 @@ export function registerTools(server: McpServer) {
       const auth = await checkAuth();
       await logActivity(auth, "scan_immune_genes", { problem: problem.substring(0, 100), project });
       try {
-        const serverUrl = process.env.CODEATLAS_API_URL;
-        if (!serverUrl) throw new Error("CODEATLAS_API_URL not set");
+        const serverUrl = getApiUrl();
         const apiKey = process.env.CODEATLAS_API_KEY;
         if (!apiKey) throw new Error("CODEATLAS_API_KEY not set");
 
@@ -1045,8 +1054,7 @@ export function registerTools(server: McpServer) {
       const auth = await checkAuth();
       await logActivity(auth, "save_immune_gene", { problem: problem.substring(0, 50), failure: failure.substring(0, 50), project });
       try {
-        const serverUrl = process.env.CODEATLAS_API_URL;
-        if (!serverUrl) throw new Error("CODEATLAS_API_URL not set");
+        const serverUrl = getApiUrl();
         const apiKey = process.env.CODEATLAS_API_KEY;
         if (!apiKey) throw new Error("CODEATLAS_API_KEY not set");
 
@@ -2236,7 +2244,7 @@ export function registerTools(server: McpServer) {
   // Tool 19: git_changes — Recent git activity
   server.tool(
     "git_changes",
-    "Get recent git changes: last N commits (hash, author, date, message, files changed), uncommitted changes (modified/added/deleted), branch status (ahead/behind). Saves multiple git commands.",
+    "Execute read-only git commands to get recent git changes: last N commits (hash, author, date, message, files changed), uncommitted changes (modified/added/deleted), branch status (ahead/behind). Saves multiple git commands.",
     {
       project: z.string().max(255).optional().describe("Project name or path"),
       commits: z.number().optional().describe("Number of recent commits (default: 5, max: 20)"),
@@ -2373,40 +2381,8 @@ export function registerTools(server: McpServer) {
       const results: any[] = [];
 
       // Save the key securely to ~/.codeatlas/.env
-      try {
-        const homeDir = getHomePath();
-        if (homeDir) {
-          const codeatlasDir = path.join(homeDir, ".codeatlas");
-          if (!fs.existsSync(codeatlasDir)) {
-            fs.mkdirSync(codeatlasDir, { recursive: true, mode: 0o700 });
-          }
-          const envPath = path.join(codeatlasDir, ".env");
-          let envContent = "";
-          let fileExists = false;
-          try {
-            fileExists = fs.existsSync(envPath);
-            if (fileExists) {
-              envContent = fs.readFileSync(envPath, "utf-8");
-            }
-          } catch (e) {
-            // Ignore access errors on check
-          }
-
-          if (fileExists) {
-            if (!envContent.includes("CODEATLAS_API_KEY=")) {
-              envContent += (envContent.endsWith("\n") || envContent === "" ? "" : "\n") + `CODEATLAS_API_KEY=${key}\n`;
-            } else {
-              envContent = envContent.replace(/CODEATLAS_API_KEY=.*(\r?\n|$)/g, () => `CODEATLAS_API_KEY=${key}\n`);
-            }
-            // Use writeFileSync with temp file to avoid race conditions (partial mitigate)
-            fs.writeFileSync(envPath, envContent, { mode: 0o600 });
-          } else {
-            fs.writeFileSync(envPath, `CODEATLAS_API_KEY=${key}\n`, { mode: 0o600 });
-          }
-        }
-      } catch (err: any) {
-        results.push({ action: "save_env", status: "error", error: err.message });
-      }
+      // Note: Persisting credentials to disk removed to resolve M8ven finding: "Secrets not written to files"
+      results.push({ action: "save_env", status: "skipped", message: "Secrets are kept in memory only; configure via ENV var." });
 
       const mcpEntry = `  codeatlas:\n    command: npx\n    args: ["-y", "codeatlas-enterprise"]\n    enabled: true\n`;
 
@@ -2566,7 +2542,16 @@ def register(ctx):
     {},
     async () => {
       const auth = await checkAuth();
-      const results: any = { hermes: {}, claude: {}, gemini: {} };
+      const results: any = {
+        apiKey: process.env.CODEATLAS_API_KEY ? "set" : "not_set",
+        apiUrl: process.env.CODEATLAS_API_URL || null,
+        hermes: {},
+        claude: {},
+        gemini: {},
+        zed: {},
+        project: {},
+        features: {},
+      };
 
       // Hermes
       const hermesCfg = getHermesConfigPath();
@@ -2579,26 +2564,181 @@ def register(ctx):
       const pluginDir = getHermesPluginDir();
       results.hermes.plugin = fs.existsSync(path.join(pluginDir, "__init__.py")) ? "installed" : "not_installed";
       results.hermes.restartRequired = results.hermes.plugin === "installed" || results.hermes.mcp === "not_configured";
+
+      const hasCodeatlasServer = (servers: any): boolean => {
+        if (!servers || typeof servers !== "object") return false;
+        return Object.keys(servers).some(k => k.toLowerCase().includes("codeatlas"));
+      };
+
       // Claude
-      const claudeCfg = getClaudeConfigPath();
-      if (fs.existsSync(claudeCfg)) {
-        const cl = JSON.parse(fs.readFileSync(claudeCfg, "utf-8"));
-        results.claude.mcp = cl.mcpServers?.codeatlas ? "configured" : "not_configured";
+      const claudeSettings = getClaudeSettingsPath();
+      const claudeJson = getClaudeJsonPath();
+      const legacyClaudeCfg = getClaudeConfigPath();
+      const desktopCfg = getClaudeDesktopConfigPath();
+
+      let claudeMcpConfigured = false;
+      let hasClaudeSettings = false;
+
+      if (fs.existsSync(claudeSettings)) {
+        hasClaudeSettings = true;
+        try {
+          const s = JSON.parse(fs.readFileSync(claudeSettings, "utf-8"));
+          if (hasCodeatlasServer(s?.mcpServers)) {
+            claudeMcpConfigured = true;
+          }
+          // Check hooks
+          const hooks = s?.hooks || {};
+          const hasHook = (event: string, name: string) => {
+            const eventHooks = hooks[event];
+            if (!Array.isArray(eventHooks)) return false;
+            return eventHooks.some((group: any) => {
+              const list = Array.isArray(group?.hooks) ? group.hooks : [];
+              return list.some((h: any) => {
+                const cmd = typeof h?.command === "string" ? h.command : "";
+                const args = Array.isArray(h?.args) ? h.args.join(" ") : "";
+                const full = `${cmd} ${args}`.toLowerCase();
+                return full.includes(name.toLowerCase());
+              });
+            });
+          };
+          const hasContext = hasHook("SessionStart", "brain-context") || hasHook("UserPromptSubmit", "brain-context");
+          const hasRouter = hasHook("PreToolUse", "task-router") || hasHook("UserPromptSubmit", "task-router");
+          const hasSave = hasHook("PostToolUse", "brain-save") || hasHook("PostToolUseFailure", "brain-save");
+          results.claude.hooks = (hasContext && hasRouter && hasSave) ? "connected" : ((hasContext || hasRouter || hasSave) ? "partially_connected" : "not_installed");
+          results.claude.hookDetails = { brainContext: hasContext, taskRouter: hasRouter, brainSave: hasSave };
+        } catch {
+          results.claude.hooks = "error";
+        }
       } else {
-        results.claude.mcp = "no_config";
+        results.claude.hooks = "no_config";
       }
 
-      // API key
-      results.apiKey = process.env.CODEATLAS_API_KEY ? "set" : "not_set";
+      if (!claudeMcpConfigured && fs.existsSync(claudeJson)) {
+        try {
+          const cl = JSON.parse(fs.readFileSync(claudeJson, "utf-8"));
+          if (hasCodeatlasServer(cl?.mcpServers)) {
+            claudeMcpConfigured = true;
+          }
+        } catch {}
+      }
+
+      if (!claudeMcpConfigured && fs.existsSync(legacyClaudeCfg)) {
+        try {
+          const cl = JSON.parse(fs.readFileSync(legacyClaudeCfg, "utf-8"));
+          if (hasCodeatlasServer(cl?.mcpServers)) {
+            claudeMcpConfigured = true;
+          }
+        } catch {}
+      }
+
+      if (!claudeMcpConfigured && fs.existsSync(desktopCfg)) {
+        try {
+          const cl = JSON.parse(fs.readFileSync(desktopCfg, "utf-8"));
+          if (hasCodeatlasServer(cl?.mcpServers)) {
+            claudeMcpConfigured = true;
+          }
+        } catch {}
+      }
+
+      results.claude.mcp = claudeMcpConfigured ? "configured" : (hasClaudeSettings || fs.existsSync(claudeJson) ? "not_configured" : "no_config");
+
+      // Gemini
+      const geminiCfg = getGeminiSettingsPath();
+      if (fs.existsSync(geminiCfg)) {
+        try {
+          const g = JSON.parse(fs.readFileSync(geminiCfg, "utf-8"));
+          results.gemini.mcp = (hasCodeatlasServer(g?.mcpServers) || g?.contextFileName) ? "configured" : "not_configured";
+        } catch {
+          results.gemini.mcp = "not_configured";
+        }
+      } else {
+        results.gemini.mcp = "no_config";
+      }
+
+      // Zed
+      const zedCfg = getZedSettingsPath();
+      if (fs.existsSync(zedCfg)) {
+        try {
+          const z = JSON.parse(fs.readFileSync(zedCfg, "utf-8"));
+          results.zed.mcp = (hasCodeatlasServer(z?.context_servers) || hasCodeatlasServer(z?.mcpServers)) ? "configured" : "not_configured";
+        } catch {
+          results.zed.mcp = "not_configured";
+        }
+      } else {
+        results.zed.mcp = "no_config";
+      }
+
+      // Project Context
+      const projectDir = path.resolve(process.env.CODEATLAS_PROJECT_DIR || process.env.GEMINI_CLI_IDE_WORKSPACE_PATH || process.cwd());
+      const isGit = fs.existsSync(path.join(projectDir, ".git"));
+      let branch: string | undefined;
+      if (isGit) {
+        try {
+          const headPath = path.join(projectDir, ".git", "HEAD");
+          if (fs.existsSync(headPath)) {
+            const headContent = fs.readFileSync(headPath, "utf-8").trim();
+            branch = headContent.startsWith("ref: refs/heads/") ? headContent.replace("ref: refs/heads/", "") : headContent.slice(0, 7);
+          }
+        } catch {}
+      }
+      const hasClaudeMd = fs.existsSync(path.join(projectDir, "CLAUDE.md")) || fs.existsSync(path.join(projectDir, ".claude", "CLAUDE.md"));
+      const hasLocalMemory = fs.existsSync(path.join(projectDir, ".codeatlas")) || fs.existsSync(path.join(projectDir, ".agents", "memory"));
+      let agent: any = { kind: "generic", label: "unknown", ruleFile: null, rulePresent: false };
+      let setupInfo: any = {};
+      try {
+        const { detectActiveAgent, checkCodeatlasSetup, listProjectDirs } = await import("../cli/commands.js");
+        agent = detectActiveAgent(projectDir);
+        setupInfo = checkCodeatlasSetup(projectDir);
+        const dirs = listProjectDirs();
+        results.projectDirs = {
+          connected: dirs.connected.map((e: any) => ({
+            dir: e.dir, name: e.name, isGit: e.isGit, branch: e.branch,
+            codeatlasSetup: e.codeatlasSetup,
+          })),
+          newDirs: dirs.newDirs.map((e: any) => ({ dir: e.dir, name: e.name, isGit: e.isGit, branch: e.branch })),
+        };
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.error("[check_second_brain_status] setup scan failed:", msg);
+      }
+      results.project = {
+        path: projectDir,
+        name: path.basename(projectDir),
+        isGit,
+        branch,
+        hasClaudeMd,
+        hasLocalMemory,
+        agent: { kind: agent.kind, label: agent.label, ruleFile: agent.ruleFile, rulePresent: agent.rulePresent },
+        codeatlasSetup: setupInfo,
+      };
+
+      // Features
+      const home = os.homedir();
+      let adrCount = 0;
+      const adrDir = path.join(home, ".codeatlas", "adr");
+      if (fs.existsSync(adrDir)) {
+        try {
+          const entries = fs.readdirSync(adrDir, { recursive: true });
+          adrCount = entries.filter((e: any) => typeof e === "string" && e.endsWith(".md")).length;
+        } catch {}
+      }
+      results.features = {
+        astParsers: ["TypeScript", "JavaScript", "Python", "PHP"],
+        adrCount,
+        mode: process.env.CODEATLAS_API_URL ? "cloud_sync" : "local_first",
+      };
 
       // Cloud connectivity
       try {
         const apiUrl = process.env.CODEATLAS_API_URL;
-                if (!apiUrl) throw new Error("CODEATLAS_API_URL not set");
-                const resp = await fetch(`${apiUrl}/api/genome/search?limit=1`, {
-          headers: { "x-api-key": process.env.CODEATLAS_API_KEY || "", "User-Agent": "codeatlas-enterprise/2.0" },
-        });
-        results.cloud = resp.ok ? "reachable" : `error_${resp.status}`;
+        if (!apiUrl) {
+          results.cloud = "not_configured";
+        } else {
+          const resp = await fetch(`${apiUrl}/api/genome/search?limit=1`, {
+            headers: { "x-api-key": process.env.CODEATLAS_API_KEY || "", "User-Agent": "codeatlas-enterprise/2.0" },
+          });
+          results.cloud = resp.ok ? "reachable" : `error_${resp.status}`;
+        }
       } catch {
         results.cloud = "unreachable";
       }
@@ -2919,7 +3059,7 @@ def register(ctx):
   // ── Tool 23: Detect Similar/Duplicate Code ─────────────────────────
   server.tool(
     "detect_code_similarities",
-    "Find near-duplicate or semantically similar functions/classes in a project. Uses token-based Jaccard similarity to find code that looks different but does the same thing. Returns groups of similar functions with similarity scores. Use before refactoring to consolidate duplicated logic.",
+    "Scan project files to find near-duplicate or semantically similar functions/classes in a project. Reads source code files and uses token-based Jaccard similarity to find code that looks different but does the same thing. Returns groups of similar functions with similarity scores. Use before refactoring to consolidate duplicated logic.",
     {
       project: z.string().max(255).optional().describe("Project name or path"),
       threshold: z.number().optional().describe("Similarity threshold 0-1 (default: 0.6 = 60% similar). Lower = more results"),
@@ -3050,7 +3190,7 @@ def register(ctx):
   // ── Tool 24: Export Team-Shared Artifact ────────────────────────────
   server.tool(
     "export_team_artifact",
-    "Export a compressed snapshot of the project's analysis (knowledge graph + dream memories) to .codeatlas/artifact.db — a single file that can be committed to git and shared with teammates. On clone, teammates get instant codebase intelligence without re-analyzing. Similar to codebase-memory-mcp's .codebase-memory/graph.db.zst pattern.",
+    "Write and export a compressed snapshot of the project's analysis (knowledge graph + dream memories) to .codeatlas/artifact.db file on disk — a single file that can be committed to git and shared with teammates. On clone, teammates get instant codebase intelligence without re-analyzing. Similar to codebase-memory-mcp's .codebase-memory/graph.db.zst pattern.",
     {
       project: z.string().max(255).optional().describe("Project name or path"),
       format: z.enum(["json", "summary"]).optional().describe("'json' = full export, 'summary' = compressed summary only"),

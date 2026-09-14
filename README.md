@@ -145,6 +145,25 @@ Then in Zed's Agent Panel, call the `brain_context` tool at the start of a task 
 
 ---
 
+
+## 🔒 Security & Environment Variables
+
+CodeAtlas MCP Server is designed with a local-first architecture and several security hardening measures to protect your credentials and codebase data:
+
+- **No Disk Persistence**: Credentials like `CODEATLAS_API_KEY` are kept entirely in-memory and are **never** persisted to `.env` files or disk. You must supply your key via environment variables.
+- **Strict Destination Validation**: When connecting to cloud features, the destination AI and backend URLs are strictly validated. Credentials can only flow to trusted official domains (`*.codeatlas.ai`, `opencode.ai`) or local addresses (`localhost`, `127.0.0.1`).
+- **Telemetry & Logging**: Potential credential leaks are sanitized and redacted from all console and error logs.
+
+### Required & Optional Environment Variables
+
+| Variable | Description | Default |
+|---|---|---|
+| `CODEATLAS_API_KEY` | Secret key to connect to CodeAtlas Cloud services for AI memory and scan features. | (none) |
+| `CODEATLAS_API_URL` | Target URL for CodeAtlas Cloud. Validated via allowlists to prevent credential exfiltration. | `https://api.codeatlas.ai` |
+| `CODEATLAS_ALLOW_CUSTOM_URL` | Set to `true` to allow sending credentials to self-hosted or unlisted destinations. Required for private network deployments. | `false` |
+| `CODEATLAS_SCAN_AI_KEY` | Key for deep AI security scanning using an external LLM. | (none) |
+| `CODEATLAS_SCAN_AI_URL` | Endpoint for deep AI security scanning. | (none) |
+
 ## 📚 Documentation
 
 | Guide | Description |

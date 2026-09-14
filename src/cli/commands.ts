@@ -11,7 +11,20 @@ import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
 import * as readline from "readline";
-import { getHermesConfigPath, getHermesPluginDir, getZedSettingsPath } from "../utils/pathUtils.js";
+import {
+  getHomePath,
+  getHermesConfigPath,
+  getHermesPluginDir,
+  getZedSettingsPath,
+  getClaudeConfigPath,
+  getClaudeSettingsPath,
+  getClaudeJsonPath,
+  getClaudeDesktopConfigPath,
+  getGeminiSettingsPath,
+  getGeminiConfigPath,
+  getCursorMcpPath,
+  getClaudeHooksDir
+} from "../utils/pathUtils.js";
 
 export const API_URL = process.env.CODEATLAS_API_URL ?? "";
 
@@ -45,6 +58,9 @@ export function ask(query: string): Promise<string> {
 }
 
 export async function cloudFetch(method: string, path_: string, body?: any): Promise<{ ok: boolean; status: number; data: any }> {
+  if (!API_URL) {
+    return { ok: false, status: 0, data: { error: "CODEATLAS_API_URL not set" } };
+  }
   const url = `${API_URL.replace(/\/+$/, "")}${path_}`;
   const headers: Record<string, string> = {
     "User-Agent": "codeatlas-enterprise-cli/2.0",
@@ -71,6 +87,366 @@ export async function cloudFetch(method: string, path_: string, body?: any): Pro
   }
 }
 
+/* ── Diagnostic Helpers ─────────────────────────────────────────── */
+
+export interface DiagnosticResult {
+  status: "ok" | "warn" | "fail";
+  detail?: string;
+}
+
+function hasCodeatlasServer(servers: any): boolean {
+  if (!servers || typeof servers !== "object") return false;
+  return Object.keys(servers).some(k => k.toLowerCase().includes("codeatlas"));
+}
+
+export function checkClaudeMcp(): DiagnosticResult {
+  // Check ~/.claude/settings.json
+  const settingsPath = getClaudeSettingsPath();
+  if (fs.existsSync(settingsPath)) {
+    try {
+      const settings = JSON.parse(fs.readFileSync(settingsPath, "utf-8"));
+      if (hasCodeatlasServer(settings?.mcpServers)) {
+        return { status: "ok", detail: "configured in ~/.claude/settings.json" };
+      }
+    } catch {}
+  }
+
+  // Check ~/.claude.json
+  const claudeJson = getClaudeJsonPath();
+  if (fs.existsSync(claudeJson)) {
+    try {
+      const cl = JSON.parse(fs.readFileSync(claudeJson, "utf-8"));
+      if (hasCodeatlasServer(cl?.mcpServers)) {
+        return { status: "ok", detail: "configured in ~/.claude.json" };
+      }
+    } catch {}
+  }
+
+  // Check legacy ~/.claude/claude.json
+  const legacyCfg = getClaudeConfigPath();
+  if (fs.existsSync(legacyCfg)) {
+    try {
+      const cl = JSON.parse(fs.readFileSync(legacyCfg, "utf-8"));
+      if (hasCodeatlasServer(cl?.mcpServers)) {
+        return { status: "ok", detail: "configured in ~/.claude/claude.json" };
+      }
+    } catch {}
+  }
+
+  // Check Claude Desktop config
+  const desktopCfg = getClaudeDesktopConfigPath();
+  if (fs.existsSync(desktopCfg)) {
+    try {
+      const cl = JSON.parse(fs.readFileSync(desktopCfg, "utf-8"));
+      if (hasCodeatlasServer(cl?.mcpServers)) {
+        return { status: "ok", detail: "configured in Claude Desktop" };
+      }
+    } catch {}
+  }
+
+  return { status: "warn", detail: "not configured (run 'codeatlas setup claude')" };
+}
+
+export function checkClaudeHooks(): DiagnosticResult & { connected: string[]; missing: string[] } {
+  const settingsPath = getClaudeSettingsPath();
+  if (!fs.existsSync(settingsPath)) {
+    return { status: "warn", detail: "settings.json not found", connected: [], missing: ["brain-context", "task-router", "brain-save"] };
+  }
+
+  try {
+    const settings = JSON.parse(fs.readFileSync(settingsPath, "utf-8"));
+    const hooks = settings?.hooks || {};
+
+    const hasHook = (event: string, name: string) => {
+      const eventHooks = hooks[event];
+      if (!Array.isArray(eventHooks)) return false;
+      return eventHooks.some((group: any) => {
+        const list = Array.isArray(group?.hooks) ? group.hooks : [];
+        return list.some((h: any) => {
+          const cmd = typeof h?.command === "string" ? h.command : "";
+          const args = Array.isArray(h?.args) ? h.args.join(" ") : "";
+          const full = `${cmd} ${args}`.toLowerCase();
+          return full.includes(name.toLowerCase());
+        });
+      });
+    };
+
+    const hasContext = hasHook("SessionStart", "brain-context") || hasHook("UserPromptSubmit", "brain-context");
+    const hasRouter = hasHook("PreToolUse", "task-router") || hasHook("UserPromptSubmit", "task-router");
+    const hasSave = hasHook("PostToolUse", "brain-save") || hasHook("PostToolUseFailure", "brain-save");
+
+    const connected: string[] = [];
+    const missing: string[] = [];
+
+    if (hasContext) connected.push("brain-context"); else missing.push("brain-context");
+    if (hasRouter) connected.push("task-router"); else missing.push("task-router");
+    if (hasSave) connected.push("brain-save"); else missing.push("brain-save");
+
+    if (missing.length === 0) {
+      return { status: "ok", detail: `connected (${connected.join(", ")})`, connected, missing };
+    }
+    if (connected.length > 0) {
+      return { status: "warn", detail: `partially connected (active: ${connected.join(", ")}; missing: ${missing.join(", ")})`, connected, missing };
+    }
+    return { status: "warn", detail: "not installed (run 'codeatlas setup claude')", connected, missing };
+  } catch (err: any) {
+    return { status: "fail", detail: `error reading settings: ${err.message}`, connected: [], missing: ["brain-context", "task-router", "brain-save"] };
+  }
+}
+
+export type AgentKind = "claude" | "codex" | "agents" | "gemini" | "cursor" | "generic";
+export interface AgentInfo { kind: AgentKind; label: string; ruleFile: string | null; rulePresent: boolean; }
+export interface CodeatlasSetupInfo {
+  skills: { count: number; hasCodeatlas: boolean };
+  rules: { count: number; hasCodeatlas: boolean };
+  agents: { count: number };
+  ruleFile: { path: string | null; present: boolean; agent: AgentKind };
+}
+export interface ProjectDirEntry { dir: string; name: string; isGit: boolean; branch?: string; codeatlasSetup: CodeatlasSetupInfo }
+
+export function detectActiveAgent(projectDir: string): AgentInfo {
+  // Which AI is in use? Check env + installed binaries + rule files
+  const hasClaude = Boolean(process.env.CLAUDECODE || process.env.CLAUDE_CODE_ENTRYPOINT || process.env.ANTHROPIC_API_KEY || fs.existsSync(path.join(os.homedir(), ".claude", "settings.json")));
+  const hasCodex = Boolean(process.env.CODEX_HOME || fs.existsSync(path.join(os.homedir(), ".codex", "config.toml")) || fs.existsSync(path.join(projectDir, "codex.md")) || fs.existsSync(path.join(projectDir, "CODEX.md")));
+  const hasGemini = Boolean(process.env.GEMINI_API_KEY || fs.existsSync(path.join(os.homedir(), ".gemini", "settings.json")));
+  // Pick based on strongest signal: explicit md files win, else env
+  const hasClaudeMd = fs.existsSync(path.join(projectDir, "CLAUDE.md")) || fs.existsSync(path.join(projectDir, ".claude", "CLAUDE.md"));
+  const hasCodexMd = fs.existsSync(path.join(projectDir, "codex.md")) || fs.existsSync(path.join(projectDir, "CODEX.md"));
+  const hasAgentsMd = fs.existsSync(path.join(projectDir, "AGENTS.md")) || fs.existsSync(path.join(projectDir, ".agents", "AGENTS.md"));
+  if (hasClaudeMd || (hasClaude && !hasCodexMd && !hasAgentsMd)) {
+    const f = fs.existsSync(path.join(projectDir, "CLAUDE.md")) ? path.join(projectDir, "CLAUDE.md") : fs.existsSync(path.join(projectDir, ".claude", "CLAUDE.md")) ? path.join(projectDir, ".claude", "CLAUDE.md") : null;
+    return { kind: "claude", label: "Claude Code", ruleFile: f, rulePresent: Boolean(f) };
+  }
+  if (hasCodexMd) {
+    const f = fs.existsSync(path.join(projectDir, "codex.md")) ? path.join(projectDir, "codex.md") : path.join(projectDir, "CODEX.md");
+    return { kind: "codex", label: "Codex", ruleFile: f, rulePresent: true };
+  }
+  if (hasAgentsMd) {
+    const f = fs.existsSync(path.join(projectDir, "AGENTS.md")) ? path.join(projectDir, "AGENTS.md") : path.join(projectDir, ".agents", "AGENTS.md");
+    return { kind: "agents", label: "AGENTS.md (generic)", ruleFile: f, rulePresent: true };
+  }
+  if (hasCodex) return { kind: "codex", label: "Codex", ruleFile: null, rulePresent: false };
+  if (hasGemini) return { kind: "gemini", label: "Gemini CLI", ruleFile: null, rulePresent: false };
+  return { kind: "generic", label: "Unknown / generic", ruleFile: null, rulePresent: false };
+}
+
+export function checkCodeatlasSetup(projectDir: string): CodeatlasSetupInfo {
+  const skillsDir = path.join(projectDir, ".agents", "skills");
+  const claudeSkillsDir = path.join(projectDir, ".claude", "skills");
+  let skillCount = 0; let hasCodeatlasSkill = false;
+  for (const d of [skillsDir, claudeSkillsDir]) {
+    if (!fs.existsSync(d)) continue;
+    try { const e = fs.readdirSync(d); skillCount += e.length; if (e.some((x: string) => x.toLowerCase().includes("codeatlas"))) hasCodeatlasSkill = true; } catch {}
+  }
+  // Also count home skills as fallback hint
+  if (skillCount === 0) {
+    for (const d of [path.join(os.homedir(), ".agents", "skills"), path.join(os.homedir(), ".claude", "skills")]) {
+      if (!fs.existsSync(d)) continue;
+      try { const e = fs.readdirSync(d); if (e.some((x: string) => x.toLowerCase().includes("codeatlas"))) hasCodeatlasSkill = true; } catch {}
+    }
+  }
+  const rulesDir = path.join(projectDir, ".agents", "rules");
+  let ruleCount = 0; let hasCodeatlasRule = false;
+  if (fs.existsSync(rulesDir)) {
+    try { const e = fs.readdirSync(rulesDir); ruleCount = e.length; hasCodeatlasRule = e.some((x: string) => x.toLowerCase().includes("codeatlas")); } catch {}
+  }
+  const agentsDir = path.join(projectDir, ".claude", "agents");
+  let agentCount = 0;
+  if (fs.existsSync(agentsDir)) { try { agentCount = fs.readdirSync(agentsDir).filter((x: string) => x.endsWith(".md")).length; } catch {} }
+  // Alternative agent location
+  const agentsDir2 = path.join(projectDir, ".agents", "agents");
+  if (agentCount === 0 && fs.existsSync(agentsDir2)) { try { agentCount = fs.readdirSync(agentsDir2).filter((x: string) => x.endsWith(".md")).length; } catch {} }
+
+  // Rule file per active agent
+  const agent = detectActiveAgent(projectDir);
+  let rulePath: string | null = null; let rulePresent = false;
+  if (agent.kind === "claude") {
+    rulePath = fs.existsSync(path.join(projectDir, "CLAUDE.md")) ? "CLAUDE.md" : fs.existsSync(path.join(projectDir, ".claude", "CLAUDE.md")) ? ".claude/CLAUDE.md" : "CLAUDE.md";
+    rulePresent = agent.rulePresent;
+  } else if (agent.kind === "codex") {
+    rulePath = fs.existsSync(path.join(projectDir, "codex.md")) ? "codex.md" : fs.existsSync(path.join(projectDir, "CODEX.md")) ? "CODEX.md" : "codex.md";
+    rulePresent = fs.existsSync(path.join(projectDir, "codex.md")) || fs.existsSync(path.join(projectDir, "CODEX.md"));
+  } else if (agent.kind === "agents") {
+    rulePath = fs.existsSync(path.join(projectDir, "AGENTS.md")) ? "AGENTS.md" : ".agents/AGENTS.md";
+    rulePresent = agent.rulePresent;
+  } else {
+    // generic: check all
+    if (fs.existsSync(path.join(projectDir, "CLAUDE.md"))) { rulePath = "CLAUDE.md"; rulePresent = true; }
+    else if (fs.existsSync(path.join(projectDir, "AGENTS.md"))) { rulePath = "AGENTS.md"; rulePresent = true; }
+    else if (fs.existsSync(path.join(projectDir, "codex.md"))) { rulePath = "codex.md"; rulePresent = true; }
+    else { rulePath = "CLAUDE.md / AGENTS.md / codex.md"; rulePresent = false; }
+  }
+
+  return {
+    skills: { count: skillCount, hasCodeatlas: hasCodeatlasSkill },
+    rules: { count: ruleCount, hasCodeatlas: hasCodeatlasRule },
+    agents: { count: agentCount },
+    ruleFile: { path: rulePath, present: rulePresent, agent: agent.kind }
+  };
+}
+
+export function listProjectDirs(): { connected: ProjectDirEntry[]; newDirs: ProjectDirEntry[] } {
+  const raw = process.env.CODEATLAS_PROJECT_DIRS || process.env.CODEATLAS_PROJECT_DIR || "";
+  const connectedSet = new Set(raw.split(",").map(s => s.trim()).filter(Boolean).map(s => path.resolve(s)));
+  // Always include cwd as connected if it's a git project
+  const cwd = path.resolve(process.cwd());
+  if (fs.existsSync(path.join(cwd, ".git")) || fs.existsSync(path.join(cwd, "package.json"))) connectedSet.add(cwd);
+
+  const scanRoots = [path.join(os.homedir(), "")];
+  const candidates: string[] = [];
+  // Discover sibling git projects under $HOME (max depth 1, cheap)
+  try {
+    for (const e of fs.readdirSync(os.homedir(), { withFileTypes: true })) {
+      if (!e.isDirectory() || e.name.startsWith(".")) continue;
+      const full = path.join(os.homedir(), e.name);
+      if (fs.existsSync(path.join(full, ".git")) || fs.existsSync(path.join(full, "package.json"))) candidates.push(full);
+      if (candidates.length >= 30) break;
+    }
+  } catch {}
+
+  function toEntry(dir: string): ProjectDirEntry {
+    let isGit = fs.existsSync(path.join(dir, ".git"));
+    let branch: string | undefined;
+    if (isGit) {
+      try {
+        const h = fs.readFileSync(path.join(dir, ".git", "HEAD"), "utf-8").trim();
+        branch = h.startsWith("ref: refs/heads/") ? h.replace("ref: refs/heads/", "") : h.slice(0, 7);
+      } catch {}
+    }
+    return { dir, name: path.basename(dir), isGit, branch, codeatlasSetup: checkCodeatlasSetup(dir) };
+  }
+
+  const connected: ProjectDirEntry[] = [...connectedSet].filter(d => fs.existsSync(d)).map(toEntry);
+  const newDirs: ProjectDirEntry[] = candidates.filter(c => !connectedSet.has(path.resolve(c))).map(toEntry);
+  return { connected, newDirs };
+}
+
+export function checkProjectDir(customDir?: string): {
+  status: "ok" | "warn";
+  detail: string;
+  projectDir: string;
+  projectName: string;
+  isGit: boolean;
+  branch?: string;
+  hasClaudeMd: boolean;
+  hasLocalMemory: boolean;
+  stack?: string;
+} {
+  const projectDir = path.resolve(customDir || process.env.CODEATLAS_PROJECT_DIR || process.env.GEMINI_CLI_IDE_WORKSPACE_PATH || process.cwd());
+  const projectName = path.basename(projectDir);
+
+  // Git detection
+  let isGit = false;
+  let branch: string | undefined;
+  const gitDir = path.join(projectDir, ".git");
+  if (fs.existsSync(gitDir)) {
+    isGit = true;
+    try {
+      const headPath = path.join(gitDir, "HEAD");
+      if (fs.existsSync(headPath)) {
+        const headContent = fs.readFileSync(headPath, "utf-8").trim();
+        if (headContent.startsWith("ref: refs/heads/")) {
+          branch = headContent.replace("ref: refs/heads/", "");
+        } else {
+          branch = headContent.slice(0, 7);
+        }
+      }
+    } catch {}
+  }
+
+  // CLAUDE.md detection
+  const claudeMdPath = path.join(projectDir, "CLAUDE.md");
+  const dotClaudeMdPath = path.join(projectDir, ".claude", "CLAUDE.md");
+  const hasClaudeMd = fs.existsSync(claudeMdPath) || fs.existsSync(dotClaudeMdPath);
+
+  // Local CodeAtlas memory detection
+  const hasLocalCodeatlas = fs.existsSync(path.join(projectDir, ".codeatlas"));
+  const hasAgentMemory = fs.existsSync(path.join(projectDir, ".agents", "memory"));
+  const hasLocalMemory = hasLocalCodeatlas || hasAgentMemory;
+
+  // Stack detection
+  let stack = "Generic";
+  if (fs.existsSync(path.join(projectDir, "package.json"))) {
+    stack = fs.existsSync(path.join(projectDir, "tsconfig.json")) ? "TypeScript/Node" : "JavaScript/Node";
+  } else if (fs.existsSync(path.join(projectDir, "pyproject.toml")) || fs.existsSync(path.join(projectDir, "requirements.txt"))) {
+    stack = "Python";
+  } else if (fs.existsSync(path.join(projectDir, "composer.json"))) {
+    stack = "PHP";
+  } else if (fs.existsSync(path.join(projectDir, "Cargo.toml"))) {
+    stack = "Rust";
+  } else if (fs.existsSync(path.join(projectDir, "go.mod"))) {
+    stack = "Go";
+  }
+
+  const details: string[] = [projectName];
+  if (isGit) details.push(`git:${branch || "yes"}`);
+  if (stack) details.push(stack);
+  if (hasClaudeMd) details.push("CLAUDE.md ✓");
+  if (hasLocalMemory) details.push("memory: active");
+
+  return {
+    status: isGit || hasClaudeMd || fs.existsSync(projectDir) ? "ok" : "warn",
+    detail: `${projectDir} [${details.join(", ")}]`,
+    projectDir,
+    projectName,
+    isGit,
+    branch,
+    hasClaudeMd,
+    hasLocalMemory,
+    stack
+  };
+}
+
+export function checkFeaturesDiff(): {
+  astParsers: string[];
+  adrCount: number;
+  localMode: boolean;
+  cloudSync: boolean;
+  connectedClients: string[];
+} {
+  const home = os.homedir();
+  const adrDir = path.join(home, ".codeatlas", "adr");
+  let adrCount = 0;
+  if (fs.existsSync(adrDir)) {
+    try {
+      const entries = fs.readdirSync(adrDir, { recursive: true });
+      adrCount = entries.filter((e: any) => typeof e === "string" && e.endsWith(".md")).length;
+    } catch {}
+  }
+
+  const connectedClients: string[] = [];
+  if (checkClaudeMcp().status === "ok") connectedClients.push("Claude Code");
+  if (fs.existsSync(getHermesConfigPath()) && fs.readFileSync(getHermesConfigPath(), "utf-8").includes("codeatlas:")) {
+    connectedClients.push("Hermes");
+  }
+  const zedCfg = getZedSettingsPath();
+  if (fs.existsSync(zedCfg)) {
+    try {
+      const z = JSON.parse(fs.readFileSync(zedCfg, "utf-8"));
+      if (z?.context_servers?.codeatlas || z?.context_servers?.["codeatlas-mcp-server"]) {
+        connectedClients.push("Zed");
+      }
+    } catch {}
+  }
+  const geminiPath = getGeminiSettingsPath();
+  if (fs.existsSync(geminiPath)) {
+    try {
+      const g = JSON.parse(fs.readFileSync(geminiPath, "utf-8"));
+      if (g?.mcpServers?.codeatlas || g?.contextFileName) {
+        connectedClients.push("Gemini CLI");
+      }
+    } catch {}
+  }
+
+  return {
+    astParsers: ["TypeScript", "JavaScript", "Python", "PHP"],
+    adrCount,
+    localMode: !process.env.CODEATLAS_API_URL,
+    cloudSync: Boolean(process.env.CODEATLAS_API_URL && process.env.CODEATLAS_API_KEY),
+    connectedClients
+  };
+}
+
 import {
   stepAuthenticate,
   stepConnectProject,
@@ -88,7 +464,7 @@ export async function cmdSetup(): Promise<void> {
   console.log(bold("╔══════════════════════════════════════════════════╗"));
   console.log(bold("║   CodeAtlas Second Brain Setup Wizard           ║"));
   console.log(bold("╚══════════════════════════════════════════════════╝"));
-  console.log(`  Cloud: ${API_URL}`);
+  console.log(`  Cloud: ${API_URL || "(local mode)"}`);
 
   const s1 = await stepAuthenticate();
   if (!s1) {
@@ -109,7 +485,7 @@ export async function cmdSetup(): Promise<void> {
 
   console.log(`\n${bold("🎉 Second Brain setup complete!")}`);
   console.log(`  ${ok()} Project: ${project}`);
-  console.log(`  ${ok()} Cloud: ${API_URL}`);
+  console.log(`  ${ok()} Cloud: ${API_URL || "(local mode)"}`);
   console.log(`  ${ok()} Config: ~/.hermes/config.yaml`);
   console.log(`  ${ok()} Plugin: ~/.hermes/plugins/codeatlas_second_brain/`);
   console.log(`\n  ${bold("Next steps:")}`);
@@ -119,73 +495,166 @@ export async function cmdSetup(): Promise<void> {
 }
 
 export async function cmdDoctor(): Promise<void> {
-  console.log(`\n${bold("CodeAtlas Second Brain — Health Check")}`);
-  console.log("=".repeat(50));
+  console.log(`\n${bold("CodeAtlas Second Brain — Health Check & Diagnostics")}`);
+  console.log("=".repeat(60));
 
-  const checks: [string, () => Promise<{ status: string; detail?: string }>][] = [
-    ["CODEATLAS_API_KEY", async () => {
-      if (process.env.CODEATLAS_API_KEY) return { status: "ok", detail: "Set" };
-      return { status: "fail", detail: "not set" };
-    }],
-    ["Cloud connection", async () => {
-      const r = await cloudFetch("GET", "/api/version");
-      if (r.ok) return { status: "ok", detail: `${API_URL} (build ${r.data?.version || "?"})` };
-      return { status: "fail", detail: `HTTP ${r.status}` };
-    }],
-    ["MCP config (Hermes)", async () => {
-      const cfg = getHermesConfigPath();
-      if (!fs.existsSync(cfg)) return { status: "warn", detail: "not found" };
-      const c = fs.readFileSync(cfg, "utf-8");
-      if (c.includes("codeatlas:")) return { status: "ok" };
-      return { status: "warn", detail: "codeatlas not configured" };
-    }],
-    ["MCP config (Zed)", async () => {
-      const cfg = getZedSettingsPath();
-      if (!fs.existsSync(cfg)) return { status: "warn", detail: "not found" };
-      try {
-        const c = JSON.parse(fs.readFileSync(cfg, "utf-8"));
-        if (c?.context_servers?.codeatlas) return { status: "ok" };
-      } catch { /* ignore parse errors */ }
-      return { status: "warn", detail: "codeatlas not configured" };
-    }],
-    ["Auto plugin (Hermes)", async () => {
-      const p = path.join(getHermesPluginDir(), "__init__.py");
-      return fs.existsSync(p) ? { status: "ok" } : { status: "warn", detail: "not installed" };
-    }],
-    ["Dream persistence", async () => {
-      const r = await cloudFetch("GET", "/api/dreams/query?query=test&project=hermes-auto&limit=3");
-      if (!r.ok) return { status: "warn", detail: "query timed out (network-specific)" };
-      return { status: "ok", detail: `${r.data?.memories?.length || 0} dreams found` };
-    }],
-    ["Genome (DNA)", async () => {
-      const r = await cloudFetch("GET", "/api/genome/search?query=test&limit=3");
-      if (!r.ok) return { status: "warn", detail: `transient (HTTP ${r.status})` };
-      return { status: "ok", detail: `${r.data?.genes?.length || 0} genes found` };
-    }],
-    ["Immune System", async () => {
-      const r = await cloudFetch("GET", "/api/genome/immune?problem=test&limit=3");
-      if (!r.ok) return { status: "warn", detail: `transient (HTTP ${r.status})` };
-      return { status: "ok", detail: `${r.data?.genes?.length || 0} immune genes found` };
-    }],
-  ];
+  let passed = 0;
+  let total = 0;
 
-  let passed = 0, failed = 0;
-  for (const [name, fn] of checks) {
-    const r = await fn();
-    const icon = r.status === "ok" ? ok() : r.status === "warn" ? warn() : fail();
-    const detail = r.detail ? ` (${r.detail})` : "";
-    console.log(`  ${icon} ${name}${detail}`);
-    if (r.status === "ok") passed++;
-    else failed++;
+  const countCheck = (status: "ok" | "warn" | "fail") => {
+    total++;
+    if (status === "ok") passed++;
+  };
+
+  // 1. Project & Workspace — flow: connected dirs vs new dirs + CodeAtlas setup completeness + AI-aware rule file
+  console.log(`\n${bold("1. Project & Workspace")}`);
+  const proj = checkProjectDir();
+  console.log(`  ${proj.status === "ok" ? ok() : warn()} Directory: ${proj.projectDir}`);
+  countCheck(proj.status);
+
+  console.log(`  ${proj.isGit ? ok() : warn()} Git Repository: ${proj.isGit ? `Active (branch: ${proj.branch || "unknown"})` : "Not a git repository"}`);
+  countCheck(proj.isGit ? "ok" : "warn");
+
+  const agent = detectActiveAgent(proj.projectDir);
+  const setup = checkCodeatlasSetup(proj.projectDir);
+  const ruleLabel = setup.ruleFile.path || "CLAUDE.md / AGENTS.md / codex.md";
+  const ruleOk = setup.ruleFile.present;
+  console.log(`  ${ruleOk ? ok() : warn()} Project Rules (${agent.label}): ${ruleOk ? `${ruleLabel} present` : `${ruleLabel} missing (run 'codeatlas setup ${agent.kind === "codex" ? "codex" : agent.kind === "agents" ? "agents" : "claude"}')`}`);
+  countCheck(ruleOk ? "ok" : "warn");
+
+  console.log(`  ${proj.hasLocalMemory ? ok() : ok()} Local Memory: ${proj.hasLocalMemory ? "CodeAtlas memory indexed" : "Standard workspace"}`);
+  countCheck("ok");
+
+  const skillLabel = setup.skills.hasCodeatlas ? `CodeAtlas skills ready (${setup.skills.count})` : setup.skills.count > 0 ? `${setup.skills.count} skills (CodeAtlas skill missing)` : "No project skills (global: " + (setup.skills.hasCodeatlas ? "CodeAtlas present" : "missing") + ")";
+  console.log(`  ${setup.skills.hasCodeatlas ? ok() : warn()} Skills: ${skillLabel}`);
+  countCheck(setup.skills.hasCodeatlas ? "ok" : "warn");
+
+  console.log(`  ${setup.rules.hasCodeatlas ? ok() : setup.rules.count > 0 ? warn() : warn()} Rules: ${setup.rules.count > 0 ? `${setup.rules.count} rule(s)${setup.rules.hasCodeatlas ? " (CodeAtlas present)" : " (CodeAtlas rule missing)"}` : "No .agents/rules"}`);
+  countCheck(setup.rules.hasCodeatlas ? "ok" : "warn");
+
+  console.log(`  ${setup.agents.count > 0 ? ok() : warn()} Agents: ${setup.agents.count > 0 ? `${setup.agents.count} agent(s) in .claude/agents` : "No project agents"}`);
+  countCheck(setup.agents.count > 0 ? "ok" : "warn");
+
+  console.log(`  ${ok()} Which AI: ${agent.label} ${agent.ruleFile ? `(${agent.ruleFile})` : "(no rule file)"}`);
+  countCheck("ok");
+
+  // Connected vs new project dirs — the flow
+  const dirs = listProjectDirs();
+  if (dirs.connected.length > 0) {
+    console.log(`\n  ${bold("Connected project dirs")} (${dirs.connected.length}):`);
+    for (const e of dirs.connected.slice(0, 12)) {
+      const s = e.codeatlasSetup;
+      const tag = s.skills.hasCodeatlas && s.rules.hasCodeatlas && s.ruleFile.present ? ok() : warn();
+      console.log(`    ${tag} ${e.name} — ${e.dir}${e.isGit ? ` [${e.branch || "git"}]` : ""}  skills:${s.skills.count} rules:${s.rules.count} agents:${s.agents.count}`);
+    }
+    if (dirs.connected.length > 12) console.log(`    … +${dirs.connected.length - 12} more`);
+  } else {
+    console.log(`  ${warn()} No connected project dirs (set CODEATLAS_PROJECT_DIRS)`);
+    countCheck("warn");
+  }
+  if (dirs.newDirs.length > 0) {
+    console.log(`\n  ${bold("New / unconnected dirs")} (${dirs.newDirs.length}):`);
+    for (const e of dirs.newDirs.slice(0, 12)) {
+      console.log(`    ${warn()} ${e.name} — ${e.dir}${e.isGit ? ` [${e.branch || "git"}]` : ""}`);
+    }
+    if (dirs.newDirs.length > 12) console.log(`    … +${dirs.newDirs.length - 12} more`);
+    console.log(`    ${yellow("Tip:")} add to CODEATLAS_PROJECT_DIRS or run 'codeatlas init' in that dir`);
   }
 
-  console.log(`\n${bold("Result:")} ${passed}/${passed + failed} checks passed`);
-  if (failed === 0) {
+  // 2. MCP Client Integrations
+  console.log(`\n${bold("2. MCP Client Integrations")}`);
+  const claudeMcp = checkClaudeMcp();
+  console.log(`  ${claudeMcp.status === "ok" ? ok() : warn()} Claude Code MCP: ${claudeMcp.detail}`);
+  countCheck(claudeMcp.status);
+
+  const hermesCfg = getHermesConfigPath();
+  const hermesMcp = fs.existsSync(hermesCfg) && fs.readFileSync(hermesCfg, "utf-8").includes("codeatlas:");
+  console.log(`  ${hermesMcp ? ok() : warn()} Hermes MCP: ${hermesMcp ? "configured" : (fs.existsSync(hermesCfg) ? "not configured" : "not found")}`);
+  countCheck(hermesMcp ? "ok" : "warn");
+
+  const zedCfg = getZedSettingsPath();
+  let zedMcp = false;
+  if (fs.existsSync(zedCfg)) {
+    try {
+      const z = JSON.parse(fs.readFileSync(zedCfg, "utf-8"));
+      zedMcp = Boolean(z?.context_servers?.codeatlas || z?.context_servers?.["codeatlas-mcp-server"]);
+    } catch {}
+  }
+  console.log(`  ${zedMcp ? ok() : warn()} Zed MCP: ${zedMcp ? "configured" : (fs.existsSync(zedCfg) ? "not configured" : "not found")}`);
+  countCheck(zedMcp ? "ok" : "warn");
+
+  const geminiCfg = getGeminiSettingsPath();
+  let geminiMcp = false;
+  if (fs.existsSync(geminiCfg)) {
+    try {
+      const g = JSON.parse(fs.readFileSync(geminiCfg, "utf-8"));
+      geminiMcp = Boolean(g?.mcpServers?.codeatlas || g?.contextFileName);
+    } catch {}
+  }
+  console.log(`  ${geminiMcp ? ok() : warn()} Gemini CLI MCP: ${geminiMcp ? "configured" : (fs.existsSync(geminiCfg) ? "not configured" : "not found")}`);
+  countCheck(geminiMcp ? "ok" : "warn");
+
+  // 3. Hooks & Automation Status
+  console.log(`\n${bold("3. Hooks & Automation Status")}`);
+  const claudeHooks = checkClaudeHooks();
+  console.log(`  ${claudeHooks.status === "ok" ? ok() : warn()} Claude Code Hooks: ${claudeHooks.detail}`);
+  countCheck(claudeHooks.status);
+
+  const hermesPluginPath = path.join(getHermesPluginDir(), "__init__.py");
+  const hermesPlugin = fs.existsSync(hermesPluginPath);
+  console.log(`  ${hermesPlugin ? ok() : warn()} Hermes Auto-Plugin: ${hermesPlugin ? "installed" : "not installed"}`);
+  countCheck(hermesPlugin ? "ok" : "warn");
+
+  // 4. Environment & Cloud Services
+  console.log(`\n${bold("4. Environment & Cloud Services")}`);
+  const hasApiKey = Boolean(process.env.CODEATLAS_API_KEY);
+  console.log(`  ${hasApiKey ? ok() : warn()} CODEATLAS_API_KEY: ${hasApiKey ? "Set" : "not set (local mode only)"}`);
+  countCheck(hasApiKey ? "ok" : "warn");
+
+  if (API_URL) {
+    const r = await cloudFetch("GET", "/api/version");
+    if (r.ok) {
+      console.log(`  ${ok()} Cloud Connection: ${API_URL} (build ${r.data?.version || "?"})`);
+      countCheck("ok");
+    } else {
+      console.log(`  ${r.status === 401 || r.status === 403 ? fail() : warn()} Cloud Connection: ${API_URL} (HTTP ${r.status})`);
+      countCheck(r.status === 401 || r.status === 403 ? "fail" : "warn");
+    }
+
+    const d = await cloudFetch("GET", "/api/dreams/query?query=test&project=hermes-auto&limit=3");
+    console.log(`  ${d.ok ? ok() : warn()} Dream Persistence: ${d.ok ? `${d.data?.memories?.length || 0} memories found` : "network unavailable"}`);
+    countCheck(d.ok ? "ok" : "warn");
+
+    const g = await cloudFetch("GET", "/api/genome/search?query=test&limit=3");
+    console.log(`  ${g.ok ? ok() : warn()} Genome (DNA): ${g.ok ? `${g.data?.genes?.length || 0} genes found` : "network unavailable"}`);
+    countCheck(g.ok ? "ok" : "warn");
+
+    const im = await cloudFetch("GET", "/api/genome/immune?problem=test&limit=3");
+    console.log(`  ${im.ok ? ok() : warn()} Immune System: ${im.ok ? `${im.data?.genes?.length || 0} immune genes found` : "network unavailable"}`);
+    countCheck(im.ok ? "ok" : "warn");
+  } else {
+    console.log(`  ${ok()} Operation Mode: Local-First / Standalone (CODEATLAS_API_URL unset)`);
+    countCheck("ok");
+    console.log(`  ${ok()} Local AST Parsers: Ready (TypeScript/JavaScript, Python, PHP)`);
+    countCheck("ok");
+  }
+
+  // 5. System Features & Difference Summary
+  console.log(`\n${bold("5. System Features & Difference Summary")}`);
+  const diff = checkFeaturesDiff();
+  console.log(`  • Connected MCP Clients: ${diff.connectedClients.length > 0 ? diff.connectedClients.join(", ") : "None detected"}`);
+  console.log(`  • AST Analysis Engines: ${diff.astParsers.join(", ")}`);
+  console.log(`  • ADR System: ${diff.adrCount} records at ~/.codeatlas/adr`);
+  console.log(`  • Execution Mode: ${diff.cloudSync ? "Cloud Synchronized" : (diff.localMode ? "Local-First / Standalone" : "Hybrid")}`);
+  console.log(`  • Second Brain Hooks: ${claudeHooks.status === "ok" ? "Fully Automated" : "Partial / Manual"}`);
+
+  console.log(`\n${bold("Result:")} ${passed}/${total} checks passed`);
+  if (claudeMcp.status === "ok" && (claudeHooks.status === "ok" || hermesPlugin)) {
     console.log(`${green("All systems operational. Your Second Brain is ready.")}`);
   } else {
-    console.log(`${red("Some checks failed. Run 'codeatlas init' to reconfigure.")}`);
+    console.log(`${yellow("Tip: Run 'codeatlas setup claude' or 'codeatlas init' to enable missing integrations.")}`);
   }
-  console.log("=".repeat(50));
+  console.log("=".repeat(60));
 }
 
 // ──────────────────────────────────────────────────────────────────────
