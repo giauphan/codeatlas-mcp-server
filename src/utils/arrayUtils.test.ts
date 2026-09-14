@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import * as assert from 'node:assert';
-import { binarySearchClosestPrecedingClass } from './arrayUtils.js';
+import { binarySearchClosestPrecedingClass, partitionByPriority } from './arrayUtils.js';
 
 describe('binarySearchClosestPrecedingClass', () => {
   it('should find the closest preceding class', () => {
@@ -88,5 +88,27 @@ describe('binarySearchClosestPrecedingClass', () => {
     // Function is before the class
     const resultBefore = binarySearchClosestPrecedingClass(singleElementArray, 10);
     assert.strictEqual(resultBefore, undefined);
+  });
+});
+
+describe('partitionByPriority', () => {
+  it('should correctly partition nodes', () => {
+    const nodes = [
+      { type: "other", val: 1 },
+      { type: "variable", val: 2 },
+      { type: "function", val: 3 },
+      { type: "class", val: 4 },
+      { type: "module", val: 5 },
+      { type: "unknown", val: 6 },
+    ];
+    const result = partitionByPriority(nodes);
+    assert.deepStrictEqual(result, [
+      { type: "module", val: 5 },
+      { type: "class", val: 4 },
+      { type: "function", val: 3 },
+      { type: "variable", val: 2 },
+      { type: "other", val: 1 },
+      { type: "unknown", val: 6 },
+    ]);
   });
 });

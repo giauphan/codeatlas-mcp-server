@@ -18,6 +18,7 @@ import {
 } from "../utils/pathUtils.js";
 import { jaccardSimilarity } from "../utils/mathUtils.js";
 import { getApiUrl } from "../utils/envUtils.js";
+import { partitionByPriority } from "../utils/arrayUtils.js";
 import { checkAuth, logActivity } from "../services/authService.js";
 import {
   discoverProjectsAsync,
@@ -541,13 +542,7 @@ export function registerTools(server: McpServer) {
 
       // Truncate if too many nodes
       if (nodes.length > max) {
-        const priorityOrder = ["module", "class", "function", "variable"];
-        nodes.sort((a, b) => {
-          const ia = priorityOrder.indexOf(a.type);
-          const ib = priorityOrder.indexOf(b.type);
-          return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
-        });
-        nodes = nodes.slice(0, max);
+        nodes = partitionByPriority(nodes).slice(0, max);
       }
 
       const finalNodeIds = createNodeIdSet(nodes);
