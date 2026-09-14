@@ -34,3 +34,32 @@ export function binarySearchClosestPrecedingClass(
   }
   return parentClass;
 }
+
+/**
+ * ⚡ Bolt Optimization: Replace O(N log N) sorting + indexOf with an O(N) bucket-collection strategy
+ * Takes an array of nodes and orders them by type based on a predefined priority sequence:
+ * module, class, function, variable. Unrecognized types are pushed to the end.
+ * Limits the final returned array to `max` items if specified.
+ */
+export function takeByPriority<T extends { type: string }>(nodes: T[], max?: number): T[] {
+  const buckets: Record<string, T[]> = { module: [], class: [], function: [], variable: [] };
+  const other: T[] = [];
+
+  for (const n of nodes) {
+    if (Object.hasOwn(buckets, n.type)) {
+      buckets[n.type].push(n);
+    } else {
+      other.push(n);
+    }
+  }
+
+  const sorted = [
+    ...buckets.module,
+    ...buckets.class,
+    ...buckets.function,
+    ...buckets.variable,
+    ...other
+  ];
+
+  return max !== undefined ? sorted.slice(0, max) : sorted;
+}
