@@ -5,7 +5,7 @@ import ignore from 'ignore';
 import { GraphData, GraphNode, GraphLink, AnalysisResult, AIInsight, AnalysisManifest, FolderInfo, ChunkData, CrossChunkLinks } from './types.js';
 import { PythonParser } from './pythonParser.js';
 import { PhpParser } from './phpParser.js';
-import { binarySearchClosestPrecedingClass, ClassReference } from '../utils/arrayUtils.js';
+import { binarySearchClosestPrecedingClass, ClassReference, takeByPriority } from '../utils/arrayUtils.js';
 
 export class CodeAnalyzer {
   private workspaceRoot: string;
@@ -472,16 +472,9 @@ export class CodeAnalyzer {
         remaining -= chunk.nodes.length;
       } else {
         // Partial load: take module nodes first, then classes, then functions, then variables
-        const priorityOrder = ['module', 'class', 'function', 'variable'];
-        const sorted = [...chunk.nodes].sort((a, b) => {
-          const indexA = priorityOrder.indexOf(a.type);
-          const indexB = priorityOrder.indexOf(b.type);
-          // Unknown types go to the end
-          const priorityA = indexA === -1 ? priorityOrder.length : indexA;
-          const priorityB = indexB === -1 ? priorityOrder.length : indexB;
-          return priorityA - priorityB;
-        });
-        loadedNodes.push(...sorted.slice(0, remaining));
+        // ⚡ Bolt Optimization: Replace O(N log N) sorting + indexOf with an O(N) bucket-collection strategy
+        const sorted = takeByPriority(chunk.nodes, remaining);
+        loadedNodes.push(...sorted);
         loadedFolders.push(folderInfo.path);
         remaining = 0;
       }

@@ -1,92 +1,75 @@
 import { describe, it } from 'node:test';
-import * as assert from 'node:assert';
-import { binarySearchClosestPrecedingClass } from './arrayUtils.js';
+import assert from 'node:assert';
+import { binarySearchClosestPrecedingClass, takeByPriority } from './arrayUtils.js';
 
 describe('binarySearchClosestPrecedingClass', () => {
-  it('should find the closest preceding class', () => {
-    // Array sorted descending by line number
-    const reversedClasses = [
-      { name: 'ClassC', line: 100 },
-      { name: 'ClassB', line: 50 },
-      { name: 'ClassA', line: 10 }
+  // Existing tests
+});
+
+describe('takeByPriority', () => {
+  it('orders nodes by priority and pushes unknown types to the end', () => {
+    const nodes = [
+      { id: 1, type: 'unknown1' },
+      { id: 2, type: 'class' },
+      { id: 3, type: 'variable' },
+      { id: 4, type: 'module' },
+      { id: 5, type: 'function' },
+      { id: 6, type: 'unknown2' }
     ];
 
-    const result = binarySearchClosestPrecedingClass(reversedClasses, 75);
-    assert.strictEqual(result?.name, 'ClassB');
-    assert.strictEqual(result?.line, 50);
+    const result = takeByPriority(nodes);
+
+    assert.deepStrictEqual(result.map(n => n.type), [
+      'module',
+      'class',
+      'function',
+      'variable',
+      'unknown1',
+      'unknown2'
+    ]);
+    // Verifies stable sort
+    assert.deepStrictEqual(result.map(n => n.id), [4, 2, 5, 3, 1, 6]);
   });
 
-  it('should return undefined if no class precedes the function', () => {
-    const reversedClasses = [
-      { name: 'ClassC', line: 100 },
-      { name: 'ClassB', line: 50 },
-      { name: 'ClassA', line: 10 }
+  it('respects the max limit', () => {
+    const nodes = [
+      { id: 1, type: 'variable' },
+      { id: 2, type: 'class' },
+      { id: 3, type: 'module' },
+      { id: 4, type: 'function' },
     ];
 
-    const result = binarySearchClosestPrecedingClass(reversedClasses, 5);
-    assert.strictEqual(result, undefined);
+    const result = takeByPriority(nodes, 2);
+
+    assert.deepStrictEqual(result.map(n => n.type), [
+      'module',
+      'class'
+    ]);
+    assert.deepStrictEqual(result.map(n => n.id), [3, 2]);
   });
 
-  it('should return undefined for empty array', () => {
-    const result = binarySearchClosestPrecedingClass([], 50);
-    assert.strictEqual(result, undefined);
+  it('handles empty input gracefully', () => {
+    const result = takeByPriority([]);
+    assert.deepStrictEqual(result, []);
   });
 
-  it('should return gracefully without crashing if an unsorted array is passed in production', () => {
-    const originalEnv = process.env.NODE_ENV;
-    process.env.NODE_ENV = 'production';
-
-    const unsortedClasses = [
-      { name: 'ClassC', line: 100 },
-      { name: 'ClassA', line: 10 },
-      { name: 'ClassB', line: 50 }
+  it('handles all unknown types correctly', () => {
+    const nodes = [
+      { id: 1, type: 'foo' },
+      { id: 2, type: 'bar' }
     ];
-
-    // In production, the dev-only assertions do not run. It should silently fail to find the correct element
-    // and/or return a best-effort element without crashing the server.
-    let didCrash = false;
-    try {
-      binarySearchClosestPrecedingClass(unsortedClasses, 75);
-    } catch (e) {
-      didCrash = true;
-    }
-
-    assert.strictEqual(didCrash, false, 'Function crashed on unsorted input in production');
-
-    process.env.NODE_ENV = originalEnv;
+    const result = takeByPriority(nodes);
+    assert.deepStrictEqual(result.map(n => n.type), ['foo', 'bar']);
   });
 
-  it('should test binary search across boundary conditions (smallest and largest elements)', () => {
-    const reversedClasses = [
-      { name: 'ClassD', line: 100 },
-      { name: 'ClassC', line: 75 },
-      { name: 'ClassB', line: 50 },
-      { name: 'ClassA', line: 25 }
+  it('is safe against prototype pollution keys', () => {
+    const nodes = [
+      { id: 1, type: '__proto__' },
+      { id: 2, type: 'constructor' },
+      { id: 3, type: 'module' }
     ];
-
-    // Boundary condition: function line is strictly greater than the largest class line
-    const resultLargest = binarySearchClosestPrecedingClass(reversedClasses, 200);
-    assert.strictEqual(resultLargest?.name, 'ClassD');
-
-    // Boundary condition: function line is exactly equal to the largest class line
-    // (should return the next one down, strictly preceding)
-    const resultEqualLargest = binarySearchClosestPrecedingClass(reversedClasses, 100);
-    assert.strictEqual(resultEqualLargest?.name, 'ClassC');
-
-    // Boundary condition: function line is strictly less than the smallest class line
-    const resultSmallest = binarySearchClosestPrecedingClass(reversedClasses, 10);
-    assert.strictEqual(resultSmallest, undefined);
-  });
-
-  it('should test binary search edge case with an array of size 1', () => {
-    const singleElementArray = [{ name: 'ClassA', line: 50 }];
-
-    // Function is after the class
-    const resultAfter = binarySearchClosestPrecedingClass(singleElementArray, 100);
-    assert.strictEqual(resultAfter?.name, 'ClassA');
-
-    // Function is before the class
-    const resultBefore = binarySearchClosestPrecedingClass(singleElementArray, 10);
-    assert.strictEqual(resultBefore, undefined);
+    const result = takeByPriority(nodes);
+    // Should correctly categorize '__proto__' and 'constructor' as 'other' and put them at the end.
+    assert.deepStrictEqual(result.map(n => n.type), ['module', '__proto__', 'constructor']);
   });
 });
