@@ -288,14 +288,7 @@ export function checkCodeatlasSetup(projectDir: string): CodeatlasSetupInfo {
 
 export function listProjectDirs(): { connected: ProjectDirEntry[]; newDirs: ProjectDirEntry[] } {
   const raw = process.env.CODEATLAS_PROJECT_DIRS || process.env.CODEATLAS_PROJECT_DIR || "";
-
-  const connectedSet = new Set<string>();
-  for (const s of raw.split(",")) {
-    const trimmed = s.trim();
-    if (trimmed) {
-      connectedSet.add(path.resolve(trimmed));
-    }
-  }
+  const connectedSet = new Set(raw.split(",").map(s => s.trim()).filter(Boolean).map(s => path.resolve(s)));
   // Always include cwd as connected if it's a git project
   const cwd = path.resolve(process.cwd());
   if (fs.existsSync(path.join(cwd, ".git")) || fs.existsSync(path.join(cwd, "package.json"))) connectedSet.add(cwd);
@@ -324,18 +317,8 @@ export function listProjectDirs(): { connected: ProjectDirEntry[]; newDirs: Proj
     return { dir, name: path.basename(dir), isGit, branch, codeatlasSetup: checkCodeatlasSetup(dir) };
   }
 
-  const connected: ProjectDirEntry[] = [];
-  for (const d of connectedSet) {
-    if (fs.existsSync(d)) {
-      connected.push(toEntry(d));
-    }
-  }
-  const newDirs: ProjectDirEntry[] = [];
-  for (const c of candidates) {
-    if (!connectedSet.has(path.resolve(c))) {
-      newDirs.push(toEntry(c));
-    }
-  }
+  const connected: ProjectDirEntry[] = [...connectedSet].filter(d => fs.existsSync(d)).map(toEntry);
+  const newDirs: ProjectDirEntry[] = candidates.filter(c => !connectedSet.has(path.resolve(c))).map(toEntry);
   return { connected, newDirs };
 }
 
