@@ -14,7 +14,8 @@ import {
   getClaudeDesktopConfigPath,
   getGeminiSettingsPath,
   getZedSettingsPath,
-  writeFileSyncNoFollow
+  writeFileSyncNoFollow,
+  appendFileSyncNoFollow
 } from "../utils/pathUtils.js";
 import { jaccardSimilarity } from "../utils/mathUtils.js";
 import { getApiUrl } from "../utils/envUtils.js";
@@ -2416,7 +2417,7 @@ export function registerTools(server: McpServer) {
               fs.writeFileSync(hermesCfg, cfg);
               results.push({ client: "hermes", action: "mcp_config", status: "updated" });
             } else {
-              fs.writeFileSync(hermesCfg, "\nmcp_servers:\n" + mcpEntry, { flag: "a" });
+              appendFileSyncNoFollow(hermesCfg, "\nmcp_servers:\n" + mcpEntry);
               results.push({ client: "hermes", action: "mcp_config", status: "appended" });
             }
           } else {
@@ -3330,7 +3331,7 @@ def register(ctx):
         if (fs.existsSync(gitignorePath)) {
           const gi = fs.readFileSync(gitignorePath, "utf-8");
           if (!gi.includes(".codeatlas/")) {
-            fs.appendFileSync(gitignorePath, "\n# CodeAtlas artifact (shared with team)\n!.codeatlas/\n.codeatlas/!artifact*.json\n");
+            appendFileSyncNoFollow(gitignorePath, "\n# CodeAtlas artifact (shared with team)\n!.codeatlas/\n.codeatlas/!artifact*.json\n");
           }
         }
 
