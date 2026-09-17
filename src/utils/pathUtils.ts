@@ -67,14 +67,20 @@ export function getZedSettingsPath(): string {
 }
 
 export function writeFileSyncNoFollow(filePath: string, content: string, mode: number = 0o600): void {
-  const fd = fs.openSync(
-    filePath,
-    fs.constants.O_CREAT |   // Create file if it doesn't exist
-    fs.constants.O_WRONLY |  // Open for writing
-    fs.constants.O_TRUNC |   // Truncate file content if it exists
-    fs.constants.O_NOFOLLOW, // Prevent symlink following
-    mode
-  );
+  // O_NOFOLLOW not supported on all platforms (e.g. Windows), silently degrades
+  const flags = fs.constants.O_CREAT | fs.constants.O_WRONLY | fs.constants.O_TRUNC | (fs.constants.O_NOFOLLOW || 0);
+  const fd = fs.openSync(filePath, flags, mode);
+  try {
+    fs.writeFileSync(fd, content);
+  } finally {
+    fs.closeSync(fd);
+  }
+}
+
+export function appendFileSyncNoFollow(filePath: string, content: string, mode: number = 0o644): void {
+  // O_NOFOLLOW not supported on all platforms (e.g. Windows), silently degrades
+  const flags = fs.constants.O_CREAT | fs.constants.O_WRONLY | fs.constants.O_APPEND | (fs.constants.O_NOFOLLOW || 0);
+  const fd = fs.openSync(filePath, flags, mode);
   try {
     fs.writeFileSync(fd, content);
   } finally {

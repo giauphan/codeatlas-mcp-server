@@ -14,7 +14,8 @@ import {
   getClaudeDesktopConfigPath,
   getGeminiSettingsPath,
   getZedSettingsPath,
-  writeFileSyncNoFollow
+  writeFileSyncNoFollow,
+  appendFileSyncNoFollow
 } from "../utils/pathUtils.js";
 import { jaccardSimilarity } from "../utils/mathUtils.js";
 import { getApiUrl } from "../utils/envUtils.js";
@@ -3326,11 +3327,22 @@ def register(ctx):
         const size = fs.statSync(outPath).size;
 
         // Also update .gitignore to track it
+        let gitNote = "Added .codeatlas/ exception to .gitignore — artifact.json is tracked.";
         const gitignorePath = path.join(projectDir, ".gitignore");
         if (fs.existsSync(gitignorePath)) {
           const gi = fs.readFileSync(gitignorePath, "utf-8");
           if (!gi.includes(".codeatlas/")) {
-            fs.appendFileSync(gitignorePath, "\n# CodeAtlas artifact (shared with team)\n!.codeatlas/\n.codeatlas/!artifact*.json\n");
+            try {
+              appendFileSyncNoFollow(gitignorePath, "\n# CodeAtlas artifact (shared with team)\n!.codeatlas/\n.codeatlas/!artifact*.json\n");
+            } catch (err) {
+              const error = err as NodeJS.ErrnoException;
+              if (error.code === 'ELOOP') {
+                console.warn("[Export Artifact] Skipped symlinked .gitignore");
+                gitNote = "Skipped symlinked .gitignore - exception not added.";
+              } else {
+                throw error;
+              }
+            }
           }
         }
 
@@ -3338,7 +3350,7 @@ def register(ctx):
           success: true, path: path.relative(projectDir, outPath),
           size: `${(size / 1024).toFixed(1)}KB`,
           stats: getStats(loaded.analysis),
-          gitNote: "Added .codeatlas/ exception to .gitignore — artifact.json is tracked.",
+          gitNote,
           usage: `Commit .codeatlas/artifact.json to git. Teammates get instant codebase knowledge on clone.`,
         }, null, 2) }] };
       } catch (err: unknown) {
