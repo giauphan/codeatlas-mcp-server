@@ -1206,7 +1206,7 @@ export function registerTools(server: McpServer) {
       }
 
       const MAX_RELATIONSHIPS = 50;
-      // Replaced chained .filter().slice().map() with a loop to avoid allocating intermediate arrays and skip processing after reaching the limit
+      // Gather relationships up to the cap, then stop scanning to avoid unnecessary allocations
       const relationships: Array<{ from: string; to: string; type: string }> = [];
       for (const l of links) {
         if (visited.has(l.source) && visited.has(l.target)) {
