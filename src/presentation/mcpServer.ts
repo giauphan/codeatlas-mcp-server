@@ -1209,13 +1209,13 @@ export function registerTools(server: McpServer) {
       // Gather relationships up to the cap, then stop scanning to avoid unnecessary allocations
       const relationships: Array<{ from: string; to: string; type: string }> = [];
       for (const l of links) {
+        if (relationships.length >= MAX_RELATIONSHIPS) break;
         if (visited.has(l.source) && visited.has(l.target)) {
           relationships.push({
             from: nodeMap.get(l.source)?.label || l.source,
             to: nodeMap.get(l.target)?.label || l.target,
             type: l.type,
           });
-          if (relationships.length >= MAX_RELATIONSHIPS) break;
         }
       }
 
