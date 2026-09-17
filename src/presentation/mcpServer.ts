@@ -3331,7 +3331,16 @@ def register(ctx):
         if (fs.existsSync(gitignorePath)) {
           const gi = fs.readFileSync(gitignorePath, "utf-8");
           if (!gi.includes(".codeatlas/")) {
-            appendFileSyncNoFollow(gitignorePath, "\n# CodeAtlas artifact (shared with team)\n!.codeatlas/\n.codeatlas/!artifact*.json\n");
+            try {
+              appendFileSyncNoFollow(gitignorePath, "\n# CodeAtlas artifact (shared with team)\n!.codeatlas/\n.codeatlas/!artifact*.json\n");
+            } catch (err) {
+              const error = err as NodeJS.ErrnoException;
+              if (error.code === 'ELOOP') {
+                console.warn("[Export Artifact] Ignored malicious symlink at .gitignore");
+              } else {
+                throw err;
+              }
+            }
           }
         }
 
