@@ -1205,7 +1205,8 @@ export function registerTools(server: McpServer) {
         }
       }
 
-      // ⚡ Bolt Optimization: Replace chained .filter().slice(0, 50).map() with a single O(N) loop with early break
+      const MAX_RELATIONSHIPS = 50;
+      // Replaced chained .filter().slice().map() with a loop to avoid allocating intermediate arrays and skip processing after reaching the limit
       const relationships: Array<{ from: string; to: string; type: string }> = [];
       for (const l of links) {
         if (visited.has(l.source) && visited.has(l.target)) {
@@ -1214,7 +1215,7 @@ export function registerTools(server: McpServer) {
             to: nodeMap.get(l.target)?.label || l.target,
             type: l.type,
           });
-          if (relationships.length >= 50) break;
+          if (relationships.length >= MAX_RELATIONSHIPS) break;
         }
       }
 
