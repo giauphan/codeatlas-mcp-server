@@ -106,7 +106,6 @@ export class SecurityScanner {
     }
 
     try {
-      // ⚡ Bolt Optimization: Replace chained .filter().slice().map() with a single loop to reduce GC pressure and O(N) traversals
       const criticalStrings: string[] = [];
       for (const f of findings) {
         if (f.severity === "CRITICAL" || f.severity === "HIGH") {
