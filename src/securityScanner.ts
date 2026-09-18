@@ -106,10 +106,15 @@ export class SecurityScanner {
     }
 
     try {
-      const criticalFindings = findings.filter(f => f.severity === "CRITICAL" || f.severity === "HIGH").slice(0, 5);
-      const codeContext = criticalFindings.map(f => {
-        return "[" + f.severity + "] " + f.type + ": " + f.message + " (" + f.filePath + ":" + f.line + ")";
-      }).join("\n");
+      // ⚡ Bolt Optimization: Replace chained .filter().slice().map() with a single loop to reduce GC pressure and O(N) traversals
+      const criticalStrings: string[] = [];
+      for (const f of findings) {
+        if (f.severity === "CRITICAL" || f.severity === "HIGH") {
+          criticalStrings.push("[" + f.severity + "] " + f.type + ": " + f.message + " (" + f.filePath + ":" + f.line + ")");
+          if (criticalStrings.length >= 5) break;
+        }
+      }
+      const codeContext = criticalStrings.join("\n");
 
       const response = await fetch(aiUrl, {
         method: "POST",
