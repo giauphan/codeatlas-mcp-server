@@ -1159,7 +1159,19 @@ export function registerTools(server: McpServer) {
       }
 
       const traceNodes = getTraceNodes(visited, nodeMap);
-      const traceLinks = links.filter((l) => visited.has(l.source) && visited.has(l.target));
+
+      // ⚡ Bolt Optimization: Replace O(L) .filter().slice().map() over all graph links with a single loop and early exit
+      const relationships = [];
+      for (const l of links) {
+        if (visited.has(l.source) && visited.has(l.target)) {
+          relationships.push({
+            from: nodeMap.get(l.source)?.label || l.source,
+            to: nodeMap.get(l.target)?.label || l.target,
+            type: l.type,
+          });
+          if (relationships.length >= 50) break;
+        }
+      }
 
       const byFile = new Map<string, Array<{ name: string; type: string; isSeed: boolean; line: number | null }>>();
       for (const node of traceNodes) {
@@ -1214,11 +1226,7 @@ export function registerTools(server: McpServer) {
         depth: maxDepth,
         files,
         externalDeps: byFile.get("external")?.map((e) => e.name) || [],
-        relationships: traceLinks.slice(0, 50).map((l) => ({
-          from: nodeMap.get(l.source)?.label || l.source,
-          to: nodeMap.get(l.target)?.label || l.target,
-          type: l.type,
-        })),
+        relationships,
         readingOrder,
         message: `Found ${seedNodes.size} direct matches and ${visited.size - seedNodes.size} connected entities for '${keyword}'. Start reading from the files in 'readingOrder'.`,
       };
