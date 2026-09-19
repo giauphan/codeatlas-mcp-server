@@ -1160,8 +1160,8 @@ export function registerTools(server: McpServer) {
 
       const traceNodes = getTraceNodes(visited, nodeMap);
 
-      // ⚡ Bolt Optimization: Replace O(L) .filter().slice().map() over all graph links with a single loop and early exit
-      const relationships = [];
+      const MAX_RELATIONSHIPS = 50;
+      const relationships: Array<{ from: string; to: string; type: string }> = [];
       for (const l of links) {
         if (visited.has(l.source) && visited.has(l.target)) {
           relationships.push({
@@ -1169,7 +1169,7 @@ export function registerTools(server: McpServer) {
             to: nodeMap.get(l.target)?.label || l.target,
             type: l.type,
           });
-          if (relationships.length >= 50) break;
+          if (relationships.length >= MAX_RELATIONSHIPS) break;
         }
       }
 
