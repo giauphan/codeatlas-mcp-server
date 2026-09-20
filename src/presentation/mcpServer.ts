@@ -68,7 +68,7 @@ function createNodeMap<T extends { id: string }>(nodes: T[]): Map<string, T> {
  */
 function bfsReachable(adjList: Map<string, Set<string>>, seeds: Iterable<string>, maxDepth: number): Set<string> {
   const visited = new Set<string>(seeds);
-  let frontier = new Set<string>(seeds);
+  let frontier = new Set<string>(visited);
 
   if (visited.size === 0) return visited;
 
