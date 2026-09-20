@@ -87,8 +87,8 @@ function bfsReachable(adjList: Map<string, Set<string>>, seeds: Iterable<string>
         }
       }
     }
-    frontier = nextFrontier;
     if (nextFrontier.size === 0) break;
+    frontier = nextFrontier;
   }
 
   return visited;
