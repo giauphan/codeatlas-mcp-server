@@ -2404,7 +2404,7 @@ export function registerTools(server: McpServer) {
       if (client === "hermes" || client === "all") {
         const hermesCfg = getHermesConfigPath();
         try {
-          if (fs.existsSync(hermesCfg)) {
+          try {
             let cfg = readFileSyncNoFollow(hermesCfg, "utf-8");
 
             if (cfg.includes("codeatlas:")) {
@@ -2421,7 +2421,8 @@ export function registerTools(server: McpServer) {
               appendFileSyncNoFollow(hermesCfg, "\nmcp_servers:\n" + mcpEntry);
               results.push({ client: "hermes", action: "mcp_config", status: "appended" });
             }
-          } else {
+          } catch (err: any) {
+            if (err.code !== 'ENOENT') throw err;
             // Accepted risk: mkdirSync may follow symlinks in the parent path, but the actual file write is protected by O_NOFOLLOW
             fs.mkdirSync(path.dirname(hermesCfg), { recursive: true });
             writeFileSyncNoFollow(hermesCfg, "mcp_servers:\n" + mcpEntry);
@@ -2511,7 +2512,7 @@ def register(ctx):
             codeatlas: { command: "npx", args: ["-y", "codeatlas-enterprise"] },
             ["codeatlas-genome"]: { command: "npx", args: ["-y", "codeatlas-enterprise"] },
           }};
-          if (fs.existsSync(claudeCfg)) {
+          try {
             const existing = JSON.parse(readFileSyncNoFollow(claudeCfg, "utf-8"));
 
             // Clean up old env references if they exist
@@ -2531,7 +2532,8 @@ def register(ctx):
             existing.mcpServers = { ...existing.mcpServers, ...claudeEntry.mcpServers };
             writeFileSyncNoFollow(claudeCfg, JSON.stringify(existing, null, 2));
             results.push({ client: "claude", action: "mcp_config", status: "updated" });
-          } else {
+          } catch (err: any) {
+            if (err.code !== 'ENOENT') throw err;
             // Accepted risk: mkdirSync may follow symlinks in the parent path, but the actual file write is protected by O_NOFOLLOW
             fs.mkdirSync(path.dirname(claudeCfg), { recursive: true });
             writeFileSyncNoFollow(claudeCfg, JSON.stringify(claudeEntry, null, 2));
@@ -3331,11 +3333,13 @@ def register(ctx):
 
         // Also update .gitignore to track it
         const gitignorePath = path.join(projectDir, ".gitignore");
-        if (fs.existsSync(gitignorePath)) {
+        try {
           const gi = readFileSyncNoFollow(gitignorePath, "utf-8");
           if (!gi.includes(".codeatlas/")) {
             appendFileSyncNoFollow(gitignorePath, "\n# CodeAtlas artifact (shared with team)\n!.codeatlas/\n.codeatlas/!artifact*.json\n", 0o644);
           }
+        } catch (err: any) {
+           if (err.code !== 'ENOENT') throw err;
         }
 
         return { content: [{ type: "text" as const, text: JSON.stringify({

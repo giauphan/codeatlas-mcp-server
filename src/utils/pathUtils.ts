@@ -67,15 +67,19 @@ export function getZedSettingsPath(): string {
 }
 
 /**
- * Reads a file returning a string, enforcing symlink protections.
- * Note: Always returns a string. If Buffer output is required, use raw fs calls.
+ * Reads a file, enforcing symlink protections.
  */
-export function readFileSyncNoFollow(filePath: string, encoding: BufferEncoding = "utf-8"): string {
+export function readFileSyncNoFollow(filePath: string): Buffer;
+export function readFileSyncNoFollow(filePath: string, encoding: BufferEncoding): string;
+export function readFileSyncNoFollow(filePath: string, encoding?: BufferEncoding): string | Buffer {
   const flags = fs.constants.O_RDONLY | (process.platform === "win32" ? 0 : fs.constants.O_NOFOLLOW);
   const fd = fs.openSync(filePath, flags);
   try {
     const buffer = fs.readFileSync(fd);
-    return buffer.toString(encoding);
+    if (encoding) {
+      return buffer.toString(encoding);
+    }
+    return buffer;
   } finally {
     fs.closeSync(fd);
   }
