@@ -66,11 +66,11 @@ function createNodeMap<T extends { id: string }>(nodes: T[]): Map<string, T> {
  * @param seeds The initial set of starting nodes.
  * @param maxDepth The maximum number of hops to traverse.
  */
-function bfsReachable(adjList: Map<string, string[]>, seeds: Set<string>, maxDepth: number): Set<string> {
+function bfsReachable(adjList: Map<string, Set<string>>, seeds: Iterable<string>, maxDepth: number): Set<string> {
   const visited = new Set<string>(seeds);
   let frontier = new Set<string>(seeds);
 
-  if (seeds.size === 0) return visited;
+  if (visited.size === 0) return visited;
 
   for (let d = 0; d < maxDepth; d++) {
     const nextFrontier = new Set<string>();
@@ -98,23 +98,23 @@ function bfsReachable(adjList: Map<string, string[]>, seeds: Set<string>, maxDep
  * @param links Array of GraphLink objects representing the edges.
  * @param predicate Optional filtering function to only include specific links. Defaults to including all links.
  */
-function buildAdjacencyList(links: GraphLink[], predicate: (link: GraphLink) => boolean = () => true): Map<string, string[]> {
-  const adjList = new Map<string, string[]>();
+function buildAdjacencyList(links: GraphLink[], predicate: (link: GraphLink) => boolean = () => true): Map<string, Set<string>> {
+  const adjList = new Map<string, Set<string>>();
   for (const link of links) {
     if (predicate(link)) {
-      let sourceArr = adjList.get(link.source);
-      if (!sourceArr) {
-        sourceArr = [];
-        adjList.set(link.source, sourceArr);
+      let sourceSet = adjList.get(link.source);
+      if (!sourceSet) {
+        sourceSet = new Set<string>();
+        adjList.set(link.source, sourceSet);
       }
-      sourceArr.push(link.target);
+      sourceSet.add(link.target);
 
-      let targetArr = adjList.get(link.target);
-      if (!targetArr) {
-        targetArr = [];
-        adjList.set(link.target, targetArr);
+      let targetSet = adjList.get(link.target);
+      if (!targetSet) {
+        targetSet = new Set<string>();
+        adjList.set(link.target, targetSet);
       }
-      targetArr.push(link.source);
+      targetSet.add(link.source);
     }
   }
   return adjList;
