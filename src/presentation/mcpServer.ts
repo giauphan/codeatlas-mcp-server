@@ -61,6 +61,8 @@ function createNodeMap<T extends { id: string }>(nodes: T[]): Map<string, T> {
 
 /**
  * Computes the set of reachable nodes within a maximum depth using breadth-first search.
+ * Time Complexity: O(V + E) where V is the number of reachable nodes and E is the number of reachable edges.
+ * Space Complexity: O(V) for the visited and frontier sets.
  *
  * @param adjList The adjacency list mapping nodes to their neighbors.
  * @param seeds The initial set of starting nodes.
@@ -97,6 +99,8 @@ function bfsReachable(adjList: Map<string, Set<string>>, seeds: Iterable<string>
 /**
  * Builds an undirected adjacency list representation of a graph from a list of links,
  * adding edges symmetrically in both directions.
+ * Time Complexity: O(E) where E is the number of links in the graph.
+ * Space Complexity: O(V + E) to store the adjacency list representation.
  *
  * @param links Array of GraphLink objects representing the edges.
  * @param predicate Optional filtering function to only include specific links. Defaults to including all links.
