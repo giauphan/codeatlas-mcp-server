@@ -40,3 +40,8 @@
 **Vulnerability:** The `execSync` function was used to execute Node.js scripts using the string literal `'node'` or invoking bash implicitly. This risks command injection vulnerabilities if the execution environment is manipulated or if `execSync` spawns an unsanitized internal shell.
 **Learning:** When invoking Node.js scripts or executables, using `execSync` introduces security risks due to shell execution. Relying on the string `'node'` is unsafe if the environment path is attacker-controlled.
 **Prevention:** Always use `child_process.spawnSync` configured explicitly with `shell: false`. For executing Node.js scripts securely, use `process.execPath` to guarantee the binary executed is the active Node.js instance.
+
+## 2025-03-01 - [Fix TOCTOU Symlink Vulnerability in Configuration and File Appends]
+**Vulnerability:** Multiple configuration setups (`setup_second_brain`, `sync_skills_inventory`) and Git ignore appending (`export_team_artifact`) used `fs.writeFileSync` and `fs.appendFileSync`. These functions natively follow symlinks, opening the system to TOCTOU (Time-of-Check to Time-of-Use) attacks if an attacker substitutes a configuration or target file for a symlink pointing to sensitive system files.
+**Learning:** Even well-intentioned writes to seemingly "safe" files (like `~/.hermes/config.yaml` or `.gitignore`) are dangerous if the underlying API follows symlinks, as the files reside in mutable directories or user-controlled space.
+**Prevention:** To prevent TOCTOU symlink attacks, all file writes and appends must use file descriptors obtained via `fs.openSync` with `fs.constants.O_NOFOLLOW` flag, encapsulating this logic in safe wrappers like `writeFileSyncNoFollow` and `appendFileSyncNoFollow`.
