@@ -2536,8 +2536,8 @@ def register(ctx):
             existing.mcpServers = { ...existing.mcpServers, ...claudeEntry.mcpServers };
             writeFileSyncNoFollow(claudeCfg, JSON.stringify(existing, null, 2));
             results.push({ client: "claude", action: "mcp_config", status: "updated" });
-          } catch (err: any) {
-            if (err.code !== 'ENOENT') throw err;
+          } catch (readErr: any) {
+            if (readErr.code !== 'ENOENT') throw readErr;
             // Accepted risk: mkdirSync may follow symlinks in the parent path, but the actual file write is protected by O_NOFOLLOW
             fs.mkdirSync(path.dirname(claudeCfg), { recursive: true });
             writeFileSyncNoFollow(claudeCfg, JSON.stringify(claudeEntry, null, 2));
