@@ -72,13 +72,15 @@ export function getZedSettingsPath(): string {
 export function readFileSyncNoFollow(filePath: string): Buffer;
 export function readFileSyncNoFollow(filePath: string, encoding: BufferEncoding): string;
 export function readFileSyncNoFollow(filePath: string, encoding?: BufferEncoding): string | Buffer {
-  if (process.platform === "win32" && process.env.NODE_ENV !== "production") {
+  if (process.platform === "win32") {
     console.warn(`[readFileSyncNoFollow] O_NOFOLLOW is not supported on Windows. Symlink protection is disabled for ${filePath}`);
   }
   const flags = fs.constants.O_RDONLY | (process.platform === "win32" ? 0 : fs.constants.O_NOFOLLOW);
   const fd = fs.openSync(filePath, flags);
   try {
-    const buffer = fs.readFileSync(fd);
+    const stat = fs.fstatSync(fd);
+    const buffer = Buffer.alloc(stat.size);
+    fs.readSync(fd, buffer, 0, stat.size, 0);
     if (encoding) {
       return buffer.toString(encoding);
     }
@@ -89,7 +91,7 @@ export function readFileSyncNoFollow(filePath: string, encoding?: BufferEncoding
 }
 
 export function writeFileSyncNoFollow(filePath: string, content: string, mode: number = 0o600): void {
-  if (process.platform === "win32" && process.env.NODE_ENV !== "production") {
+  if (process.platform === "win32") {
     console.warn(`[writeFileSyncNoFollow] O_NOFOLLOW is not supported on Windows. Symlink protection is disabled for ${filePath}`);
   }
   const flags = fs.constants.O_CREAT | fs.constants.O_WRONLY | fs.constants.O_TRUNC | (process.platform === "win32" ? 0 : fs.constants.O_NOFOLLOW);
@@ -106,7 +108,7 @@ export function writeFileSyncNoFollow(filePath: string, content: string, mode: n
  * Default mode is 0o600 for security, but consider 0o644 for shared files like .gitignore.
  */
 export function appendFileSyncNoFollow(filePath: string, content: string, mode: number = 0o600): void {
-  if (process.platform === "win32" && process.env.NODE_ENV !== "production") {
+  if (process.platform === "win32") {
     console.warn(`[appendFileSyncNoFollow] O_NOFOLLOW is not supported on Windows. Symlink protection is disabled for ${filePath}`);
   }
   const flags = fs.constants.O_CREAT | fs.constants.O_WRONLY | fs.constants.O_APPEND | (process.platform === "win32" ? 0 : fs.constants.O_NOFOLLOW);
