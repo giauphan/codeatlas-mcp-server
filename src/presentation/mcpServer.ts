@@ -68,6 +68,7 @@ function createNodeMap<T extends { id: string }>(nodes: T[]): Map<string, T> {
  */
 function bfsReachable(adjList: Map<string, Set<string>>, seeds: Iterable<string>, maxDepth: number): Set<string> {
   const visited = new Set<string>(seeds);
+  // Must copy `visited` so mutation-during-iteration doesn't consume depth-d+1 nodes and bypass maxDepth
   let frontier = new Set<string>(visited);
 
   if (visited.size === 0) return visited;
@@ -1201,7 +1202,6 @@ export function registerTools(server: McpServer) {
         };
       }
 
-      // ⚡ Bolt Optimization: Replace O(D * E) graph traversal with O(E) adjacency list precomputation and O(V + E) BFS
       const adjList = buildAdjacencyList(links);
       const visited = bfsReachable(adjList, seedNodes, maxDepth);
 
@@ -1348,7 +1348,6 @@ export function registerTools(server: McpServer) {
         };
       }
 
-      // ⚡ Bolt Optimization: Replace O(D * E) graph traversal with O(E) adjacency list precomputation and O(V + E) BFS
       const adjList = buildAdjacencyList(links, (l) => l.type === "call" || l.type === "contains");
       const visited = bfsReachable(adjList, seedNodes, maxDepth);
 
