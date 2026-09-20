@@ -72,7 +72,7 @@ export function getZedSettingsPath(): string {
 export function readFileSyncNoFollow(filePath: string): Buffer;
 export function readFileSyncNoFollow(filePath: string, encoding: BufferEncoding): string;
 export function readFileSyncNoFollow(filePath: string, encoding?: BufferEncoding): string | Buffer {
-  if (process.platform === "win32") {
+  if (process.platform === "win32" && process.env.CODEATLAS_WINDOWS_WARNINGS !== "false") {
     console.warn(`[readFileSyncNoFollow] O_NOFOLLOW is not supported on Windows. Symlink protection is disabled for ${filePath}`);
   }
   const flags = fs.constants.O_RDONLY | (process.platform === "win32" ? 0 : fs.constants.O_NOFOLLOW);
@@ -91,7 +91,7 @@ export function readFileSyncNoFollow(filePath: string, encoding?: BufferEncoding
 }
 
 export function writeFileSyncNoFollow(filePath: string, content: string, mode: number = 0o600): void {
-  if (process.platform === "win32") {
+  if (process.platform === "win32" && process.env.CODEATLAS_WINDOWS_WARNINGS !== "false") {
     console.warn(`[writeFileSyncNoFollow] O_NOFOLLOW is not supported on Windows. Symlink protection is disabled for ${filePath}`);
   }
   const flags = fs.constants.O_CREAT | fs.constants.O_WRONLY | fs.constants.O_TRUNC | (process.platform === "win32" ? 0 : fs.constants.O_NOFOLLOW);
@@ -108,7 +108,7 @@ export function writeFileSyncNoFollow(filePath: string, content: string, mode: n
  * Default mode is 0o600 for security, but consider 0o644 for shared files like .gitignore.
  */
 export function appendFileSyncNoFollow(filePath: string, content: string, mode: number = 0o600): void {
-  if (process.platform === "win32") {
+  if (process.platform === "win32" && process.env.CODEATLAS_WINDOWS_WARNINGS !== "false") {
     console.warn(`[appendFileSyncNoFollow] O_NOFOLLOW is not supported on Windows. Symlink protection is disabled for ${filePath}`);
   }
   const flags = fs.constants.O_CREAT | fs.constants.O_WRONLY | fs.constants.O_APPEND | (process.platform === "win32" ? 0 : fs.constants.O_NOFOLLOW);
