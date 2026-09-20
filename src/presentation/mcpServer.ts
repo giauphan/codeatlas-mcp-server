@@ -2400,34 +2400,38 @@ export function registerTools(server: McpServer) {
 
       const mcpEntry = `  codeatlas:\n    command: npx\n    args: ["-y", "codeatlas-enterprise"]\n    enabled: true\n`;
 
-      // Hermes MCP config
-      if (client === "hermes" || client === "all") {
+      const updateHermesConfig = () => {
         const hermesCfg = getHermesConfigPath();
         try {
-          try {
-            let cfg = readFileSyncNoFollow(hermesCfg, "utf-8");
+          let cfg = readFileSyncNoFollow(hermesCfg, "utf-8");
 
-            if (cfg.includes("codeatlas:")) {
-              let status = "already_configured";
-              if (cfg.includes("CODEATLAS_API_KEY:")) {
-                status = "already_configured_legacy_key_warning";
-              }
-              results.push({ client: "hermes", action: "mcp_config", status });
-            } else if (cfg.includes("mcp_servers:")) {
-              cfg = cfg.replace("mcp_servers:", () => "mcp_servers:\n" + mcpEntry);
-              writeFileSyncNoFollow(hermesCfg, cfg);
-              results.push({ client: "hermes", action: "mcp_config", status: "updated" });
-            } else {
-              appendFileSyncNoFollow(hermesCfg, "\nmcp_servers:\n" + mcpEntry);
-              results.push({ client: "hermes", action: "mcp_config", status: "appended" });
+          if (cfg.includes("codeatlas:")) {
+            let status = "already_configured";
+            if (cfg.includes("CODEATLAS_API_KEY:")) {
+              status = "already_configured_legacy_key_warning";
             }
-          } catch (err: any) {
-            if (err.code !== 'ENOENT') throw err;
-            // Accepted risk: mkdirSync may follow symlinks in the parent path, but the actual file write is protected by O_NOFOLLOW
-            fs.mkdirSync(path.dirname(hermesCfg), { recursive: true });
-            writeFileSyncNoFollow(hermesCfg, "mcp_servers:\n" + mcpEntry);
-            results.push({ client: "hermes", action: "mcp_config", status: "created" });
+            results.push({ client: "hermes", action: "mcp_config", status });
+          } else if (cfg.includes("mcp_servers:")) {
+            cfg = cfg.replace("mcp_servers:", () => "mcp_servers:\n" + mcpEntry);
+            writeFileSyncNoFollow(hermesCfg, cfg);
+            results.push({ client: "hermes", action: "mcp_config", status: "updated" });
+          } else {
+            appendFileSyncNoFollow(hermesCfg, "\nmcp_servers:\n" + mcpEntry);
+            results.push({ client: "hermes", action: "mcp_config", status: "appended" });
           }
+        } catch (err: any) {
+          if (err.code !== 'ENOENT') throw err;
+          // Accepted risk: mkdirSync may follow symlinks in the parent path, but the actual file write is protected by O_NOFOLLOW
+          fs.mkdirSync(path.dirname(hermesCfg), { recursive: true });
+          writeFileSyncNoFollow(hermesCfg, "mcp_servers:\n" + mcpEntry);
+          results.push({ client: "hermes", action: "mcp_config", status: "created" });
+        }
+      };
+
+      // Hermes MCP config
+      if (client === "hermes" || client === "all") {
+        try {
+          updateHermesConfig();
         } catch (err: any) {
           results.push({ client: "hermes", action: "mcp_config", status: "error", error: err.message });
         }
@@ -3339,7 +3343,11 @@ def register(ctx):
             appendFileSyncNoFollow(gitignorePath, "\n# CodeAtlas artifact (shared with team)\n!.codeatlas/\n.codeatlas/!artifact*.json\n", 0o644);
           }
         } catch (err: any) {
-           if (err.code !== 'ENOENT') throw err;
+          if (err.code !== 'ENOENT') throw err;
+          // Silently fail if .gitignore does not exist, preserving original behavior
+          if (process.env.NODE_ENV !== "production") {
+            console.warn(`[export_team_artifact] .gitignore not found at ${gitignorePath}, skipping append.`);
+          }
         }
 
         return { content: [{ type: "text" as const, text: JSON.stringify({

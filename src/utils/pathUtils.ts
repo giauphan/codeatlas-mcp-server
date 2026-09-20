@@ -95,6 +95,10 @@ export function writeFileSyncNoFollow(filePath: string, content: string, mode: n
   }
 }
 
+/**
+ * Appends to a file, enforcing symlink protections.
+ * Default mode is 0o600 for security, but consider 0o644 for shared files like .gitignore.
+ */
 export function appendFileSyncNoFollow(filePath: string, content: string, mode: number = 0o600): void {
   const flags = fs.constants.O_CREAT | fs.constants.O_WRONLY | fs.constants.O_APPEND | (process.platform === "win32" ? 0 : fs.constants.O_NOFOLLOW);
   const fd = fs.openSync(filePath, flags, mode);
