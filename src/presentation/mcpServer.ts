@@ -103,21 +103,20 @@ function bfsReachable(adjList: Map<string, Set<string>>, seeds: Iterable<string>
  */
 function buildAdjacencyList(links: GraphLink[], predicate: (link: GraphLink) => boolean = () => true): Map<string, Set<string>> {
   const adjList = new Map<string, Set<string>>();
+
+  const getOrCreate = (key: string) => {
+    let set = adjList.get(key);
+    if (!set) {
+      set = new Set<string>();
+      adjList.set(key, set);
+    }
+    return set;
+  };
+
   for (const link of links) {
     if (predicate(link)) {
-      let sourceSet = adjList.get(link.source);
-      if (!sourceSet) {
-        sourceSet = new Set<string>();
-        adjList.set(link.source, sourceSet);
-      }
-      sourceSet.add(link.target);
-
-      let targetSet = adjList.get(link.target);
-      if (!targetSet) {
-        targetSet = new Set<string>();
-        adjList.set(link.target, targetSet);
-      }
-      targetSet.add(link.source);
+      getOrCreate(link.source).add(link.target);
+      getOrCreate(link.target).add(link.source);
     }
   }
   return adjList;
