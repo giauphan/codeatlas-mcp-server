@@ -66,8 +66,13 @@ export function getZedSettingsPath(): string {
   return path.join(getZedConfigDir(), "settings.json");
 }
 
+/**
+ * Reads a file returning a string, enforcing symlink protections.
+ * Note: Always returns a string. If Buffer output is required, use raw fs calls.
+ */
 export function readFileSyncNoFollow(filePath: string, encoding: BufferEncoding = "utf-8"): string {
-  const fd = fs.openSync(filePath, fs.constants.O_RDONLY | fs.constants.O_NOFOLLOW);
+  const flags = fs.constants.O_RDONLY | (process.platform === "win32" ? 0 : fs.constants.O_NOFOLLOW);
+  const fd = fs.openSync(filePath, flags);
   try {
     const buffer = fs.readFileSync(fd);
     return buffer.toString(encoding);
@@ -77,14 +82,8 @@ export function readFileSyncNoFollow(filePath: string, encoding: BufferEncoding 
 }
 
 export function writeFileSyncNoFollow(filePath: string, content: string, mode: number = 0o600): void {
-  const fd = fs.openSync(
-    filePath,
-    fs.constants.O_CREAT |   // Create file if it doesn't exist
-    fs.constants.O_WRONLY |  // Open for writing
-    fs.constants.O_TRUNC |   // Truncate file content if it exists
-    fs.constants.O_NOFOLLOW, // Prevent symlink following
-    mode
-  );
+  const flags = fs.constants.O_CREAT | fs.constants.O_WRONLY | fs.constants.O_TRUNC | (process.platform === "win32" ? 0 : fs.constants.O_NOFOLLOW);
+  const fd = fs.openSync(filePath, flags, mode);
   try {
     fs.writeFileSync(fd, content);
   } finally {
@@ -93,14 +92,8 @@ export function writeFileSyncNoFollow(filePath: string, content: string, mode: n
 }
 
 export function appendFileSyncNoFollow(filePath: string, content: string, mode: number = 0o600): void {
-  const fd = fs.openSync(
-    filePath,
-    fs.constants.O_CREAT |   // Create file if it doesn't exist
-    fs.constants.O_WRONLY |  // Open for writing
-    fs.constants.O_APPEND |  // Append to the file
-    fs.constants.O_NOFOLLOW, // Prevent symlink following
-    mode
-  );
+  const flags = fs.constants.O_CREAT | fs.constants.O_WRONLY | fs.constants.O_APPEND | (process.platform === "win32" ? 0 : fs.constants.O_NOFOLLOW);
+  const fd = fs.openSync(filePath, flags, mode);
   try {
     fs.writeSync(fd, content);
   } finally {

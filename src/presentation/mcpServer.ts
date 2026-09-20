@@ -3334,7 +3334,7 @@ def register(ctx):
         if (fs.existsSync(gitignorePath)) {
           const gi = readFileSyncNoFollow(gitignorePath, "utf-8");
           if (!gi.includes(".codeatlas/")) {
-            appendFileSyncNoFollow(gitignorePath, "\n# CodeAtlas artifact (shared with team)\n!.codeatlas/\n.codeatlas/!artifact*.json\n");
+            appendFileSyncNoFollow(gitignorePath, "\n# CodeAtlas artifact (shared with team)\n!.codeatlas/\n.codeatlas/!artifact*.json\n", 0o644);
           }
         }
 
