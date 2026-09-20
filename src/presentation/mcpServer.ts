@@ -68,10 +68,11 @@ function createNodeMap<T extends { id: string }>(nodes: T[]): Map<string, T> {
  */
 function bfsReachable(adjList: Map<string, Set<string>>, seeds: Iterable<string>, maxDepth: number): Set<string> {
   const visited = new Set<string>(seeds);
-  // Must copy `visited` so mutation-during-iteration doesn't consume depth-d+1 nodes and bypass maxDepth
-  let frontier = new Set<string>(visited);
 
   if (visited.size === 0) return visited;
+
+  // Initialize frontier from seeds to begin traversal from all seed nodes
+  let frontier = new Set<string>(visited);
 
   for (let d = 0; d < maxDepth; d++) {
     const nextFrontier = new Set<string>();
