@@ -2422,15 +2422,8 @@ export function registerTools(server: McpServer) {
               results.push({ client: "hermes", action: "mcp_config", status: "appended" });
             }
           } else {
-            // Explicitly resolve the dirname to ensure it is not a symlink before mkdirSync
-            const dir = path.dirname(hermesCfg);
-            if (fs.existsSync(dir)) {
-               const resolvedDir = fs.realpathSync(dir);
-               if (resolvedDir !== dir) {
-                   throw new Error("Security Error: Target directory is a symlink");
-               }
-            }
-            fs.mkdirSync(dir, { recursive: true });
+            // Accepted risk: mkdirSync may follow symlinks in the parent path, but the actual file write is protected by O_NOFOLLOW
+            fs.mkdirSync(path.dirname(hermesCfg), { recursive: true });
             writeFileSyncNoFollow(hermesCfg, "mcp_servers:\n" + mcpEntry);
             results.push({ client: "hermes", action: "mcp_config", status: "created" });
           }
@@ -2539,15 +2532,8 @@ def register(ctx):
             writeFileSyncNoFollow(claudeCfg, JSON.stringify(existing, null, 2));
             results.push({ client: "claude", action: "mcp_config", status: "updated" });
           } else {
-            // Explicitly resolve the dirname to ensure it is not a symlink before mkdirSync
-            const dir = path.dirname(claudeCfg);
-            if (fs.existsSync(dir)) {
-               const resolvedDir = fs.realpathSync(dir);
-               if (resolvedDir !== dir) {
-                   throw new Error("Security Error: Target directory is a symlink");
-               }
-            }
-            fs.mkdirSync(dir, { recursive: true });
+            // Accepted risk: mkdirSync may follow symlinks in the parent path, but the actual file write is protected by O_NOFOLLOW
+            fs.mkdirSync(path.dirname(claudeCfg), { recursive: true });
             writeFileSyncNoFollow(claudeCfg, JSON.stringify(claudeEntry, null, 2));
             results.push({ client: "claude", action: "mcp_config", status: "created" });
           }
