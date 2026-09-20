@@ -66,6 +66,28 @@ function createNodeMap<T extends { id: string }>(nodes: T[]): Map<string, T> {
  * @param nodeMap Map containing the actual GraphNode objects.
  * @param predicate Optional filtering function. Defaults to including all nodes.
  */
+function buildAdjacencyList(links: GraphLink[], predicate: (link: GraphLink) => boolean = () => true): Map<string, string[]> {
+  const adjList = new Map<string, string[]>();
+  for (const link of links) {
+    if (predicate(link)) {
+      let sourceArr = adjList.get(link.source);
+      if (!sourceArr) {
+        sourceArr = [];
+        adjList.set(link.source, sourceArr);
+      }
+      sourceArr.push(link.target);
+
+      let targetArr = adjList.get(link.target);
+      if (!targetArr) {
+        targetArr = [];
+        adjList.set(link.target, targetArr);
+      }
+      targetArr.push(link.source);
+    }
+  }
+  return adjList;
+}
+
 function getTraceNodes(visited: Set<string>, nodeMap: Map<string, GraphNode>, predicate: (node: GraphNode) => boolean = () => true /* Default behavior is "include all nodes" */): GraphNode[] {
   const traceNodes: GraphNode[] = [];
   for (const id of visited) {
@@ -1144,22 +1166,7 @@ export function registerTools(server: McpServer) {
       let frontier = new Set<string>(seedNodes);
 
       // ⚡ Bolt Optimization: Replace O(D * E) graph traversal with O(E) adjacency list precomputation and O(V + E) BFS
-      const adjList = new Map<string, string[]>();
-      for (const link of links) {
-        let sourceArr = adjList.get(link.source);
-        if (!sourceArr) {
-          sourceArr = [];
-          adjList.set(link.source, sourceArr);
-        }
-        sourceArr.push(link.target);
-
-        let targetArr = adjList.get(link.target);
-        if (!targetArr) {
-          targetArr = [];
-          adjList.set(link.target, targetArr);
-        }
-        targetArr.push(link.source);
-      }
+      const adjList = buildAdjacencyList(links);
 
       for (let d = 0; d < maxDepth; d++) {
         const nextFrontier = new Set<string>();
@@ -1324,24 +1331,7 @@ export function registerTools(server: McpServer) {
       const visited = new Set<string>(seedNodes);
       let frontier = new Set<string>(seedNodes);
       // ⚡ Bolt Optimization: Replace O(D * E) graph traversal with O(E) adjacency list precomputation and O(V + E) BFS
-      const adjList = new Map<string, string[]>();
-      for (const link of links) {
-        if (link.type === "call" || link.type === "contains") {
-          let sourceArr = adjList.get(link.source);
-          if (!sourceArr) {
-            sourceArr = [];
-            adjList.set(link.source, sourceArr);
-          }
-          sourceArr.push(link.target);
-
-          let targetArr = adjList.get(link.target);
-          if (!targetArr) {
-            targetArr = [];
-            adjList.set(link.target, targetArr);
-          }
-          targetArr.push(link.source);
-        }
-      }
+      const adjList = buildAdjacencyList(links, (l) => l.type === "call" || l.type === "contains");
 
       for (let d = 0; d < maxDepth; d++) {
         const nextFrontier = new Set<string>();
