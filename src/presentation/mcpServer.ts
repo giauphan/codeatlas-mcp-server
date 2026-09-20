@@ -1143,19 +1143,39 @@ export function registerTools(server: McpServer) {
       const visited = new Set<string>(seedNodes);
       let frontier = new Set<string>(seedNodes);
 
+      // ⚡ Bolt Optimization: Replace O(D * E) graph traversal with O(E) adjacency list precomputation and O(V + E) BFS
+      const adjList = new Map<string, string[]>();
+      for (const link of links) {
+        let sourceArr = adjList.get(link.source);
+        if (!sourceArr) {
+          sourceArr = [];
+          adjList.set(link.source, sourceArr);
+        }
+        sourceArr.push(link.target);
+
+        let targetArr = adjList.get(link.target);
+        if (!targetArr) {
+          targetArr = [];
+          adjList.set(link.target, targetArr);
+        }
+        targetArr.push(link.source);
+      }
+
       for (let d = 0; d < maxDepth; d++) {
         const nextFrontier = new Set<string>();
-        for (const link of links) {
-          if (frontier.has(link.source) && !visited.has(link.target)) {
-            nextFrontier.add(link.target);
-            visited.add(link.target);
-          }
-          if (frontier.has(link.target) && !visited.has(link.source)) {
-            nextFrontier.add(link.source);
-            visited.add(link.source);
+        for (const node of frontier) {
+          const neighbors = adjList.get(node);
+          if (neighbors) {
+            for (const neighbor of neighbors) {
+              if (!visited.has(neighbor)) {
+                nextFrontier.add(neighbor);
+                visited.add(neighbor);
+              }
+            }
           }
         }
         frontier = nextFrontier;
+        if (nextFrontier.size === 0) break;
       }
 
       const traceNodes = getTraceNodes(visited, nodeMap);
@@ -1303,18 +1323,37 @@ export function registerTools(server: McpServer) {
 
       const visited = new Set<string>(seedNodes);
       let frontier = new Set<string>(seedNodes);
-      const callAndContainsLinks = links.filter((l) => l.type === "call" || l.type === "contains");
+      // ⚡ Bolt Optimization: Replace O(D * E) graph traversal with O(E) adjacency list precomputation and O(V + E) BFS
+      const adjList = new Map<string, string[]>();
+      for (const link of links) {
+        if (link.type === "call" || link.type === "contains") {
+          let sourceArr = adjList.get(link.source);
+          if (!sourceArr) {
+            sourceArr = [];
+            adjList.set(link.source, sourceArr);
+          }
+          sourceArr.push(link.target);
+
+          let targetArr = adjList.get(link.target);
+          if (!targetArr) {
+            targetArr = [];
+            adjList.set(link.target, targetArr);
+          }
+          targetArr.push(link.source);
+        }
+      }
 
       for (let d = 0; d < maxDepth; d++) {
         const nextFrontier = new Set<string>();
-        for (const link of callAndContainsLinks) {
-          if (frontier.has(link.source) && !visited.has(link.target)) {
-            nextFrontier.add(link.target);
-            visited.add(link.target);
-          }
-          if (frontier.has(link.target) && !visited.has(link.source)) {
-            nextFrontier.add(link.source);
-            visited.add(link.source);
+        for (const node of frontier) {
+          const neighbors = adjList.get(node);
+          if (neighbors) {
+            for (const neighbor of neighbors) {
+              if (!visited.has(neighbor)) {
+                nextFrontier.add(neighbor);
+                visited.add(neighbor);
+              }
+            }
           }
         }
         frontier = nextFrontier;
