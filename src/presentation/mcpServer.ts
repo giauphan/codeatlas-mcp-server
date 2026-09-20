@@ -95,7 +95,8 @@ function bfsReachable(adjList: Map<string, Set<string>>, seeds: Iterable<string>
 }
 
 /**
- * Builds an adjacency list representation of a graph from a list of links.
+ * Builds an undirected adjacency list representation of a graph from a list of links,
+ * adding edges symmetrically in both directions.
  *
  * @param links Array of GraphLink objects representing the edges.
  * @param predicate Optional filtering function to only include specific links. Defaults to including all links.
