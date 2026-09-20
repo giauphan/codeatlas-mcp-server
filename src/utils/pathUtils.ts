@@ -66,6 +66,16 @@ export function getZedSettingsPath(): string {
   return path.join(getZedConfigDir(), "settings.json");
 }
 
+export function readFileSyncNoFollow(filePath: string, encoding: BufferEncoding = "utf-8"): string {
+  const fd = fs.openSync(filePath, fs.constants.O_RDONLY | fs.constants.O_NOFOLLOW);
+  try {
+    const buffer = fs.readFileSync(fd);
+    return buffer.toString(encoding);
+  } finally {
+    fs.closeSync(fd);
+  }
+}
+
 export function writeFileSyncNoFollow(filePath: string, content: string, mode: number = 0o600): void {
   const fd = fs.openSync(
     filePath,
@@ -92,7 +102,7 @@ export function appendFileSyncNoFollow(filePath: string, content: string, mode: 
     mode
   );
   try {
-    fs.appendFileSync(fd, content);
+    fs.writeSync(fd, content);
   } finally {
     fs.closeSync(fd);
   }

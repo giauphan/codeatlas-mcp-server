@@ -15,7 +15,8 @@ import {
   getGeminiSettingsPath,
   getZedSettingsPath,
   writeFileSyncNoFollow,
-  appendFileSyncNoFollow
+  appendFileSyncNoFollow,
+  readFileSyncNoFollow
 } from "../utils/pathUtils.js";
 import { jaccardSimilarity } from "../utils/mathUtils.js";
 import { getApiUrl } from "../utils/envUtils.js";
@@ -2404,7 +2405,7 @@ export function registerTools(server: McpServer) {
         const hermesCfg = getHermesConfigPath();
         try {
           if (fs.existsSync(hermesCfg)) {
-            let cfg = fs.readFileSync(hermesCfg, "utf-8");
+            let cfg = readFileSyncNoFollow(hermesCfg, "utf-8");
 
             if (cfg.includes("codeatlas:")) {
               let status = "already_configured";
@@ -2421,7 +2422,15 @@ export function registerTools(server: McpServer) {
               results.push({ client: "hermes", action: "mcp_config", status: "appended" });
             }
           } else {
-            fs.mkdirSync(path.dirname(hermesCfg), { recursive: true });
+            // Explicitly resolve the dirname to ensure it is not a symlink before mkdirSync
+            const dir = path.dirname(hermesCfg);
+            if (fs.existsSync(dir)) {
+               const resolvedDir = fs.realpathSync(dir);
+               if (resolvedDir !== dir) {
+                   throw new Error("Security Error: Target directory is a symlink");
+               }
+            }
+            fs.mkdirSync(dir, { recursive: true });
             writeFileSyncNoFollow(hermesCfg, "mcp_servers:\n" + mcpEntry);
             results.push({ client: "hermes", action: "mcp_config", status: "created" });
           }
@@ -2510,7 +2519,7 @@ def register(ctx):
             ["codeatlas-genome"]: { command: "npx", args: ["-y", "codeatlas-enterprise"] },
           }};
           if (fs.existsSync(claudeCfg)) {
-            const existing = JSON.parse(fs.readFileSync(claudeCfg, "utf-8"));
+            const existing = JSON.parse(readFileSyncNoFollow(claudeCfg, "utf-8"));
 
             // Clean up old env references if they exist
             if (existing.mcpServers?.codeatlas?.env?.CODEATLAS_API_KEY) {
@@ -2530,7 +2539,15 @@ def register(ctx):
             writeFileSyncNoFollow(claudeCfg, JSON.stringify(existing, null, 2));
             results.push({ client: "claude", action: "mcp_config", status: "updated" });
           } else {
-            fs.mkdirSync(path.dirname(claudeCfg), { recursive: true });
+            // Explicitly resolve the dirname to ensure it is not a symlink before mkdirSync
+            const dir = path.dirname(claudeCfg);
+            if (fs.existsSync(dir)) {
+               const resolvedDir = fs.realpathSync(dir);
+               if (resolvedDir !== dir) {
+                   throw new Error("Security Error: Target directory is a symlink");
+               }
+            }
+            fs.mkdirSync(dir, { recursive: true });
             writeFileSyncNoFollow(claudeCfg, JSON.stringify(claudeEntry, null, 2));
             results.push({ client: "claude", action: "mcp_config", status: "created" });
           }
@@ -3329,7 +3346,7 @@ def register(ctx):
         // Also update .gitignore to track it
         const gitignorePath = path.join(projectDir, ".gitignore");
         if (fs.existsSync(gitignorePath)) {
-          const gi = fs.readFileSync(gitignorePath, "utf-8");
+          const gi = readFileSyncNoFollow(gitignorePath, "utf-8");
           if (!gi.includes(".codeatlas/")) {
             appendFileSyncNoFollow(gitignorePath, "\n# CodeAtlas artifact (shared with team)\n!.codeatlas/\n.codeatlas/!artifact*.json\n");
           }
