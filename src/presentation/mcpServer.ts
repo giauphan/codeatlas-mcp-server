@@ -69,14 +69,12 @@ function createNodeMap<T extends { id: string }>(nodes: T[]): Map<string, T> {
  * @param maxDepth The maximum number of hops to traverse.
  */
 function bfsReachable(adjList: Map<string, Set<string>>, seeds: Iterable<string>, maxDepth: number): Set<string> {
-  if (!adjList || !seeds) return new Set();
-
   const visited = new Set<string>(seeds);
 
   if (visited.size === 0) return visited;
 
   // Initialize frontier from seeds to begin traversal from all seed nodes
-  let frontier = new Set<string>(visited);
+  let frontier = visited;
 
   for (let d = 0; d < maxDepth; d++) {
     const nextFrontier = new Set<string>();
