@@ -100,7 +100,8 @@ function bfsReachable(adjList: Map<string, Set<string>>, seeds: Iterable<string>
  * Builds an undirected adjacency list representation of a graph from a list of links,
  * adding edges symmetrically in both directions.
  * Time Complexity: O(E) where E is the number of links in the graph.
- * Space Complexity: O(V + E) to store the adjacency list representation.
+ * Space Complexity: O(V + E) to store the adjacency list representation. For extremely
+ * large, highly-connected graphs, this may consume significant memory relative to the raw array.
  *
  * @param links Array of GraphLink objects representing the edges.
  * @param predicate Optional filtering function to only include specific links. Defaults to including all links.
