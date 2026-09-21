@@ -65,12 +65,18 @@ function createNodeMap<T extends { id: string }>(nodes: T[]): Map<string, T> {
  * Time Complexity: O(V + E) where V is the number of reachable nodes and E is the number of reachable edges.
  * Space Complexity: O(V) for the visited and frontier sets.
  *
+ * Example usage:
+ * ```ts
+ * const reachable = bfsReachable(adjList, new Set(['A']), 2, false);
+ * // reachable: Set { 'A', 'B', 'C' }
+ * ```
+ *
  * @param adjList The adjacency list mapping nodes to their neighbors.
  * @param seeds The initial set of starting nodes.
  * @param maxDepth The maximum number of hops to traverse (must be >= 0).
- * @param excludeSeeds Whether to exclude the initial seed nodes in the returned set. Defaults to false.
+ * @param excludeInitialNodes Whether to exclude the initial seed nodes in the returned set. Defaults to false.
  */
-function bfsReachable(adjList: Map<string, Set<string>>, seeds: Iterable<string>, maxDepth: number, excludeSeeds: boolean = false): Set<string> {
+function bfsReachable(adjList: Map<string, Set<string>>, seeds: Iterable<string>, maxDepth: number, excludeInitialNodes: boolean = false): Set<string> {
   if (maxDepth < 0) maxDepth = 0;
   const visited = new Set<string>(seeds);
 
@@ -96,7 +102,7 @@ function bfsReachable(adjList: Map<string, Set<string>>, seeds: Iterable<string>
     frontier = nextFrontier;
   }
 
-  if (excludeSeeds) {
+  if (excludeInitialNodes) {
     for (const seed of seeds) {
       visited.delete(seed);
     }
