@@ -97,16 +97,16 @@ function bfsReachable(adjList: Map<string, Set<string>>, seeds: Iterable<string>
 }
 
 /**
- * Builds an undirected adjacency list representation of a graph from a list of links,
- * adding edges symmetrically in both directions.
+ * Builds an adjacency list representation of a graph from a list of links.
  * Time Complexity: O(E) where E is the number of links in the graph.
  * Space Complexity: O(V + E) to store the adjacency list representation. For extremely
  * large, highly-connected graphs, this may consume significant memory relative to the raw array.
  *
  * @param links Array of GraphLink objects representing the edges.
  * @param predicate Optional filtering function to only include specific links. Defaults to including all links.
+ * @param isUndirected If true, adds edges symmetrically in both directions. Defaults to true.
  */
-function buildAdjacencyList(links: GraphLink[], predicate: (link: GraphLink) => boolean = () => true): Map<string, Set<string>> {
+function buildAdjacencyList(links: GraphLink[], predicate: (link: GraphLink) => boolean = () => true, isUndirected: boolean = true): Map<string, Set<string>> {
   if (!links) return new Map();
 
   const adjList = new Map<string, Set<string>>();
@@ -123,7 +123,9 @@ function buildAdjacencyList(links: GraphLink[], predicate: (link: GraphLink) => 
   for (const link of links) {
     if (predicate(link)) {
       getOrCreate(link.source).add(link.target);
-      getOrCreate(link.target).add(link.source);
+      if (isUndirected) {
+        getOrCreate(link.target).add(link.source);
+      }
     }
   }
   return adjList;
