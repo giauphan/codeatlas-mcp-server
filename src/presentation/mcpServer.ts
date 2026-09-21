@@ -109,7 +109,15 @@ function bfsReachable(adjList: Map<string, Set<string>>, seeds: Iterable<string>
  * Builds an adjacency list representation of a graph from a list of links.
  * Time Complexity: O(E) where E is the number of links in the graph.
  * Space Complexity: O(V + E) to store the adjacency list representation. For extremely
- * large, highly-connected graphs, this may consume significant memory relative to the raw array.
+ * large, highly-connected graphs (e.g. 50k+ nodes and 500k+ edges), this may
+ * consume significant memory relative to the raw array.
+ *
+ * Example usage:
+ * ```ts
+ * const links = [{ source: 'A', target: 'B', type: 'call' }];
+ * const adjList = buildAdjacencyList(links, l => l.type === 'call', true);
+ * // adjList: Map { 'A' => Set { 'B' }, 'B' => Set { 'A' } }
+ * ```
  *
  * @param links Array of GraphLink objects representing the edges.
  * @param predicate Optional filtering function to only include specific links. Defaults to including all links.
