@@ -67,10 +67,11 @@ function createNodeMap<T extends { id: string }>(nodes: T[]): Map<string, T> {
  *
  * @param adjList The adjacency list mapping nodes to their neighbors.
  * @param seeds The initial set of starting nodes.
- * @param maxDepth The maximum number of hops to traverse.
+ * @param maxDepth The maximum number of hops to traverse (must be >= 0).
  * @param includeSeeds Whether to include the initial seed nodes in the returned set. Defaults to true.
  */
 function bfsReachable(adjList: Map<string, Set<string>>, seeds: Iterable<string>, maxDepth: number, includeSeeds: boolean = true): Set<string> {
+  if (maxDepth < 0) maxDepth = 0;
   const visited = new Set<string>(seeds);
 
   if (visited.size === 0) return visited;
