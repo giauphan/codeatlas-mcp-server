@@ -133,7 +133,7 @@ function bfsReachable(adjList: Map<string, Set<string>>, seeds: Iterable<string>
  * @param isUndirected If true, adds edges symmetrically in both directions. Defaults to true.
  */
 function buildAdjacencyList(links: GraphLink[], predicate: (link: GraphLink) => boolean = () => true, isUndirected: boolean = true): Map<string, Set<string>> {
-  if (!links) return new Map();
+  if (!Array.isArray(links)) return new Map();
 
   const adjList = new Map<string, Set<string>>();
 
