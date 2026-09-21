@@ -75,9 +75,11 @@ function createNodeMap<T extends { id: string }>(nodes: T[]): Map<string, T> {
  * @param seeds The initial set of starting nodes.
  * @param maxDepth The maximum number of hops to traverse (must be >= 0).
  * @param excludeInitialNodes Whether to exclude the initial seed nodes in the returned set. Defaults to false.
- * @param maxNodes Optional limit on the maximum number of nodes to visit to prevent excessive memory usage.
+ * @param maxNodes Optional limit on the maximum number of nodes to visit to prevent excessive memory usage. Traversal will halt if this limit is reached.
  */
 function bfsReachable(adjList: Map<string, Set<string>>, seeds: Iterable<string>, maxDepth: number, excludeInitialNodes: boolean = false, maxNodes?: number): Set<string> {
+  if (!adjList || !seeds) return new Set();
+
   if (maxDepth < 0) maxDepth = 0;
   const visited = new Set<string>(seeds);
 
