@@ -61,6 +61,7 @@ function createNodeMap<T extends { id: string }>(nodes: T[]): Map<string, T> {
 
 /**
  * Computes the set of reachable nodes within a maximum depth using breadth-first search.
+ * Note: The returned set of reachable nodes always includes the initial seed nodes.
  * Time Complexity: O(V + E) where V is the number of reachable nodes and E is the number of reachable edges.
  * Space Complexity: O(V) for the visited and frontier sets.
  *
@@ -1212,7 +1213,7 @@ export function registerTools(server: McpServer) {
         };
       }
 
-      const adjList = buildAdjacencyList(links);
+      const adjList = buildAdjacencyList(links, () => true, true);
       const visited = bfsReachable(adjList, seedNodes, maxDepth);
 
       const traceNodes = getTraceNodes(visited, nodeMap);
@@ -1358,7 +1359,7 @@ export function registerTools(server: McpServer) {
         };
       }
 
-      const adjList = buildAdjacencyList(links, (l) => l.type === "call" || l.type === "contains");
+      const adjList = buildAdjacencyList(links, (l) => l.type === "call" || l.type === "contains", true);
       const visited = bfsReachable(adjList, seedNodes, maxDepth);
 
       let filteredTraceNodes = getTraceNodes(visited, nodeMap, (node) => node.type === "function" || node.type === "class");
