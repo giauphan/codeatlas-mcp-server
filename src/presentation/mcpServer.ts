@@ -85,6 +85,14 @@ function bfsReachable(adjList: Map<string, Set<string>>, seeds: Iterable<string>
   } else {
     maxDepth = Math.floor(maxDepth);
   }
+
+  if (maxNodes !== undefined) {
+    if (typeof maxNodes !== 'number' || isNaN(maxNodes) || maxNodes < 0) {
+      maxNodes = 0;
+    } else {
+      maxNodes = Math.floor(maxNodes);
+    }
+  }
   const visited = new Set<string>(seeds);
 
   if (visited.size === 0) return visited;
