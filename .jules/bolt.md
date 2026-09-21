@@ -86,5 +86,5 @@
 **Action:** When mapping and slicing elements inside functions that iterate repeatedly on a hot path, refactor `.filter().map().slice()` chains by substituting them with a single `for` or `for...of` loop. Maintain a bounded array by utilizing `.push()` directly and early-exiting the loop (`if (suggestions.length >= 10) break;`), negating massive unnecessary iteration scaling and mitigating Node.js garbage collection pauses.
 
 ## 2026-09-14 - [Performance improvement] Optimized O(N) Array spreads and chained .slice() on Iterables
-**Learning:** Operations like `[...Array.from(set1), ...Array.from(set2)]` and `Array.from(map.values()).slice()` cause substantial Garbage Collection overhead by allocating multiple intermediate large arrays. This becomes a major bottleneck for large graph topologies.
+**Learning:** Operations like `[...Array.from(set1), ...Array.from(set2)]` and `Array.from(map.values()).slice()` cause substantial Garbage Collection overhead by allocating intermediate arrays. This becomes a major bottleneck for large graph topologies.
 **Action:** Replace `Array.from()` conversions and array spreads with simple, bounded `for...of` loops iterating directly on `Set.values()` and `Map.values()` with a manual counter and `break` for early exit when capping limits.
