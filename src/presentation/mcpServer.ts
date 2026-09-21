@@ -80,7 +80,11 @@ function createNodeMap<T extends { id: string }>(nodes: T[]): Map<string, T> {
 function bfsReachable(adjList: Map<string, Set<string>>, seeds: Iterable<string>, maxDepth: number, excludeInitialNodes: boolean = false, maxNodes?: number): Set<string> {
   if (!adjList || !seeds) return new Set();
 
-  if (maxDepth < 0) maxDepth = 0;
+  if (typeof maxDepth !== 'number' || isNaN(maxDepth) || maxDepth < 0) {
+    maxDepth = 0;
+  } else {
+    maxDepth = Math.floor(maxDepth);
+  }
   const visited = new Set<string>(seeds);
 
   if (visited.size === 0) return visited;
