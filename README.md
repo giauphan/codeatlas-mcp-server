@@ -206,3 +206,9 @@ MIT © [Giau Phan](mailto:giauphan012@gmail.com)
 
 - Report bugs or request features: [GitHub Issues](https://github.com/giauphan/codeatlas-mcp-server/issues)
 - For questions: [Discussions](https://github.com/giauphan/codeatlas-mcp-server/discussions)
+
+## Security Note on Configuration Files
+
+CodeAtlas MCP Server performs secure, symlink-aware file operations (`O_NOFOLLOW`) when writing configurations and system memories to prevent Time-of-Check to Time-of-Use (TOCTOU) symlink attacks.
+
+*Note: The `O_NOFOLLOW` flag is a POSIX feature and is not supported natively on Windows environments. Users running CodeAtlas on Windows will receive a warning log indicating that symlink protection is disabled for configuration file operations. This warning can be disabled by setting the environment variable `CODEATLAS_WINDOWS_WARNINGS="false"`.*
