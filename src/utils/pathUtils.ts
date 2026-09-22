@@ -67,14 +67,19 @@ export function getZedSettingsPath(): string {
 }
 
 export function appendFileSyncNoFollow(filePath: string, content: string, mode: number = 0o600): void {
-  const fd = fs.openSync(
-    filePath,
-    fs.constants.O_CREAT |   // Create file if it doesn't exist
-    fs.constants.O_WRONLY |  // Open for writing
-    fs.constants.O_APPEND |  // Append file content if it exists
-    fs.constants.O_NOFOLLOW, // Prevent symlink following
-    mode
-  );
+  let fd: number;
+  try {
+    fd = fs.openSync(
+      filePath,
+      fs.constants.O_CREAT |   // Create file if it doesn't exist
+      fs.constants.O_WRONLY |  // Open for writing
+      fs.constants.O_APPEND |  // Append file content if it exists
+      fs.constants.O_NOFOLLOW, // Prevent symlink following
+      mode
+    );
+  } catch (err: any) {
+    throw new Error(`Failed to safely open file for appending: ${err.message}`);
+  }
   try {
     fs.writeFileSync(fd, content);
   } finally {
