@@ -87,6 +87,9 @@ export function appendFileSyncNoFollow(filePath: string, content: string, mode: 
       mode
     );
   } catch (err: any) {
+    if (err.code === 'ENOENT') {
+      throw new Error(`Failed to safely open file for appending: Directory does not exist (${err.message})`);
+    }
     throw new Error(`Failed to safely open file for appending: ${err.message}`);
   }
   try {
