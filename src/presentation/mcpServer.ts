@@ -14,7 +14,8 @@ import {
   getClaudeDesktopConfigPath,
   getGeminiSettingsPath,
   getZedSettingsPath,
-  writeFileSyncNoFollow
+  writeFileSyncNoFollow,
+  appendFileSyncNoFollow
 } from "../utils/pathUtils.js";
 import { jaccardSimilarity } from "../utils/mathUtils.js";
 import { getApiUrl } from "../utils/envUtils.js";
@@ -3330,7 +3331,7 @@ def register(ctx):
         if (fs.existsSync(gitignorePath)) {
           const gi = fs.readFileSync(gitignorePath, "utf-8");
           if (!gi.includes(".codeatlas/")) {
-            fs.appendFileSync(gitignorePath, "\n# CodeAtlas artifact (shared with team)\n!.codeatlas/\n.codeatlas/!artifact*.json\n");
+            appendFileSyncNoFollow(gitignorePath, "\n# CodeAtlas artifact (shared with team)\n!.codeatlas/\n.codeatlas/!artifact*.json\n");
           }
         }
 
