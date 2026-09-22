@@ -66,6 +66,15 @@ export function getZedSettingsPath(): string {
   return path.join(getZedConfigDir(), "settings.json");
 }
 
+/**
+ * Securely appends content to a file, preventing symlink following (TOCTOU attacks).
+ * If the file is a symlink, the operation will fail safely.
+ *
+ * @param filePath - The absolute path of the file to append to.
+ * @param content - The content to append to the file.
+ * @param mode - The file mode to use if creating a new file (defaults to 0o600).
+ * @throws {Error} If the file cannot be opened securely (e.g. if it is a symlink).
+ */
 export function appendFileSyncNoFollow(filePath: string, content: string, mode: number = 0o600): void {
   let fd: number;
   try {
