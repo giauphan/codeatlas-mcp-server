@@ -288,7 +288,8 @@ export function checkCodeatlasSetup(projectDir: string): CodeatlasSetupInfo {
 
 export function listProjectDirs(): { connected: ProjectDirEntry[]; newDirs: ProjectDirEntry[] } {
   const raw = process.env.CODEATLAS_PROJECT_DIRS || process.env.CODEATLAS_PROJECT_DIR || "";
-  // ⚡ Bolt Optimization: Replace chained string/array methods with an O(N) loop to avoid intermediate array allocations
+  // ⚡ Bolt Optimization: Replace chained string/array methods with an O(N) loop to avoid intermediate array allocations.
+  // This avoids allocating multiple intermediate arrays (from .map(), .filter(), and .map()) in memory, which reduces garbage collection overhead.
   const connectedSet = new Set<string>();
   if (raw) {
     for (const s of raw.split(",")) {
