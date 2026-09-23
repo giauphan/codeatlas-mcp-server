@@ -507,7 +507,12 @@ export function registerTools(server: McpServer) {
       const nodeMap = createNodeLabelMap(loaded.analysis.graph.nodes);
 
       // ⚡ Bolt Optimization: Precompute links for matched nodes to avoid O(N*L) filtering inside map
-      const matchIds = new Set(topMatches.map((n) => n.id));
+      // ⚡ Bolt Optimization: Replace new Set(array.map(...)) with an O(N) loop to avoid intermediate array allocation.
+      // This reduces GC pressure for large projects by preventing the allocation of an intermediate mapped array.
+      const matchIds = new Set<string>();
+      for (const n of topMatches) {
+        matchIds.add(n.id);
+      }
 
       const incomingLinksMap = new Map<string, Array<{ from: string, type: string }>>();
       const outgoingLinksMap = new Map<string, Array<{ to: string, type: string }>>();
@@ -580,7 +585,12 @@ export function registerTools(server: McpServer) {
       let filesEntries = Array.from(byFile.entries());
 
       // ⚡ Bolt Optimization: Precompute dependencies for matched nodes to avoid O(N*L) filtering inside map
-      const matchIds = new Set(matches.map((n) => n.id));
+      // ⚡ Bolt Optimization: Replace new Set(array.map(...)) with an O(N) loop to avoid intermediate array allocation.
+      // This reduces GC pressure for large projects by preventing the allocation of an intermediate mapped array.
+      const matchIds = new Set<string>();
+      for (const n of matches) {
+        matchIds.add(n.id);
+      }
       const dependenciesMap = new Map<string, Array<{ to: string, type: string }>>();
 
       for (const l of links) {
@@ -1901,8 +1911,15 @@ export function registerTools(server: McpServer) {
         } catch { /* skip */ }
       }
 
+      // ⚡ Bolt Optimization: Replace [...new Set(array.map(...))] with an O(N) loop to avoid intermediate array allocations.
+      // This reduces GC pressure by removing the temporary mapped array for file paths.
+      const uniqueFiles = new Set<string>();
+      for (const r of results) {
+        uniqueFiles.add(r.file);
+      }
+
       return {
-        content: [{ type: "text" as const, text: JSON.stringify({ query, project: loaded.projectName, matchCount: results.length, truncated: results.length >= maxRes, files: [...new Set(results.map(r => r.file))], results: results.slice(0, maxRes) }, null, 2) }],
+        content: [{ type: "text" as const, text: JSON.stringify({ query, project: loaded.projectName, matchCount: results.length, truncated: results.length >= maxRes, files: [...uniqueFiles], results: results.slice(0, maxRes) }, null, 2) }],
       };
     }
   );
