@@ -65,7 +65,7 @@ filepath = sys.argv[1]
 with open(filepath, 'r') as f:
     try:
         settings = json.load(f)
-    except json.JSONDecodeError:
+    except Exception:
         settings = {}
 
 if 'hooks' not in settings:
