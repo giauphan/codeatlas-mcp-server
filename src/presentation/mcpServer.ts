@@ -61,6 +61,118 @@ function createNodeMap<T extends { id: string }>(nodes: T[]): Map<string, T> {
 }
 
 /**
+ * Computes the set of reachable nodes within a maximum depth using breadth-first search.
+ * Note: The returned set of reachable nodes always includes the initial seed nodes.
+ * Time Complexity: O(V + E) where V is the number of reachable nodes and E is the number of reachable edges.
+ * Space Complexity: O(V) for the visited and frontier sets.
+ *
+ * Example usage:
+ * ```ts
+ * const reachable = bfsReachable(adjList, new Set(['A']), 2, false);
+ * // reachable: Set { 'A', 'B', 'C' }
+ * ```
+ *
+ * @param adjList The adjacency list mapping nodes to their neighbors.
+ * @param seeds The initial set of starting nodes.
+ * @param maxDepth The maximum number of hops to traverse (must be >= 0).
+ * @param excludeInitialNodes Whether to exclude the initial seed nodes in the returned set. Defaults to false.
+ * @param maxNodes Optional limit on the maximum number of nodes to visit to prevent excessive memory usage. Traversal will halt if this limit is reached.
+ */
+function bfsReachable(adjList: Map<string, Set<string>>, seeds: Iterable<string>, maxDepth: number, excludeInitialNodes: boolean = false, maxNodes?: number): Set<string> {
+  if (!adjList || !seeds) return new Set();
+
+  if (typeof maxDepth !== 'number' || isNaN(maxDepth) || maxDepth < 0) {
+    maxDepth = 0;
+  } else {
+    maxDepth = Math.floor(maxDepth);
+  }
+
+  if (maxNodes !== undefined) {
+    if (typeof maxNodes !== 'number' || isNaN(maxNodes) || maxNodes < 0) {
+      maxNodes = 0;
+    } else {
+      maxNodes = Math.floor(maxNodes);
+    }
+  }
+  const visited = new Set<string>(seeds);
+
+  if (visited.size === 0) return visited;
+
+  // Initialize frontier from seeds to begin traversal from all seed nodes
+  let frontier = visited;
+
+  for (let d = 0; d < maxDepth; d++) {
+    const nextFrontier = new Set<string>();
+    for (const node of frontier) {
+      const neighbors = adjList.get(node);
+      if (neighbors) {
+        for (const neighbor of neighbors) {
+          if (!visited.has(neighbor)) {
+            if (maxNodes !== undefined && visited.size >= maxNodes) break;
+            nextFrontier.add(neighbor);
+            visited.add(neighbor);
+          }
+        }
+        if (maxNodes !== undefined && visited.size >= maxNodes) break;
+      }
+    }
+    if (nextFrontier.size === 0 || (maxNodes !== undefined && visited.size >= maxNodes)) break;
+    frontier = nextFrontier;
+  }
+
+  if (excludeInitialNodes) {
+    for (const seed of seeds) {
+      visited.delete(seed);
+    }
+  }
+
+  return visited;
+}
+
+/**
+ * Builds an adjacency list representation of a graph from a list of links.
+ * Time Complexity: O(E) where E is the number of links in the graph.
+ * Space Complexity: O(V + E) to store the adjacency list representation. For extremely
+ * large, highly-connected graphs (e.g. 50k+ nodes and 500k+ edges), this may
+ * consume significant memory relative to the raw array.
+ *
+ * Example usage:
+ * ```ts
+ * const links = [{ source: 'A', target: 'B', type: 'call' }];
+ * const adjList = buildAdjacencyList(links, l => l.type === 'call', true);
+ * // adjList: Map { 'A' => Set { 'B' }, 'B' => Set { 'A' } }
+ * ```
+ *
+ * @param links Array of GraphLink objects representing the edges.
+ * @param predicate Optional filtering function to only include specific links. Defaults to including all links.
+ * @param isUndirected If true, adds edges symmetrically in both directions. Defaults to true.
+ */
+function buildAdjacencyList(links: GraphLink[], predicate: (link: GraphLink) => boolean = () => true, isUndirected: boolean = true): Map<string, Set<string>> {
+  if (!Array.isArray(links)) return new Map();
+
+  const adjList = new Map<string, Set<string>>();
+
+  const getOrCreate = (key: string) => {
+    let set = adjList.get(key);
+    if (!set) {
+      set = new Set<string>();
+      adjList.set(key, set);
+    }
+    return set;
+  };
+
+  for (const link of links) {
+    if (predicate(link)) {
+      getOrCreate(link.source).add(link.target);
+      if (isUndirected) {
+        getOrCreate(link.target).add(link.source);
+      }
+    }
+  }
+  return adjList;
+}
+
+/**
  * Extracts nodes corresponding to the IDs in the `visited` set from `nodeMap`.
  *
  * @param visited Set of visited node IDs.
@@ -1141,23 +1253,8 @@ export function registerTools(server: McpServer) {
         };
       }
 
-      const visited = new Set<string>(seedNodes);
-      let frontier = new Set<string>(seedNodes);
-
-      for (let d = 0; d < maxDepth; d++) {
-        const nextFrontier = new Set<string>();
-        for (const link of links) {
-          if (frontier.has(link.source) && !visited.has(link.target)) {
-            nextFrontier.add(link.target);
-            visited.add(link.target);
-          }
-          if (frontier.has(link.target) && !visited.has(link.source)) {
-            nextFrontier.add(link.source);
-            visited.add(link.source);
-          }
-        }
-        frontier = nextFrontier;
-      }
+      const adjList = buildAdjacencyList(links, () => true, true);
+      const visited = bfsReachable(adjList, seedNodes, maxDepth);
 
       const traceNodes = getTraceNodes(visited, nodeMap);
       const traceLinks = links.filter((l) => visited.has(l.source) && visited.has(l.target));
@@ -1302,25 +1399,8 @@ export function registerTools(server: McpServer) {
         };
       }
 
-      const visited = new Set<string>(seedNodes);
-      let frontier = new Set<string>(seedNodes);
-      const callAndContainsLinks = links.filter((l) => l.type === "call" || l.type === "contains");
-
-      for (let d = 0; d < maxDepth; d++) {
-        const nextFrontier = new Set<string>();
-        for (const link of callAndContainsLinks) {
-          if (frontier.has(link.source) && !visited.has(link.target)) {
-            nextFrontier.add(link.target);
-            visited.add(link.target);
-          }
-          if (frontier.has(link.target) && !visited.has(link.source)) {
-            nextFrontier.add(link.source);
-            visited.add(link.source);
-          }
-        }
-        frontier = nextFrontier;
-        if (nextFrontier.size === 0) break;
-      }
+      const adjList = buildAdjacencyList(links, (l) => l.type === "call" || l.type === "contains", true);
+      const visited = bfsReachable(adjList, seedNodes, maxDepth);
 
       let filteredTraceNodes = getTraceNodes(visited, nodeMap, (node) => node.type === "function" || node.type === "class");
 
