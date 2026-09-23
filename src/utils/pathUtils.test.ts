@@ -38,3 +38,18 @@ describe("pathUtils", () => {
     assert.ok(getCursorMcpPath().includes(".cursor"));
   });
 });
+
+  it("appendFileSyncNoFollow correctly appends securely", async () => {
+    const fs = await import("fs");
+    const path = await import("path");
+    const { appendFileSyncNoFollow } = await import("./pathUtils.js");
+    const testFile = path.join(process.cwd(), "test-append.txt");
+    try {
+      fs.writeFileSync(testFile, "hello\\n");
+      appendFileSyncNoFollow(testFile, "world\\n");
+      const content = fs.readFileSync(testFile, "utf-8");
+      assert.strictEqual(content, "hello\\nworld\\n");
+    } finally {
+      if (fs.existsSync(testFile)) fs.unlinkSync(testFile);
+    }
+  });
