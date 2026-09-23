@@ -36,8 +36,10 @@ payload = {}
 if raw:
     try:
         payload = json.loads(raw)
-    except Exception:
-        pass
+    except json.JSONDecodeError as e:
+        sys.stderr.write(f"Warning: Invalid JSON input: {e}\n")
+    except Exception as e:
+        sys.stderr.write(f"Warning: Unexpected error parsing JSON input: {e}\n")
 
 cwd = payload.get("cwd", "")
 session_id = payload.get("session_id") or payload.get("sessionId") or ""
@@ -94,8 +96,10 @@ payload = {}
 if raw:
     try:
         payload = json.loads(raw)
-    except Exception:
-        pass
+    except json.JSONDecodeError as e:
+        sys.stderr.write(f"Warning: Invalid JSON input: {e}\n")
+    except Exception as e:
+        sys.stderr.write(f"Warning: Unexpected error parsing JSON input: {e}\n")
 
 cwd = payload.get("cwd") or os.environ.get("CLAUDE_PROJECT_DIR") or os.getcwd()
 sid = payload.get("session_id") or payload.get("sessionId") or ""
@@ -175,7 +179,11 @@ try:
                 continue
             try:
                 line = json.loads(raw)
-            except Exception:
+            except json.JSONDecodeError as e:
+                sys.stderr.write(f"Warning: Invalid JSON line: {e}\n")
+                continue
+            except Exception as e:
+                sys.stderr.write(f"Warning: Unexpected error parsing JSON line: {e}\n")
                 continue
 
             if line.get('isMeta'):
