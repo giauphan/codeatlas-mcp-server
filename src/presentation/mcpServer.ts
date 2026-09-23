@@ -507,7 +507,8 @@ export function registerTools(server: McpServer) {
       const nodeMap = createNodeLabelMap(loaded.analysis.graph.nodes);
 
       // ⚡ Bolt Optimization: Precompute links for matched nodes to avoid O(N*L) filtering inside map
-      // ⚡ Bolt Optimization: Replace new Set(array.map(...)) with an O(N) loop to avoid intermediate array allocation
+      // ⚡ Bolt Optimization: Replace new Set(array.map(...)) with an O(N) loop to avoid intermediate array allocation.
+      // This reduces GC pressure for large projects by preventing the allocation of an intermediate mapped array.
       const matchIds = new Set<string>();
       for (const n of topMatches) {
         matchIds.add(n.id);
@@ -584,7 +585,8 @@ export function registerTools(server: McpServer) {
       let filesEntries = Array.from(byFile.entries());
 
       // ⚡ Bolt Optimization: Precompute dependencies for matched nodes to avoid O(N*L) filtering inside map
-      // ⚡ Bolt Optimization: Replace new Set(array.map(...)) with an O(N) loop to avoid intermediate array allocation
+      // ⚡ Bolt Optimization: Replace new Set(array.map(...)) with an O(N) loop to avoid intermediate array allocation.
+      // This reduces GC pressure for large projects by preventing the allocation of an intermediate mapped array.
       const matchIds = new Set<string>();
       for (const n of matches) {
         matchIds.add(n.id);
@@ -1909,7 +1911,8 @@ export function registerTools(server: McpServer) {
         } catch { /* skip */ }
       }
 
-      // ⚡ Bolt Optimization: Replace [...new Set(array.map(...))] with an O(N) loop to avoid intermediate array allocations
+      // ⚡ Bolt Optimization: Replace [...new Set(array.map(...))] with an O(N) loop to avoid intermediate array allocations.
+      // This reduces GC pressure by removing the temporary mapped array for file paths.
       const uniqueFiles = new Set<string>();
       for (const r of results) {
         uniqueFiles.add(r.file);
