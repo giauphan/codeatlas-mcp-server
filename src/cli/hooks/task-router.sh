@@ -36,7 +36,11 @@ def main():
     input_str = sys.argv[1]
     try:
         data = json.loads(input_str)
-    except json.JSONDecodeError:
+    except json.JSONDecodeError as e:
+        sys.stderr.write(f"Warning: Invalid JSON input: {e}\n")
+        data = {}
+    except Exception as e:
+        sys.stderr.write(f"Warning: Unexpected error parsing JSON input: {e}\n")
         data = {}
     
     tool = data.get("tool") or data.get("tool_name", "")

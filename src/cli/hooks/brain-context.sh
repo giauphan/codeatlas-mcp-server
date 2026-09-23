@@ -36,7 +36,11 @@ readarray -t HOOK_FIELDS < <(python3 -c '
 import json, os, sys
 try:
     payload = json.loads(os.environ.get("HOOK_INPUT", ""))
-except json.JSONDecodeError:
+except json.JSONDecodeError as e:
+    sys.stderr.write(f"Warning: Invalid JSON in HOOK_INPUT: {e}\n")
+    payload = {}
+except Exception as e:
+    sys.stderr.write(f"Warning: Unexpected error parsing HOOK_INPUT: {e}\n")
     payload = {}
 print(payload.get("prompt", "session context"))
 print(payload.get("cwd") or os.environ.get("CLAUDE_PROJECT_DIR") or os.getcwd())
@@ -72,7 +76,11 @@ import os
 def load(name):
     try:
         return json.loads(os.environ.get(name, ""))
-    except json.JSONDecodeError:
+    except json.JSONDecodeError as e:
+        sys.stderr.write(f"Warning: Invalid JSON in env var {name}: {e}\n")
+        return {}
+    except Exception as e:
+        sys.stderr.write(f"Warning: Unexpected error parsing env var {name}: {e}\n")
         return {}
 
 
