@@ -63,3 +63,16 @@ export function takeByPriority<T extends { type: string }>(nodes: T[], max?: num
 
   return max !== undefined ? sorted.slice(0, max) : sorted;
 }
+
+/**
+ * ⚡ Bolt Optimization: Replace O(N) array allocation and slice with an early exit iterator
+ * Converts an iterable into an array, pulling at most `max` items.
+ */
+export function takeFromIterable<T>(iterable: Iterable<T>, max: number): T[] {
+  const result: T[] = [];
+  for (const item of iterable) {
+    if (result.length >= max) break;
+    result.push(item);
+  }
+  return result;
+}

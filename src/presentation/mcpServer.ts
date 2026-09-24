@@ -19,7 +19,7 @@ import {
 } from "../utils/pathUtils.js";
 import { jaccardSimilarity } from "../utils/mathUtils.js";
 import { getApiUrl } from "../utils/envUtils.js";
-import { takeByPriority } from "../utils/arrayUtils.js";
+import { takeByPriority, takeFromIterable } from "../utils/arrayUtils.js";
 import { checkAuth, logActivity } from "../services/authService.js";
 import {
   discoverProjectsAsync,
@@ -1966,7 +1966,7 @@ export function registerTools(server: McpServer) {
       const maxRes = maxResults || 30;
       const targetDetails = Array.from(targetIds).map(id => { const n = nodeMap.get(id); return n ? { name: n.label, type: n.type, filePath: n.filePath || null, line: n.line || null } : { name: id, type: "unknown", filePath: null, line: null }; });
 
-      return { content: [{ type: "text" as const, text: JSON.stringify({ symbol, project: loaded.projectName, targets: targetDetails, totalCallers: callers.size, maxDepth: maxD, callers: Array.from(callers.values()).slice(0, maxRes) }, null, 2) }] };
+      return { content: [{ type: "text" as const, text: JSON.stringify({ symbol, project: loaded.projectName, targets: targetDetails, totalCallers: callers.size, maxDepth: maxD, callers: takeFromIterable(callers.values(), maxRes) }, null, 2) }] };
     }
   );
 
@@ -2019,7 +2019,7 @@ export function registerTools(server: McpServer) {
       const nodeMap2 = createNodeMap(nodes);
       const sourceDetails = Array.from(sourceIds).map(id => { const n = nodeMap2.get(id); return n ? { name: n.label, type: n.type, filePath: n.filePath || null, line: n.line || null } : { name: id, type: "unknown", filePath: null, line: null }; });
 
-      return { content: [{ type: "text" as const, text: JSON.stringify({ symbol, project: loaded.projectName, sources: sourceDetails, totalCallees: callees.size, maxDepth: maxD, callees: Array.from(callees.values()).slice(0, maxRes) }, null, 2) }] };
+      return { content: [{ type: "text" as const, text: JSON.stringify({ symbol, project: loaded.projectName, sources: sourceDetails, totalCallees: callees.size, maxDepth: maxD, callees: takeFromIterable(callees.values(), maxRes) }, null, 2) }] };
     }
   );
 
@@ -2132,14 +2132,15 @@ export function registerTools(server: McpServer) {
       }
 
       const affectedFiles = new Set<string>();
-      for (const c of [...Array.from(callers.values()), ...Array.from(callees.values())]) if (c.filePath) affectedFiles.add(c.filePath);
+      for (const c of callers.values()) if (c.filePath) affectedFiles.add(c.filePath);
+      for (const c of callees.values()) if (c.filePath) affectedFiles.add(c.filePath);
 
       return {
         content: [{ type: "text" as const, text: JSON.stringify({
           symbol, project: loaded.projectName,
           impact: { incomingDependents: callers.size, outgoingDependencies: callees.size, totalAffectedFiles: affectedFiles.size, affectedFiles: Array.from(affectedFiles), testFiles: Array.from(testFiles) },
-          callers: Array.from(callers.values()).slice(0, 20),
-          callees: Array.from(callees.values()).slice(0, 20),
+          callers: takeFromIterable(callers.values(), 20),
+          callees: takeFromIterable(callees.values(), 20),
           recommendation: callers.size > 10 ? "HIGH IMPACT" : callers.size > 0 ? "MEDIUM IMPACT" : "LOW IMPACT",
         }, null, 2) }],
       };
