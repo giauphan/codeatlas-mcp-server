@@ -81,6 +81,25 @@ describe("brain context", () => {
     ]);
   });
 
+  it("does not treat AST and parser substrings as parser terms", () => {
+    const gene = {
+      name: "JavaScript CodeAtlas inspection",
+      description: "Use pygount to report lines of code.",
+    };
+
+    assert.deepStrictEqual(
+      selectRelevantGenes([gene], "fast sparse JavaScript CodeAtlas analysis", 1),
+      [gene],
+    );
+  });
+
+  it("requires more than one description-only term by default", () => {
+    const titleMatch = { name: "Retry policy", description: "Request handling." };
+    const weakMatch = { name: "Networking", description: "Retry requests." };
+
+    assert.deepStrictEqual(selectRelevantGenes([weakMatch, titleMatch], "retry"), [titleMatch]);
+  });
+
   it("supports a minimum relevance threshold", () => {
     const genes = [
       { name: "Parser", description: "Parser guidance." },

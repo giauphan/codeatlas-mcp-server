@@ -23,7 +23,7 @@ export function filterAllowedDreams(memories: DreamMemoryResult[]): DreamMemoryR
   return memories.filter((memory) => ALLOWED_TYPES.has(text(memory.memory_type, 40).toUpperCase()));
 }
 
-/** Controls query-aware Genome filtering; minRelevanceScore defaults to 1. */
+/** Controls query-aware Genome filtering; minRelevanceScore defaults to 2. */
 export interface FormatBrainContextOptions {
   query?: string;
   minRelevanceScore?: number;
@@ -33,7 +33,7 @@ export interface FormatBrainContextOptions {
 export function selectRelevantGenes(
   genes: Array<{ name: string; description: string }>,
   query: string,
-  minRelevanceScore = 1,
+  minRelevanceScore = 2,
 ): Array<{ name: string; description: string }> {
   const normalizedQuery = query.toLowerCase().trim();
   const queryWords = normalizedQuery
@@ -44,7 +44,7 @@ export function selectRelevantGenes(
   if (queryWords.length === 0) return genes;
 
   const isAstParserQuery =
-    (normalizedQuery.includes("ast") || normalizedQuery.includes("parse") || normalizedQuery.includes("parser")) &&
+    (/\b(ast|parse|parser)\b/.test(normalizedQuery)) &&
     (normalizedQuery.includes("javascript") || normalizedQuery.includes("typescript") || normalizedQuery.includes("codeatlas"));
 
   const scoredGenes = genes
@@ -61,7 +61,7 @@ export function selectRelevantGenes(
       const geneText = `${name} ${description}`;
       let score = 0;
 
-      if (geneText.includes(normalizedQuery)) {
+      if (queryWords.length > 1 && geneText.includes(normalizedQuery)) {
         score += 3;
       }
 
