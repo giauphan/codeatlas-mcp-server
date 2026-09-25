@@ -3600,13 +3600,14 @@ def register(ctx):
       query: z.string().max(500).describe("Current user task or prompt to retrieve context for"),
       project: z.string().max(255).optional().describe("Optional project name filter"),
       limit: z.number().min(1).max(10).optional().default(5).describe("Max memories/genes to return (default: 5)"),
+      minRelevanceScore: z.number().min(0).max(10).optional().describe("Optional minimum relevance score threshold for Genome context filtering"),
     },
-    async ({ query, project, limit }) => {
+    async ({ query, project, limit, minRelevanceScore }) => {
       const auth = await checkAuth();
-      await logActivity(auth, "brain_context", { query: query.substring(0, 100), project, limit });
+      await logActivity(auth, "brain_context", { query: query.substring(0, 100), project, limit, minRelevanceScore });
       try {
         const result = await loadBrainContext({ query, project, limit });
-        return { content: [{ type: "text" as const, text: formatBrainContext(result, query) }] };
+        return { content: [{ type: "text" as const, text: formatBrainContext(result, { query, minRelevanceScore }) }] };
       } catch (err: unknown) {
         return {
           content: [{ type: "text" as const, text: `Failed to load brain context: ${err instanceof Error ? err.message : String(err)}` }],

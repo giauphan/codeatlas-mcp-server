@@ -90,6 +90,23 @@ describe("brain context", () => {
     assert.deepStrictEqual(selectRelevantGenes(genes, "AST parser", 3), [genes[1]]);
   });
 
+  it("configures the relevance threshold when formatting context", () => {
+    const text = formatBrainContext(
+      {
+        dreams: [],
+        genes: [
+          { name: "Parser", description: "Parser guidance." },
+          { name: "AST parser", description: "AST parser guidance." },
+        ],
+        immune: "",
+      },
+      { query: "AST parser", minRelevanceScore: 3 },
+    );
+
+    assert.match(text, /AST parser: AST parser guidance/);
+    assert.doesNotMatch(text, /- Parser: Parser guidance/);
+  });
+
   it("formats dreams, genome, and immune as untrusted reference", () => {
     const text = formatBrainContext({
       dreams: [memory({})],

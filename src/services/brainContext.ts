@@ -23,6 +23,12 @@ export function filterAllowedDreams(memories: DreamMemoryResult[]): DreamMemoryR
   return memories.filter((memory) => ALLOWED_TYPES.has(text(memory.memory_type, 40).toUpperCase()));
 }
 
+export interface FormatBrainContextOptions {
+  query?: string;
+  minRelevanceScore?: number;
+}
+
+/** Scores exact queries +3, name terms +2, description terms +1; excludes LOC noise from AST/parser tasks. */
 export function selectRelevantGenes(
   genes: Array<{ name: string; description: string }>,
   query: string,
@@ -74,10 +80,18 @@ export function selectRelevantGenes(
   return scoredGenes.map(({ gene }) => gene);
 }
 
-export function formatBrainContext(result: BrainContextResult, query?: string): string {
+export function formatBrainContext(
+  result: BrainContextResult,
+  queryOrOptions?: string | FormatBrainContextOptions,
+): string {
+  const options: FormatBrainContextOptions =
+    typeof queryOrOptions === "string" ? { query: queryOrOptions } : (queryOrOptions ?? {});
+
   const dreams = filterAllowedDreams(result.dreams).slice(0, 5);
   const rawGenes = result.genes.slice(0, 5);
-  const genes = query ? selectRelevantGenes(rawGenes, query) : rawGenes;
+  const genes = options.query
+    ? selectRelevantGenes(rawGenes, options.query, options.minRelevanceScore)
+    : rawGenes;
   const immune = text(result.immune, 1200);
 
   if (dreams.length === 0 && genes.length === 0 && !immune) {
