@@ -1453,6 +1453,8 @@ export function registerTools(server: McpServer) {
       const entryPoints = filteredTraceNodes.filter(
         (n) => !hasIncoming.has(n.id) || seedNodes.has(n.id)
       );
+      // ⚡ Bolt Optimization: Use Set for O(1) lookups instead of O(N^2) array.includes() inside loop
+      const entryPointsSet = new Set(entryPoints);
 
       let mermaid = "";
       const sanitizeLabel = (s: string) => s.replace(/"/g, "'").replace(/[<>]/g, "");
@@ -1500,7 +1502,7 @@ export function registerTools(server: McpServer) {
             flowLines.push(`    ${mid}("⚡ ${label}${fileSuffix}")`);
           }
 
-          if (entryPoints.includes(node) && !hasIncoming.has(node.id)) {
+          if (entryPointsSet.has(node) && !hasIncoming.has(node.id)) {
             flowLines.push(`    class ${mid} entry`);
           } else if (seedNodes.has(node.id)) {
             flowLines.push(`    class ${mid} seed`);
