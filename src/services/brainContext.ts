@@ -23,9 +23,37 @@ export function filterAllowedDreams(memories: DreamMemoryResult[]): DreamMemoryR
   return memories.filter((memory) => ALLOWED_TYPES.has(text(memory.memory_type, 40).toUpperCase()));
 }
 
-export function formatBrainContext(result: BrainContextResult): string {
+export function selectRelevantGenes(
+  genes: Array<{ name: string; description: string }>,
+  query: string,
+): Array<{ name: string; description: string }> {
+  const normalizedQuery = query.toLowerCase();
+  const queryWords = normalizedQuery
+    .replace(/[^\w\s]/g, " ")
+    .split(/\s+/)
+    .filter((w) => w.length > 2);
+
+  if (queryWords.length === 0) return genes;
+
+  const isAstParserQuery =
+    (normalizedQuery.includes("ast") || normalizedQuery.includes("parse") || normalizedQuery.includes("parser")) &&
+    (normalizedQuery.includes("javascript") || normalizedQuery.includes("typescript") || normalizedQuery.includes("codeatlas"));
+
+  return genes.filter((gene) => {
+    const geneText = `${gene.name} ${gene.description}`.toLowerCase();
+
+    if (isAstParserQuery && (geneText.includes("pygount") || geneText.includes("lines of code") || geneText.includes("comment-to-code"))) {
+      return false;
+    }
+
+    return queryWords.some((word) => geneText.includes(word));
+  });
+}
+
+export function formatBrainContext(result: BrainContextResult, query?: string): string {
   const dreams = filterAllowedDreams(result.dreams).slice(0, 5);
-  const genes = result.genes.slice(0, 5);
+  const rawGenes = result.genes.slice(0, 5);
+  const genes = query ? selectRelevantGenes(rawGenes, query) : rawGenes;
   const immune = text(result.immune, 1200);
 
   if (dreams.length === 0 && genes.length === 0 && !immune) {

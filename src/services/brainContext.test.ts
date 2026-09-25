@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import * as assert from "node:assert";
-import { filterAllowedDreams, formatBrainContext } from "./brainContext.js";
+import { filterAllowedDreams, formatBrainContext, selectRelevantGenes } from "./brainContext.js";
 import type { DreamMemoryResult } from "./dreamingService.js";
 
 function memory(partial: Partial<DreamMemoryResult>): DreamMemoryResult {
@@ -32,6 +32,7 @@ describe("brain context", () => {
       else process.env.CODEATLAS_API_KEY = originalKey;
     }
   });
+
   it("drops unrecognized memory types", () => {
     const kept = filterAllowedDreams([
       memory({ memory_type: "KNOWLEDGE", content: "Parser uses ESTree." }),
@@ -40,6 +41,20 @@ describe("brain context", () => {
     ]);
     assert.strictEqual(kept.length, 1);
     assert.strictEqual(kept[0].content, "Parser uses ESTree.");
+  });
+
+  it("drops unrelated genome results for an AST parser query", () => {
+    const kept = selectRelevantGenes(
+      [
+        { name: "ESTree Parser", description: "Use @typescript-eslint/typescript-estree for JS and TS AST analysis." },
+        { name: "Codebase Inspection", description: "Use pygount to report LOC and comment ratios." },
+      ],
+      "I need to parse JavaScript files into an AST graph. What parser library and conventions does CodeAtlas use?",
+    );
+
+    assert.deepStrictEqual(kept, [
+      { name: "ESTree Parser", description: "Use @typescript-eslint/typescript-estree for JS and TS AST analysis." },
+    ]);
   });
 
   it("formats dreams, genome, and immune as untrusted reference", () => {

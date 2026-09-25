@@ -3606,7 +3606,7 @@ def register(ctx):
       await logActivity(auth, "brain_context", { query: query.substring(0, 100), project, limit });
       try {
         const result = await loadBrainContext({ query, project, limit });
-        return { content: [{ type: "text" as const, text: formatBrainContext(result) }] };
+        return { content: [{ type: "text" as const, text: formatBrainContext(result, query) }] };
       } catch (err: unknown) {
         return {
           content: [{ type: "text" as const, text: `Failed to load brain context: ${err instanceof Error ? err.message : String(err)}` }],
