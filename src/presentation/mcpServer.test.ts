@@ -110,3 +110,27 @@ test("getTraceNodes", async (t) => {
     assert.deepEqual(result, [{ id: "a", type: "function" }, { id: "b", type: "class" }]);
   });
 });
+
+test("generate_system_flow optimization logic (entryPointsSet)", async (t) => {
+  await t.test("Set lookups behave identically to Array.includes", () => {
+    const entryPoints = [
+      { id: "a", type: "function", label: "funcA" },
+      { id: "b", type: "class", label: "classB" }
+    ];
+    const nodeA = entryPoints[0];
+    const nodeB = entryPoints[1];
+    const missingNode = { id: "c", type: "function", label: "funcC" };
+
+    const entryPointsSet = new Set(entryPoints);
+
+    // Identical positive lookups
+    assert.strictEqual(entryPoints.includes(nodeA), true);
+    assert.strictEqual(entryPointsSet.has(nodeA), true);
+    assert.strictEqual(entryPoints.includes(nodeB), true);
+    assert.strictEqual(entryPointsSet.has(nodeB), true);
+
+    // Identical negative lookups
+    assert.strictEqual(entryPoints.includes(missingNode), false);
+    assert.strictEqual(entryPointsSet.has(missingNode), false);
+  });
+});
