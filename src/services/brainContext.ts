@@ -26,8 +26,9 @@ export function filterAllowedDreams(memories: DreamMemoryResult[]): DreamMemoryR
 export function selectRelevantGenes(
   genes: Array<{ name: string; description: string }>,
   query: string,
+  minRelevanceScore = 1,
 ): Array<{ name: string; description: string }> {
-  const normalizedQuery = query.toLowerCase();
+  const normalizedQuery = query.toLowerCase().trim();
   const queryWords = normalizedQuery
     .replace(/[^\w\s]/g, " ")
     .split(/\s+/)
@@ -39,15 +40,38 @@ export function selectRelevantGenes(
     (normalizedQuery.includes("ast") || normalizedQuery.includes("parse") || normalizedQuery.includes("parser")) &&
     (normalizedQuery.includes("javascript") || normalizedQuery.includes("typescript") || normalizedQuery.includes("codeatlas"));
 
-  return genes.filter((gene) => {
-    const geneText = `${gene.name} ${gene.description}`.toLowerCase();
+  const scoredGenes = genes
+    .filter((gene) => {
+      const geneText = `${gene.name} ${gene.description}`.toLowerCase();
+      if (isAstParserQuery && (geneText.includes("pygount") || geneText.includes("lines of code") || geneText.includes("comment-to-code"))) {
+        return false;
+      }
+      return true;
+    })
+    .map((gene) => {
+      const name = gene.name.toLowerCase();
+      const description = gene.description.toLowerCase();
+      const geneText = `${name} ${description}`;
+      let score = 0;
 
-    if (isAstParserQuery && (geneText.includes("pygount") || geneText.includes("lines of code") || geneText.includes("comment-to-code"))) {
-      return false;
-    }
+      if (geneText.includes(normalizedQuery)) {
+        score += 3;
+      }
 
-    return queryWords.some((word) => geneText.includes(word));
-  });
+      for (const word of queryWords) {
+        if (name.includes(word)) {
+          score += 2;
+        } else if (description.includes(word)) {
+          score += 1;
+        }
+      }
+
+      return { gene, score };
+    })
+    .filter(({ score }) => score >= minRelevanceScore)
+    .sort((a, b) => b.score - a.score);
+
+  return scoredGenes.map(({ gene }) => gene);
 }
 
 export function formatBrainContext(result: BrainContextResult, query?: string): string {

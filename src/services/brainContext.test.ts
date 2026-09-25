@@ -43,6 +43,30 @@ describe("brain context", () => {
     assert.strictEqual(kept[0].content, "Parser uses ESTree.");
   });
 
+  it("matches and ranks genes by query relevance", () => {
+    const kept = selectRelevantGenes(
+      [
+        { name: "Database indexes", description: "Use indexes for query performance." },
+        { name: "Timeout retries", description: "Retry requests after a timeout." },
+      ],
+      "retry timeout",
+    );
+
+    assert.deepStrictEqual(kept, [
+      { name: "Timeout retries", description: "Retry requests after a timeout." },
+    ]);
+  });
+
+  it("returns all genes for empty or stop-word-only queries", () => {
+    const genes = [
+      { name: "First", description: "First result." },
+      { name: "Second", description: "Second result." },
+    ];
+
+    assert.deepStrictEqual(selectRelevantGenes(genes, ""), genes);
+    assert.deepStrictEqual(selectRelevantGenes(genes, "to a"), genes);
+  });
+
   it("drops unrelated genome results for an AST parser query", () => {
     const kept = selectRelevantGenes(
       [
@@ -55,6 +79,15 @@ describe("brain context", () => {
     assert.deepStrictEqual(kept, [
       { name: "ESTree Parser", description: "Use @typescript-eslint/typescript-estree for JS and TS AST analysis." },
     ]);
+  });
+
+  it("supports a minimum relevance threshold", () => {
+    const genes = [
+      { name: "Parser", description: "Parser guidance." },
+      { name: "AST parser", description: "AST parser guidance." },
+    ];
+
+    assert.deepStrictEqual(selectRelevantGenes(genes, "AST parser", 3), [genes[1]]);
   });
 
   it("formats dreams, genome, and immune as untrusted reference", () => {
