@@ -23,12 +23,13 @@ export function filterAllowedDreams(memories: DreamMemoryResult[]): DreamMemoryR
   return memories.filter((memory) => ALLOWED_TYPES.has(text(memory.memory_type, 40).toUpperCase()));
 }
 
+/** Controls query-aware Genome filtering; minRelevanceScore defaults to 1. */
 export interface FormatBrainContextOptions {
   query?: string;
   minRelevanceScore?: number;
 }
 
-/** Scores exact queries +3, name terms +2, description terms +1; excludes LOC noise from AST/parser tasks. */
+/** Scores exact queries +3, name terms +2, and description terms +1; AST/parser tasks exclude pygount, LOC, and comment-ratio genes before threshold filtering. */
 export function selectRelevantGenes(
   genes: Array<{ name: string; description: string }>,
   query: string,
