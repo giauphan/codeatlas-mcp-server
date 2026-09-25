@@ -3,7 +3,7 @@ import * as path from "path";
 import * as os from "os";
 import { fileURLToPath } from "url";
 import { bold, ok, fail, warn } from "./commands.js";
-import { getZedSettingsPath, getZedConfigDir, writeFileSyncNoFollow } from "../utils/pathUtils.js";
+import { getZedSettingsPath, getZedConfigDir } from "../utils/pathUtils.js";
 import { checkSpawnResult } from "../utils/processUtils.js";
 
 function getSettingsPath(): string {
@@ -102,7 +102,7 @@ export async function cmdSetupClaude(projectDir: string = process.cwd()): Promis
       console.log(`  ${warn()} Could not parse existing settings.json: ${e.message}`);
       console.log(`  ${warn()} Creating backup and merging default settings.`);
       // Create backup
-      writeFileSyncNoFollow(`${settingsPath}.bak-${Date.now()}`, fs.readFileSync(settingsPath, "utf-8"));
+      fs.writeFileSync(`${settingsPath}.bak-${Date.now()}`, fs.readFileSync(settingsPath, "utf-8"));
       existingSettings = {};
     }
   } else {
@@ -111,7 +111,7 @@ export async function cmdSetupClaude(projectDir: string = process.cwd()): Promis
 
   try {
     const merged = mergeSettings(existingSettings);
-    writeFileSyncNoFollow(settingsPath, JSON.stringify(merged, null, 2));
+    fs.writeFileSync(settingsPath, JSON.stringify(merged, null, 2), "utf-8");
     console.log(`  ${ok()} Updated hooks in ${settingsPath}`);
     console.log(`  • UserPromptSubmit: codeatlas brain-context + task-router`);
     console.log(`  • PostToolUse: codeatlas brain-save (all tools)`);
@@ -170,7 +170,7 @@ export async function cmdSetupZed(): Promise<void> {
     env,
   };
 
-  writeFileSyncNoFollow(settingsPath, JSON.stringify(settings, null, 2));
+  fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2), "utf-8");
   console.log(`  ${ok()} Registered context server in ${settingsPath}`);
 
   console.log("=".repeat(50));
