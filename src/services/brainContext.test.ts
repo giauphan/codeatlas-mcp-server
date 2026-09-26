@@ -3,6 +3,7 @@ import * as assert from "node:assert";
 import {
   DEFAULT_MIN_RELEVANCE_SCORE,
   filterAllowedDreams,
+  getDefaultMinRelevanceScore,
   formatBrainContext,
   selectRelevantGenes,
 } from "./brainContext.js";
@@ -105,6 +106,28 @@ describe("brain context", () => {
     const weakMatch = { name: "Networking", description: "Retry requests." };
 
     assert.deepStrictEqual(selectRelevantGenes([weakMatch, titleMatch], "retry"), [titleMatch]);
+  });
+
+  it("reads a valid relevance threshold from the environment", () => {
+    const original = process.env.CODEATLAS_MIN_RELEVANCE_SCORE;
+    process.env.CODEATLAS_MIN_RELEVANCE_SCORE = "4";
+    try {
+      assert.strictEqual(getDefaultMinRelevanceScore(), 4);
+    } finally {
+      if (original === undefined) delete process.env.CODEATLAS_MIN_RELEVANCE_SCORE;
+      else process.env.CODEATLAS_MIN_RELEVANCE_SCORE = original;
+    }
+  });
+
+  it("falls back for an invalid relevance threshold", () => {
+    const original = process.env.CODEATLAS_MIN_RELEVANCE_SCORE;
+    process.env.CODEATLAS_MIN_RELEVANCE_SCORE = "invalid";
+    try {
+      assert.strictEqual(getDefaultMinRelevanceScore(), DEFAULT_MIN_RELEVANCE_SCORE);
+    } finally {
+      if (original === undefined) delete process.env.CODEATLAS_MIN_RELEVANCE_SCORE;
+      else process.env.CODEATLAS_MIN_RELEVANCE_SCORE = original;
+    }
   });
 
   it("supports a minimum relevance threshold", () => {

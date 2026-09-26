@@ -23,11 +23,24 @@ export function filterAllowedDreams(memories: DreamMemoryResult[]): DreamMemoryR
   return memories.filter((memory) => ALLOWED_TYPES.has(text(memory.memory_type, 40).toUpperCase()));
 }
 
-export const DEFAULT_MIN_RELEVANCE_SCORE = 2;
+const DEFAULT_MIN_RELEVANCE_SCORE_VALUE = 2;
+
+export function getDefaultMinRelevanceScore(): number {
+  const raw = process.env.CODEATLAS_MIN_RELEVANCE_SCORE?.trim();
+  if (!raw) return DEFAULT_MIN_RELEVANCE_SCORE_VALUE;
+
+  const configured = Number(raw);
+  return Number.isFinite(configured) && configured >= 0 && configured <= 10
+    ? configured
+    : DEFAULT_MIN_RELEVANCE_SCORE_VALUE;
+}
+
+export const DEFAULT_MIN_RELEVANCE_SCORE = getDefaultMinRelevanceScore();
 
 /**
  * Scores exact queries +3, name terms +2, and description terms +1; AST/parser tasks exclude pygount, LOC, and comment-ratio genes before threshold filtering.
  * A default threshold of 2 keeps title matches while dropping description-only noise; pass a custom threshold to tune filtering.
+ * The default can be overridden with CODEATLAS_MIN_RELEVANCE_SCORE (0-10).
  */
 export function selectRelevantGenes(
   genes: Array<{ name: string; description: string }>,
