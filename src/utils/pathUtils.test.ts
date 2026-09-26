@@ -44,13 +44,19 @@ describe("pathUtils", () => {
     const path = await import("path");
     const { appendFileSyncNoFollow, writeFileSyncNoFollow } = await import("./pathUtils.js");
     const testFile = path.join(process.cwd(), "test-append.txt");
+    const symlinkFile = path.join(process.cwd(), "test-symlink.txt");
     try {
       writeFileSyncNoFollow(testFile, "hello\\n");
       appendFileSyncNoFollow(testFile, "world\\n");
       const content = fs.readFileSync(testFile, "utf-8");
       assert.strictEqual(content, "hello\\nworld\\n");
+
+      try { fs.unlinkSync(symlinkFile); } catch {}
+      fs.symlinkSync(testFile, symlinkFile);
+      assert.throws(() => appendFileSyncNoFollow(symlinkFile, "should fail\\n"), /Failed to safely open file for appending|ELOOP/);
     } finally {
       if (fs.existsSync(testFile)) fs.unlinkSync(testFile);
+      if (fs.existsSync(symlinkFile)) { try { fs.unlinkSync(symlinkFile); } catch {} }
     }
   });
 
@@ -59,6 +65,7 @@ describe("pathUtils", () => {
     const path = await import("path");
     const { writeFileSyncNoFollow } = await import("./pathUtils.js");
     const testFile = path.join(process.cwd(), "test-write.txt");
+    const symlinkFile = path.join(process.cwd(), "test-write-symlink.txt");
     try {
       writeFileSyncNoFollow(testFile, "initial content\\n");
       const content = fs.readFileSync(testFile, "utf-8");
@@ -67,7 +74,12 @@ describe("pathUtils", () => {
       writeFileSyncNoFollow(testFile, "new content\\n");
       const content2 = fs.readFileSync(testFile, "utf-8");
       assert.strictEqual(content2, "new content\\n");
+
+      try { fs.unlinkSync(symlinkFile); } catch {}
+      fs.symlinkSync(testFile, symlinkFile);
+      assert.throws(() => writeFileSyncNoFollow(symlinkFile, "should fail\\n"), /EACCES|ELOOP/);
     } finally {
       if (fs.existsSync(testFile)) fs.unlinkSync(testFile);
+      if (fs.existsSync(symlinkFile)) { try { fs.unlinkSync(symlinkFile); } catch {} }
     }
   });
