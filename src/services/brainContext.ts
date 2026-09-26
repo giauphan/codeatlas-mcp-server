@@ -23,35 +23,41 @@ export function filterAllowedDreams(memories: DreamMemoryResult[]): DreamMemoryR
   return memories.filter((memory) => ALLOWED_TYPES.has(text(memory.memory_type, 40).toUpperCase()));
 }
 
-const DEFAULT_MIN_RELEVANCE_SCORE_VALUE = 2;
+export const DEFAULT_MIN_RELEVANCE_SCORE = 2;
+export const DEFAULT_MIN_QUERY_WORD_LENGTH = 3;
 
 export function getDefaultMinRelevanceScore(): number {
   const raw = process.env.CODEATLAS_MIN_RELEVANCE_SCORE?.trim();
-  if (!raw) return DEFAULT_MIN_RELEVANCE_SCORE_VALUE;
+  if (!raw || !/^(?:\d+(?:\.\d+)?|\.\d+)$/.test(raw)) return DEFAULT_MIN_RELEVANCE_SCORE;
 
   const configured = Number(raw);
-  return Number.isFinite(configured) && configured >= 0 && configured <= 10
-    ? configured
-    : DEFAULT_MIN_RELEVANCE_SCORE_VALUE;
+  return configured >= 0 && configured <= 10 ? configured : DEFAULT_MIN_RELEVANCE_SCORE;
 }
 
-export const DEFAULT_MIN_RELEVANCE_SCORE = getDefaultMinRelevanceScore();
+export function getDefaultMinQueryWordLength(): number {
+  const raw = process.env.CODEATLAS_MIN_QUERY_WORD_LENGTH?.trim();
+  if (!raw || !/^\d+$/.test(raw)) return DEFAULT_MIN_QUERY_WORD_LENGTH;
+
+  const configured = Number(raw);
+  return configured >= 1 && configured <= 20 ? configured : DEFAULT_MIN_QUERY_WORD_LENGTH;
+}
 
 /**
  * Scores exact queries +3, name terms +2, and description terms +1; AST/parser tasks exclude pygount, LOC, and comment-ratio genes before threshold filtering.
- * A default threshold of 2 keeps title matches while dropping description-only noise; pass a custom threshold to tune filtering.
- * The default can be overridden with CODEATLAS_MIN_RELEVANCE_SCORE (0-10).
+ * Example: `AST parser` matching a gene name scores +3 exact and +4 for its two name terms, while a description-only `parser` match scores +1.
+ * Defaults: relevance score 2, query word length 3; override with CODEATLAS_MIN_RELEVANCE_SCORE or CODEATLAS_MIN_QUERY_WORD_LENGTH.
  */
 export function selectRelevantGenes(
   genes: Array<{ name: string; description: string }>,
   query: string,
-  minRelevanceScore = DEFAULT_MIN_RELEVANCE_SCORE,
+  minRelevanceScore = getDefaultMinRelevanceScore(),
+  minQueryWordLength = getDefaultMinQueryWordLength(),
 ): Array<{ name: string; description: string }> {
   const normalizedQuery = query.toLowerCase().trim();
   const queryWords = normalizedQuery
     .replace(/[^\w\s]/g, " ")
     .split(/\s+/)
-    .filter((w) => w.length > 2);
+    .filter((w) => w.length >= minQueryWordLength);
 
   if (queryWords.length === 0) return genes;
 

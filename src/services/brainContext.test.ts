@@ -1,8 +1,10 @@
 import { describe, it } from "node:test";
 import * as assert from "node:assert";
 import {
+  DEFAULT_MIN_QUERY_WORD_LENGTH,
   DEFAULT_MIN_RELEVANCE_SCORE,
   filterAllowedDreams,
+  getDefaultMinQueryWordLength,
   getDefaultMinRelevanceScore,
   formatBrainContext,
   selectRelevantGenes,
@@ -127,6 +129,28 @@ describe("brain context", () => {
     } finally {
       if (original === undefined) delete process.env.CODEATLAS_MIN_RELEVANCE_SCORE;
       else process.env.CODEATLAS_MIN_RELEVANCE_SCORE = original;
+    }
+  });
+
+  it("reads a valid query word length from the environment", () => {
+    const original = process.env.CODEATLAS_MIN_QUERY_WORD_LENGTH;
+    process.env.CODEATLAS_MIN_QUERY_WORD_LENGTH = "5";
+    try {
+      assert.strictEqual(getDefaultMinQueryWordLength(), 5);
+    } finally {
+      if (original === undefined) delete process.env.CODEATLAS_MIN_QUERY_WORD_LENGTH;
+      else process.env.CODEATLAS_MIN_QUERY_WORD_LENGTH = original;
+    }
+  });
+
+  it("falls back for an invalid query word length", () => {
+    const original = process.env.CODEATLAS_MIN_QUERY_WORD_LENGTH;
+    process.env.CODEATLAS_MIN_QUERY_WORD_LENGTH = "invalid";
+    try {
+      assert.strictEqual(getDefaultMinQueryWordLength(), DEFAULT_MIN_QUERY_WORD_LENGTH);
+    } finally {
+      if (original === undefined) delete process.env.CODEATLAS_MIN_QUERY_WORD_LENGTH;
+      else process.env.CODEATLAS_MIN_QUERY_WORD_LENGTH = original;
     }
   });
 
