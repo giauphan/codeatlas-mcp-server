@@ -26,16 +26,6 @@ export function filterAllowedDreams(memories: DreamMemoryResult[]): DreamMemoryR
 export const DEFAULT_MIN_RELEVANCE_SCORE = 2;
 
 /**
- * Controls query-aware Genome filtering.
- *
- * @example { query: "AST parser", minRelevanceScore: 3 }
- */
-export interface FormatBrainContextOptions {
-  query?: string;
-  minRelevanceScore?: number;
-}
-
-/**
  * Scores exact queries +3, name terms +2, and description terms +1; AST/parser tasks exclude pygount, LOC, and comment-ratio genes before threshold filtering.
  * A default threshold of 2 keeps title matches while dropping description-only noise; pass a custom threshold to tune filtering.
  */
@@ -88,6 +78,12 @@ export function selectRelevantGenes(
     .sort((a, b) => b.score - a.score);
 
   return scoredGenes.map(({ gene }) => gene);
+}
+
+/** Controls optional query-aware filtering when formatting Brain context. */
+export interface FormatBrainContextOptions {
+  query?: string;
+  minRelevanceScore?: number;
 }
 
 export function formatBrainContext(
