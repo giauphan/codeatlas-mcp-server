@@ -797,7 +797,7 @@ export async function cmdBrainContext(): Promise<void> {
   try {
     const { loadBrainContext, formatBrainContext } = await import("../services/brainContext.js");
     const result = await loadBrainContext({ query: prompt, project, limit });
-    console.log(formatBrainContext(result));
+    console.log(formatBrainContext(result, { query: prompt, minRelevanceScore: payload.minRelevanceScore }));
     process.exit(0);
   } catch (err) {
     // Fail silently - hooks should not break Claude

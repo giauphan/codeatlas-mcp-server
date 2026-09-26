@@ -23,9 +23,100 @@ export function filterAllowedDreams(memories: DreamMemoryResult[]): DreamMemoryR
   return memories.filter((memory) => ALLOWED_TYPES.has(text(memory.memory_type, 40).toUpperCase()));
 }
 
-export function formatBrainContext(result: BrainContextResult): string {
+export const DEFAULT_MIN_RELEVANCE_SCORE = 2;
+export const DEFAULT_MIN_QUERY_WORD_LENGTH = 3;
+
+export function getDefaultMinRelevanceScore(): number {
+  const raw = process.env.CODEATLAS_MIN_RELEVANCE_SCORE?.trim();
+  if (!raw || !/^(?:\d+(?:\.\d+)?|\.\d+)$/.test(raw)) return DEFAULT_MIN_RELEVANCE_SCORE;
+
+  const configured = Number(raw);
+  return configured >= 0 && configured <= 10 ? configured : DEFAULT_MIN_RELEVANCE_SCORE;
+}
+
+export function getDefaultMinQueryWordLength(): number {
+  const raw = process.env.CODEATLAS_MIN_QUERY_WORD_LENGTH?.trim();
+  if (!raw || !/^\d+$/.test(raw)) return DEFAULT_MIN_QUERY_WORD_LENGTH;
+
+  const configured = Number(raw);
+  return configured >= 1 && configured <= 20 ? configured : DEFAULT_MIN_QUERY_WORD_LENGTH;
+}
+
+/**
+ * Filters genes by relevance: exact queries score +3, name terms +2, and description terms +1; AST/parser tasks exclude pygount, LOC, and comment-ratio genes before threshold filtering.
+ * Example: `AST parser` matching a gene name scores +3 exact and +4 for its two name terms, while a description-only `parser` match scores +1.
+ * Defaults: relevance score 2, query word length 3; override with CODEATLAS_MIN_RELEVANCE_SCORE or CODEATLAS_MIN_QUERY_WORD_LENGTH.
+ */
+export function filterGenesByRelevance(
+  genes: Array<{ name: string; description: string }>,
+  query: string,
+  minRelevanceScore = getDefaultMinRelevanceScore(),
+  minQueryWordLength = getDefaultMinQueryWordLength(),
+): Array<{ name: string; description: string }> {
+  const normalizedQuery = query.toLowerCase().trim();
+  const queryWords = normalizedQuery
+    .replace(/[^\w\s]/g, " ")
+    .split(/\s+/)
+    .filter((w) => w.length >= minQueryWordLength);
+
+  if (queryWords.length === 0) return genes;
+
+  const isAstParserQuery =
+    (/\b(ast|parse|parser)\b/.test(normalizedQuery)) &&
+    (normalizedQuery.includes("javascript") || normalizedQuery.includes("typescript") || normalizedQuery.includes("codeatlas"));
+
+  const scoredGenes = genes
+    .filter((gene) => {
+      const geneText = `${gene.name} ${gene.description}`.toLowerCase();
+      if (isAstParserQuery && (geneText.includes("pygount") || geneText.includes("lines of code") || geneText.includes("comment-to-code"))) {
+        return false;
+      }
+      return true;
+    })
+    .map((gene) => {
+      const name = gene.name.toLowerCase();
+      const description = gene.description.toLowerCase();
+      const geneText = `${name} ${description}`;
+      let score = 0;
+
+      if (queryWords.length > 1 && geneText.includes(normalizedQuery)) {
+        score += 3;
+      }
+
+      for (const word of queryWords) {
+        if (name.includes(word)) {
+          score += 2;
+        } else if (description.includes(word)) {
+          score += 1;
+        }
+      }
+
+      return { gene, score };
+    })
+    .filter(({ score }) => score >= minRelevanceScore)
+    .sort((a, b) => b.score - a.score);
+
+  return scoredGenes.map(({ gene }) => gene);
+}
+
+/** Controls optional query-aware filtering when formatting Brain context. */
+export interface FormatBrainContextOptions {
+  query?: string;
+  minRelevanceScore?: number;
+}
+
+export function formatBrainContext(
+  result: BrainContextResult,
+  queryOrOptions?: string | FormatBrainContextOptions,
+): string {
+  const options: FormatBrainContextOptions =
+    typeof queryOrOptions === "string" ? { query: queryOrOptions } : (queryOrOptions ?? {});
+
   const dreams = filterAllowedDreams(result.dreams).slice(0, 5);
-  const genes = result.genes.slice(0, 5);
+  const rawGenes = result.genes.slice(0, 5);
+  const genes = options.query
+    ? filterGenesByRelevance(rawGenes, options.query, options.minRelevanceScore)
+    : rawGenes;
   const immune = text(result.immune, 1200);
 
   if (dreams.length === 0 && genes.length === 0 && !immune) {
