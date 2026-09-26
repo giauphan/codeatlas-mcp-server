@@ -1,6 +1,11 @@
 import { describe, it } from "node:test";
 import * as assert from "node:assert";
-import { filterAllowedDreams, formatBrainContext, selectRelevantGenes } from "./brainContext.js";
+import {
+  DEFAULT_MIN_RELEVANCE_SCORE,
+  filterAllowedDreams,
+  formatBrainContext,
+  selectRelevantGenes,
+} from "./brainContext.js";
 import type { DreamMemoryResult } from "./dreamingService.js";
 
 function memory(partial: Partial<DreamMemoryResult>): DreamMemoryResult {
@@ -94,6 +99,8 @@ describe("brain context", () => {
   });
 
   it("requires more than one description-only term by default", () => {
+    assert.strictEqual(DEFAULT_MIN_RELEVANCE_SCORE, 2);
+
     const titleMatch = { name: "Retry policy", description: "Request handling." };
     const weakMatch = { name: "Networking", description: "Retry requests." };
 
