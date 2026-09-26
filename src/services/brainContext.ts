@@ -43,11 +43,11 @@ export function getDefaultMinQueryWordLength(): number {
 }
 
 /**
- * Scores exact queries +3, name terms +2, and description terms +1; AST/parser tasks exclude pygount, LOC, and comment-ratio genes before threshold filtering.
+ * Filters genes by relevance: exact queries score +3, name terms +2, and description terms +1; AST/parser tasks exclude pygount, LOC, and comment-ratio genes before threshold filtering.
  * Example: `AST parser` matching a gene name scores +3 exact and +4 for its two name terms, while a description-only `parser` match scores +1.
  * Defaults: relevance score 2, query word length 3; override with CODEATLAS_MIN_RELEVANCE_SCORE or CODEATLAS_MIN_QUERY_WORD_LENGTH.
  */
-export function selectRelevantGenes(
+export function filterGenesByRelevance(
   genes: Array<{ name: string; description: string }>,
   query: string,
   minRelevanceScore = getDefaultMinRelevanceScore(),
@@ -115,7 +115,7 @@ export function formatBrainContext(
   const dreams = filterAllowedDreams(result.dreams).slice(0, 5);
   const rawGenes = result.genes.slice(0, 5);
   const genes = options.query
-    ? selectRelevantGenes(rawGenes, options.query, options.minRelevanceScore)
+    ? filterGenesByRelevance(rawGenes, options.query, options.minRelevanceScore)
     : rawGenes;
   const immune = text(result.immune, 1200);
 

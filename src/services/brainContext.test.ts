@@ -7,7 +7,7 @@ import {
   getDefaultMinQueryWordLength,
   getDefaultMinRelevanceScore,
   formatBrainContext,
-  selectRelevantGenes,
+  filterGenesByRelevance,
 } from "./brainContext.js";
 import type { DreamMemoryResult } from "./dreamingService.js";
 
@@ -52,7 +52,7 @@ describe("brain context", () => {
   });
 
   it("matches and ranks genes by query relevance", () => {
-    const kept = selectRelevantGenes(
+    const kept = filterGenesByRelevance(
       [
         { name: "Database indexes", description: "Use indexes for query performance." },
         { name: "Timeout retries", description: "Retry requests after a timeout." },
@@ -65,18 +65,34 @@ describe("brain context", () => {
     ]);
   });
 
-  it("returns all genes for empty or stop-word-only queries", () => {
+  it("returns all genes for empty or very short queries", () => {
     const genes = [
       { name: "First", description: "First result." },
       { name: "Second", description: "Second result." },
     ];
 
-    assert.deepStrictEqual(selectRelevantGenes(genes, ""), genes);
-    assert.deepStrictEqual(selectRelevantGenes(genes, "to a"), genes);
+    assert.deepStrictEqual(filterGenesByRelevance(genes, ""), genes);
+    assert.deepStrictEqual(filterGenesByRelevance(genes, "to a"), genes);
+  });
+
+  it("normalizes special characters before matching", () => {
+    const parserGene = { name: "AST parser", description: "Parses TypeScript." };
+    const databaseGene = { name: "Database indexes", description: "Optimizes queries." };
+
+    assert.deepStrictEqual(
+      filterGenesByRelevance([databaseGene, parserGene], "AST/parser?!"),
+      [parserGene],
+    );
+  });
+
+  it("returns no genes when nothing meets the relevance threshold", () => {
+    const genes = [{ name: "Database indexes", description: "Optimizes queries." }];
+
+    assert.deepStrictEqual(filterGenesByRelevance(genes, "AST parser"), []);
   });
 
   it("drops unrelated genome results for an AST parser query", () => {
-    const kept = selectRelevantGenes(
+    const kept = filterGenesByRelevance(
       [
         { name: "ESTree Parser", description: "Use @typescript-eslint/typescript-estree for JS and TS AST analysis." },
         { name: "Codebase Inspection", description: "Use pygount to report LOC and comment ratios." },
@@ -96,7 +112,7 @@ describe("brain context", () => {
     };
 
     assert.deepStrictEqual(
-      selectRelevantGenes([gene], "fast sparse JavaScript CodeAtlas analysis", 1),
+      filterGenesByRelevance([gene], "fast sparse JavaScript CodeAtlas analysis", 1),
       [gene],
     );
   });
@@ -107,7 +123,7 @@ describe("brain context", () => {
     const titleMatch = { name: "Retry policy", description: "Request handling." };
     const weakMatch = { name: "Networking", description: "Retry requests." };
 
-    assert.deepStrictEqual(selectRelevantGenes([weakMatch, titleMatch], "retry"), [titleMatch]);
+    assert.deepStrictEqual(filterGenesByRelevance([weakMatch, titleMatch], "retry"), [titleMatch]);
   });
 
   it("reads a valid relevance threshold from the environment", () => {
@@ -160,7 +176,7 @@ describe("brain context", () => {
       { name: "AST parser", description: "AST parser guidance." },
     ];
 
-    assert.deepStrictEqual(selectRelevantGenes(genes, "AST parser", 3), [genes[1]]);
+    assert.deepStrictEqual(filterGenesByRelevance(genes, "AST parser", 3), [genes[1]]);
   });
 
   it("configures the relevance threshold when formatting context", () => {
