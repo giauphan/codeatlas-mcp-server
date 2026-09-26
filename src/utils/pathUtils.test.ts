@@ -42,13 +42,31 @@ describe("pathUtils", () => {
   it("appendFileSyncNoFollow correctly appends securely", async () => {
     const fs = await import("fs");
     const path = await import("path");
-    const { appendFileSyncNoFollow } = await import("./pathUtils.js");
+    const { appendFileSyncNoFollow, writeFileSyncNoFollow } = await import("./pathUtils.js");
     const testFile = path.join(process.cwd(), "test-append.txt");
     try {
-      fs.writeFileSync(testFile, "hello\\n");
+      writeFileSyncNoFollow(testFile, "hello\\n");
       appendFileSyncNoFollow(testFile, "world\\n");
       const content = fs.readFileSync(testFile, "utf-8");
       assert.strictEqual(content, "hello\\nworld\\n");
+    } finally {
+      if (fs.existsSync(testFile)) fs.unlinkSync(testFile);
+    }
+  });
+
+  it("writeFileSyncNoFollow correctly writes securely", async () => {
+    const fs = await import("fs");
+    const path = await import("path");
+    const { writeFileSyncNoFollow } = await import("./pathUtils.js");
+    const testFile = path.join(process.cwd(), "test-write.txt");
+    try {
+      writeFileSyncNoFollow(testFile, "initial content\\n");
+      const content = fs.readFileSync(testFile, "utf-8");
+      assert.strictEqual(content, "initial content\\n");
+
+      writeFileSyncNoFollow(testFile, "new content\\n");
+      const content2 = fs.readFileSync(testFile, "utf-8");
+      assert.strictEqual(content2, "new content\\n");
     } finally {
       if (fs.existsSync(testFile)) fs.unlinkSync(testFile);
     }
