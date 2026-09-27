@@ -86,11 +86,11 @@ export function appendFileSyncNoFollow(filePath: string, content: string, mode: 
       fs.constants.O_NOFOLLOW, // Prevent symlink following
       mode
     );
-  } catch (err: any) {
-    if (err.code === 'ENOENT') {
-      throw new Error(`Failed to safely open file for appending: Directory does not exist (${err.message})`);
+  } catch (err: unknown) {
+    if (err && typeof err === 'object' && 'code' in err && err.code === 'ENOENT') {
+      throw new Error(`Failed to safely open file for appending: Directory does not exist (${err instanceof Error ? err.message : String(err)})`);
     }
-    throw new Error(`Failed to safely open file for appending: ${err.message}`);
+    throw new Error(`Failed to safely open file for appending: ${err instanceof Error ? err.message : String(err)}`);
   }
   try {
     fs.writeFileSync(fd, content);
