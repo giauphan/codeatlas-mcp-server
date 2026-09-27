@@ -63,3 +63,20 @@ export function takeByPriority<T extends { type: string }>(nodes: T[], max?: num
 
   return max !== undefined ? sorted.slice(0, max) : sorted;
 }
+
+/**
+ * Extracts a subset of items from an iterable up to a maximum count.
+ * This avoids the overhead of spreading or converting the entire iterable
+ * into an array (e.g., Array.from(set).slice(0, N)) when only a few items
+ * are needed.
+ */
+export function takeFromIterable<T>(iterable: Iterable<T> | IterableIterator<T>, max: number): T[] {
+  const result: T[] = [];
+  let count = 0;
+  for (const item of iterable) {
+    if (count >= max) break;
+    result.push(item);
+    count++;
+  }
+  return result;
+}

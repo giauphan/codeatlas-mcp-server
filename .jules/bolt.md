@@ -88,3 +88,7 @@
 ## 2026-09-20 - Optimize graph traversal BFS using adjacency lists
 **Learning:** In heavily connected graphs or dense source representations (like an AST module or dependency tree), iterating over an entire edge list (`O(E)`) inside every depth level of a Breadth-First Search leads to a debilitating `O(D * E)` bottleneck. Because `links.filter()` loops over the *entire* collection just to check inclusion or type, repeatedly filtering links directly inside a loop magnifies this inefficiency, causing massive GC pressure and execution latency.
 **Action:** Always precompute graph relationships into a neighbor lookup structure (e.g., `Map<string, string[]>`) before starting a graph traversal. This drops the complexity from `O(D * E)` down to `O(V + E)`, drastically reducing the total number of required loop iterations.
+
+## 2024-05-30 - [Performance improvement] Optimized O(M) Set/Map iteration into O(N) array slicing
+**Learning:** Using `Array.from(map.values()).slice(0, N)` to extract a limited number of items from a large Set or Map forces a full iteration of all M elements into a temporary array before truncating it. This scales poorly (O(M) time and space) when M >> N, causing significant GC pressure and execution latency on large datasets (like graph nodes or dependencies).
+**Action:** When extracting a subset from an iterable up to a maximum count, use a utility function like `takeFromIterable(iterable, max)` that iterates directly and breaks early when the limit is reached. This reduces the time and space complexity from O(M) to O(N).
