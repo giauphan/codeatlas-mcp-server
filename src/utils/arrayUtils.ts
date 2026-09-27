@@ -73,8 +73,12 @@ export function takeByPriority<T extends { type: string }>(nodes: T[], max?: num
  * Throws an error for negative limits.
  */
 export function takeFromIterable<T>(iterable: Iterable<T>, max?: number | null): T[] {
-  if (max === undefined || max === null || !Number.isFinite(max)) {
+  if (max === undefined || max === null || max === Infinity) {
     return Array.from(iterable);
+  }
+
+  if (Number.isNaN(max)) {
+    throw new Error(`takeFromIterable does not support NaN as limit.`);
   }
 
   const normalizedMax = Math.trunc(max);
@@ -87,12 +91,10 @@ export function takeFromIterable<T>(iterable: Iterable<T>, max?: number | null):
     return [];
   }
 
-  const result: T[] = new Array(normalizedMax);
-  let i = 0;
+  const result: T[] = [];
   for (const item of iterable) {
-    if (i >= normalizedMax) break;
-    result[i++] = item;
+    if (result.length >= normalizedMax) break;
+    result.push(item);
   }
-  result.length = i;
   return result;
 }
