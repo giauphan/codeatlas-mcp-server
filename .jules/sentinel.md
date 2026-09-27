@@ -40,3 +40,18 @@
 **Vulnerability:** The MCP configuration logic and skills inventory synchronization used `fs.writeFileSync` to write to configuration files (`config.yaml`, `claude.json`, `skills.json`). Because `fs.writeFileSync` naturally follows symlinks, this left the application vulnerable to symlink-based TOCTOU (Time-of-Check to Time-of-Use) attacks. An attacker could overwrite or append arbitrary content to critical system files by pre-creating symlinks at the expected file locations before the server attempts to write to them.
 **Learning:** File write and append operations must enforce symlink protection explicitly if the path is dynamically constructed or influenced by external state, such as when writing configuration files or cache data in predictable locations within the user's home directory.
 **Prevention:** Replaced calls to `fs.writeFileSync` with the safe `writeFileSyncNoFollow` and `appendFileSyncNoFollow` utilities, which use `fs.openSync` with the `fs.constants.O_NOFOLLOW` flag to prevent following symlinks.
+
+**Vulnerable pattern example:**
+```typescript
+// ❌ BAD: Vulnerable to TOCTOU symlink attack
+fs.writeFileSync(filePath, data);
+fs.writeFileSync(filePath, data, { flag: "a" });
+fs.appendFileSync(filePath, data);
+```
+
+**Secure pattern example:**
+```typescript
+// ✅ GOOD: Enforces symlink protection
+writeFileSyncNoFollow(filePath, data);
+appendFileSyncNoFollow(filePath, data);
+```
