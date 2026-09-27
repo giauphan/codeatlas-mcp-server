@@ -91,6 +91,10 @@ export function takeFromIterable<T>(iterable: Iterable<T>, max?: number | null):
     return Array.from(iterable).slice(0, normalizedMax);
   }
 
+  if (!Number.isFinite(normalizedMax)) {
+    return Array.from(iterable);
+  }
+
   const result: T[] = [];
   let count = 0;
   for (const item of iterable) {
