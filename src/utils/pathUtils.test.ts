@@ -53,3 +53,36 @@ describe("pathUtils", () => {
       if (fs.existsSync(testFile)) fs.unlinkSync(testFile);
     }
   });
+
+  it("writeFileSyncNoFollow correctly writes securely", async () => {
+    const fs = await import("fs");
+    const path = await import("path");
+    const { writeFileSyncNoFollow } = await import("./pathUtils.js");
+    const testFile = path.join(process.cwd(), "test-write.txt");
+    try {
+      writeFileSyncNoFollow(testFile, "initial content");
+      const content = fs.readFileSync(testFile, "utf-8");
+      assert.strictEqual(content, "initial content");
+    } finally {
+      if (fs.existsSync(testFile)) fs.unlinkSync(testFile);
+    }
+  });
+
+  it("writeFileSyncNoFollow fails safely on symlink", async () => {
+    const fs = await import("fs");
+    const path = await import("path");
+    const { writeFileSyncNoFollow } = await import("./pathUtils.js");
+    const sourceFile = path.join(process.cwd(), "test-source.txt");
+    const symlinkFile = path.join(process.cwd(), "test-symlink.txt");
+    try {
+      fs.writeFileSync(sourceFile, "original content");
+      fs.symlinkSync(sourceFile, symlinkFile);
+      assert.throws(
+        () => writeFileSyncNoFollow(symlinkFile, "malicious overwrite"),
+        /Failed to safely open file for writing: ELOOP/
+      );
+    } finally {
+      if (fs.existsSync(symlinkFile)) fs.unlinkSync(symlinkFile);
+      if (fs.existsSync(sourceFile)) fs.unlinkSync(sourceFile);
+    }
+  });
