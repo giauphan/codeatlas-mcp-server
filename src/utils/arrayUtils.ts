@@ -70,7 +70,7 @@ export function takeByPriority<T extends { type: string }>(nodes: T[], max?: num
  * into an array (e.g., Array.from(set).slice(0, N)) when only a few items
  * are needed.
  * Returns the entire array if max is unspecified (null/undefined/non-finite).
- * Throws an error for negative limits.
+ * Throws an error for negative limits. Fractional values are truncated toward zero.
  */
 export function takeFromIterable<T>(iterable: Iterable<T>, max?: number | null): T[] {
   if (max === undefined || max === null || max === Infinity) {
