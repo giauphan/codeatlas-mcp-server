@@ -81,11 +81,11 @@ export function takeFromIterable<T>(iterable: Iterable<T>, max?: number | null):
     throw new Error(`takeFromIterable requires a valid limit. Received: ${max}`);
   }
 
-  const normalizedMax = Math.trunc(max);
-
-  if (normalizedMax < 0) {
+  if (max < 0) {
     throw new Error(`takeFromIterable does not support negative limits. Received: ${max}`);
   }
+
+  const normalizedMax = Math.trunc(max);
 
   if (normalizedMax === 0) {
     return [];
