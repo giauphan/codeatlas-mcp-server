@@ -69,8 +69,12 @@ export function takeByPriority<T extends { type: string }>(nodes: T[], max?: num
  * This avoids the overhead of spreading or converting the entire iterable
  * into an array (e.g., Array.from(set).slice(0, N)) when only a few items
  * are needed.
+ * If max is negative, it falls back to the full array slice behavior to preserve semantics.
  */
 export function takeFromIterable<T>(iterable: Iterable<T> | IterableIterator<T>, max: number): T[] {
+  if (max < 0) {
+    return Array.from(iterable).slice(0, max);
+  }
   const result: T[] = [];
   let count = 0;
   for (const item of iterable) {
