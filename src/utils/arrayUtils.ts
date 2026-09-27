@@ -63,3 +63,38 @@ export function takeByPriority<T extends { type: string }>(nodes: T[], max?: num
 
   return max !== undefined ? sorted.slice(0, max) : sorted;
 }
+
+/**
+ * Extracts a subset of items from an iterable up to a maximum count.
+ * This avoids the overhead of spreading or converting the entire iterable
+ * into an array (e.g., Array.from(set).slice(0, N)) when only a few items
+ * are needed.
+ * Returns the entire array if max is unspecified (null/undefined) or Infinity.
+ * Throws an error for negative or invalid limits (NaN, -Infinity). Fractional values are truncated toward zero.
+ */
+export function takeFromIterable<T>(iterable: Iterable<T>, max?: number | null): T[] {
+  if (max === undefined || max === null || max === Infinity) {
+    return Array.from(iterable);
+  }
+
+  if (!Number.isFinite(max)) {
+    throw new Error(`takeFromIterable requires a valid limit. Received: ${max}`);
+  }
+
+  if (max < 0) {
+    throw new Error(`takeFromIterable does not support negative limits. Received: ${max}`);
+  }
+
+  const normalizedMax = Math.trunc(max);
+
+  if (normalizedMax === 0) {
+    return [];
+  }
+
+  const result: T[] = [];
+  for (const item of iterable) {
+    result.push(item);
+    if (result.length >= normalizedMax) break;
+  }
+  return result;
+}
