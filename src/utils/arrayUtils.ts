@@ -69,30 +69,22 @@ export function takeByPriority<T extends { type: string }>(nodes: T[], max?: num
  * This avoids the overhead of spreading or converting the entire iterable
  * into an array (e.g., Array.from(set).slice(0, N)) when only a few items
  * are needed.
- * Note: If max is negative, it falls back to the full array slice behavior to preserve
- * standard semantics, but this is a compatibility path and forces full materialization (O(M)).
+ * Returns the entire array if max is unspecified (null/undefined/non-finite).
+ * Throws an error for negative limits.
  */
 export function takeFromIterable<T>(iterable: Iterable<T>, max?: number | null): T[] {
-  if (max === undefined) {
+  if (max === undefined || max === null || !Number.isFinite(max)) {
     return Array.from(iterable);
   }
 
-  // Handle NaN, null, and non-positive zero values by normalizing to 0
-  let normalizedMax = max === null || Number.isNaN(max) ? 0 : Number(max);
+  const normalizedMax = Math.trunc(max);
 
-  // Truncate to integer like Array.prototype.slice does
-  normalizedMax = Math.trunc(normalizedMax);
+  if (normalizedMax < 0) {
+    throw new Error(`takeFromIterable does not support negative limits. Received: ${max}`);
+  }
 
   if (normalizedMax === 0) {
     return [];
-  }
-
-  if (normalizedMax < 0) {
-    return Array.from(iterable).slice(0, normalizedMax);
-  }
-
-  if (!Number.isFinite(normalizedMax)) {
-    return Array.from(iterable);
   }
 
   const result: T[] = [];
