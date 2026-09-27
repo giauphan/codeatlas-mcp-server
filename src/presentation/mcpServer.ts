@@ -2338,17 +2338,11 @@ export function registerTools(server: McpServer) {
         return { content: [{ type: "text" as const, text: JSON.stringify({ script, project: loaded.projectName, exitCode: 0, duration: `${dur}s`, stdout: stdoutStr, stderr: stderrStr }, null, 2) }] };
       } catch (err: unknown) {
         const dur = ((Date.now() - startTime) / 1000).toFixed(1);
-        interface SpawnError extends Error {
-          status?: number | null;
-          stdout?: Buffer | string;
-          stderr?: Buffer | string;
-          killed?: boolean;
-        }
-        const spawnErr = err as SpawnError;
-        const exitCode = spawnErr.status ?? 1;
-        const stdoutStr = (spawnErr.stdout || "").toString().substring(0, 10000);
-        const stderrStr = (spawnErr.stderr || "").toString().substring(0, 5000);
-        const isKilled = spawnErr.killed ?? false;
+        const isObject = err !== null && typeof err === 'object';
+        const exitCode = isObject && 'status' in err && typeof (err as any).status === 'number' ? (err as any).status : 1;
+        const stdoutStr = (isObject && 'stdout' in err && (err as any).stdout ? (err as any).stdout : "").toString().substring(0, 10000);
+        const stderrStr = (isObject && 'stderr' in err && (err as any).stderr ? (err as any).stderr : "").toString().substring(0, 5000);
+        const isKilled = isObject && 'killed' in err ? !!(err as any).killed : false;
         const errorMessage = err instanceof Error ? err.message.substring(0, 300) : String(err).substring(0, 300);
         return { content: [{ type: "text" as const, text: JSON.stringify({ script, project: loaded.projectName, exitCode, duration: `${dur}s`, stdout: stdoutStr, stderr: stderrStr, error: isKilled ? "TIMEOUT" : errorMessage }, null, 2) }] };
       }
