@@ -88,11 +88,9 @@ export function takeFromIterable<T>(iterable: Iterable<T>, max?: number | null):
   }
 
   const result: T[] = [];
-  let count = 0;
   for (const item of iterable) {
-    if (count >= normalizedMax) break;
+    if (result.length >= normalizedMax) break;
     result.push(item);
-    count++;
   }
   return result;
 }
