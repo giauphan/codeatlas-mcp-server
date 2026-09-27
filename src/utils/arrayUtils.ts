@@ -71,7 +71,7 @@ export function takeByPriority<T extends { type: string }>(nodes: T[], max?: num
  * are needed.
  * If max is negative, it falls back to the full array slice behavior to preserve semantics.
  */
-export function takeFromIterable<T>(iterable: Iterable<T> | IterableIterator<T>, max: number): T[] {
+export function takeFromIterable<T>(iterable: Iterable<T>, max: number): T[] {
   if (max < 0) {
     return Array.from(iterable).slice(0, max);
   }
