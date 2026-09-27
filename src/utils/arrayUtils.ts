@@ -87,10 +87,12 @@ export function takeFromIterable<T>(iterable: Iterable<T>, max?: number | null):
     return [];
   }
 
-  const result: T[] = [];
+  const result: T[] = new Array(normalizedMax);
+  let i = 0;
   for (const item of iterable) {
-    if (result.length >= normalizedMax) break;
-    result.push(item);
+    if (i >= normalizedMax) break;
+    result[i++] = item;
   }
+  result.length = i;
   return result;
 }
