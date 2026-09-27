@@ -72,13 +72,15 @@ export function takeByPriority<T extends { type: string }>(nodes: T[], max?: num
  * If max is negative, it falls back to the full array slice behavior to preserve semantics.
  */
 export function takeFromIterable<T>(iterable: Iterable<T>, max: number): T[] {
-  if (max < 0) {
+  // Handle NaN, null, and non-positive zero values by normalizing to 0
+  const normalizedMax = Number.isNaN(max) ? 0 : Number(max);
+  if (normalizedMax <= 0 && max !== undefined) {
     return Array.from(iterable).slice(0, max);
   }
   const result: T[] = [];
   let count = 0;
   for (const item of iterable) {
-    if (count >= max) break;
+    if (count >= normalizedMax) break;
     result.push(item);
     count++;
   }
