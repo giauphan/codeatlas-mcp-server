@@ -84,7 +84,7 @@ export function takeFromIterable<T>(iterable: Iterable<T>, max?: number | null):
   normalizedMax = Math.trunc(normalizedMax);
 
   if (normalizedMax === 0) {
-      return [];
+    return [];
   }
 
   if (normalizedMax < 0) {
