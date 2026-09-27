@@ -77,7 +77,10 @@ export function takeFromIterable<T>(iterable: Iterable<T>, max?: number | null):
   }
 
   // Handle NaN, null, and non-positive zero values by normalizing to 0
-  const normalizedMax = max === null || Number.isNaN(max) ? 0 : Number(max);
+  let normalizedMax = max === null || Number.isNaN(max) ? 0 : Number(max);
+
+  // Truncate to integer like Array.prototype.slice does
+  normalizedMax = Math.trunc(normalizedMax);
 
   if (normalizedMax === 0) {
       return [];
