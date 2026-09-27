@@ -73,11 +73,12 @@ export function takeByPriority<T extends { type: string }>(nodes: T[], max?: num
  * Throws an error for negative limits. Fractional values are truncated toward zero.
  */
 export function takeFromIterable<T>(iterable: Iterable<T>, max?: number | null): T[] {
-  if (max === undefined || max === null || !Number.isFinite(max)) {
-    if (Number.isNaN(max)) {
-      throw new Error(`takeFromIterable does not support NaN as limit.`);
-    }
+  if (max === undefined || max === null || max === Infinity) {
     return Array.from(iterable);
+  }
+
+  if (!Number.isFinite(max)) {
+    throw new Error(`takeFromIterable requires a valid limit. Received: ${max}`);
   }
 
   const normalizedMax = Math.trunc(max);
