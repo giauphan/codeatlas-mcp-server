@@ -151,6 +151,7 @@ Then in Zed's Agent Panel, call the `brain_context` tool at the start of a task 
 CodeAtlas MCP Server is designed with a local-first architecture and several security hardening measures to protect your credentials and codebase data:
 
 - **No Disk Persistence**: Credentials like `CODEATLAS_API_KEY` are kept entirely in-memory and are **never** persisted to `.env` files or disk. You must supply your key via environment variables.
+- **Secure File Operations**: All configuration and caching file writes explicitly block symlink following (using the `O_NOFOLLOW` flag) to prevent Time-of-Check to Time-of-Use (TOCTOU) privilege escalation attacks.
 - **Strict Destination Validation**: When connecting to cloud features, the destination AI and backend URLs are strictly validated. Credentials can only flow to trusted official domains (`*.codeatlas.ai`, `opencode.ai`) or local addresses (`localhost`, `127.0.0.1`).
 - **Telemetry & Logging**: Potential credential leaks are sanitized and redacted from all console and error logs.
 
