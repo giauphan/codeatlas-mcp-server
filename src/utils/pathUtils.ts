@@ -99,15 +99,32 @@ export function appendFileSyncNoFollow(filePath: string, content: string, mode: 
   }
 }
 
+/**
+ * Securely writes content to a file, preventing symlink following (TOCTOU attacks).
+ * If the file is a symlink, the operation will fail safely.
+ *
+ * @param filePath - The absolute path of the file to write to.
+ * @param content - The content to write to the file.
+ * @param mode - The file mode to use if creating a new file (defaults to 0o600).
+ * @throws {Error} If the file cannot be opened securely (e.g. if it is a symlink).
+ */
 export function writeFileSyncNoFollow(filePath: string, content: string, mode: number = 0o600): void {
-  const fd = fs.openSync(
-    filePath,
-    fs.constants.O_CREAT |   // Create file if it doesn't exist
-    fs.constants.O_WRONLY |  // Open for writing
-    fs.constants.O_TRUNC |   // Truncate file content if it exists
-    fs.constants.O_NOFOLLOW, // Prevent symlink following
-    mode
-  );
+  let fd: number;
+  try {
+    fd = fs.openSync(
+      filePath,
+      fs.constants.O_CREAT |   // Create file if it doesn't exist
+      fs.constants.O_WRONLY |  // Open for writing
+      fs.constants.O_TRUNC |   // Truncate file content if it exists
+      fs.constants.O_NOFOLLOW, // Prevent symlink following
+      mode
+    );
+  } catch (err: unknown) {
+    if (err && typeof err === 'object' && 'code' in err && err.code === 'ENOENT') {
+      throw new Error(`Failed to safely open file for writing: Directory does not exist (${err instanceof Error ? err.message : String(err)})`);
+    }
+    throw new Error(`Failed to safely open file for writing: ${err instanceof Error ? err.message : String(err)}`);
+  }
   try {
     fs.writeFileSync(fd, content);
   } finally {
