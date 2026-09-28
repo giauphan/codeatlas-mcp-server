@@ -1907,12 +1907,13 @@ export function registerTools(server: McpServer) {
         } catch { /* skip */ }
       }
 
-      const uniqueFiles = new Set<string>();
+      // Explicit loop for better memory management with large file lists
+      const uniqueFilePaths = new Set<string>();
       for (const r of results) {
-        uniqueFiles.add(r.file);
+        uniqueFilePaths.add(r.file);
       }
       return {
-        content: [{ type: "text" as const, text: JSON.stringify({ query, project: loaded.projectName, matchCount: results.length, truncated: results.length >= maxRes, files: [...uniqueFiles], results: results.slice(0, maxRes) }, null, 2) }],
+        content: [{ type: "text" as const, text: JSON.stringify({ query, project: loaded.projectName, matchCount: results.length, truncated: results.length >= maxRes, files: [...uniqueFilePaths], results: results.slice(0, maxRes) }, null, 2) }],
       };
     }
   );

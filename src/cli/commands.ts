@@ -288,11 +288,13 @@ export function checkCodeatlasSetup(projectDir: string): CodeatlasSetupInfo {
 
 export function listProjectDirs(): { connected: ProjectDirEntry[]; newDirs: ProjectDirEntry[] } {
   const raw = process.env.CODEATLAS_PROJECT_DIRS || process.env.CODEATLAS_PROJECT_DIR || "";
+  // Explicit loop for better memory management with large project lists
   const connectedSet = new Set<string>();
   for (const s of raw.split(",")) {
     const trimmed = s.trim();
     if (trimmed) connectedSet.add(path.resolve(trimmed));
   }
+
   // Always include cwd as connected if it's a git project
   const cwd = path.resolve(process.cwd());
   if (fs.existsSync(path.join(cwd, ".git")) || fs.existsSync(path.join(cwd, "package.json"))) connectedSet.add(cwd);
