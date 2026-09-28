@@ -299,7 +299,13 @@ export function listProjectDirs(): { connected: ProjectDirEntry[]; newDirs: Proj
 
   // Always include cwd as connected if it's a git project
   const cwd = path.resolve(process.cwd());
-  if (fs.existsSync(path.join(cwd, ".git")) || fs.existsSync(path.join(cwd, "package.json"))) connectedSet.add(cwd);
+  try {
+    if (fs.existsSync(path.join(cwd, ".git")) || fs.existsSync(path.join(cwd, "package.json"))) {
+      connectedSet.add(cwd);
+    }
+  } catch (err) {
+    console.warn(`[CodeAtlas] Failed to check cwd for git/package.json:`, err);
+  }
 
   const scanRoots = [path.join(os.homedir(), "")];
   const candidates: string[] = [];
