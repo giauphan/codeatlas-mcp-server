@@ -39,10 +39,31 @@ import { routeTask } from "../cli/taskRouter.js";
 import { CodeAnalyzer } from "../analyzer/parser.js";
 import { SecurityScanner } from "../securityScanner.js";
 import { GraphLink, GraphNode } from "../analyzer/types.js";
+import { createSetFromMap } from '../utils/set.js';
 import {
   listADRs, getADR, saveADR, deleteADR,
   ADR
 } from "../services/adrService.js";
+
+/**
+ * Formats search results into a standardized JSON response string.
+ * @param query The original search query
+ * @param projectName The name of the project being searched
+ * @param results The array of search result objects
+ * @param maxRes The maximum number of results to return
+ * @param uniqueFilePaths A set of unique file paths containing matches
+ * @returns A formatted JSON string representation of the results
+ */
+function formatSearchResults(query: string, projectName: string, results: any[], maxRes: number, uniqueFilePaths: Set<string>): string {
+  return JSON.stringify({
+    query,
+    project: projectName,
+    matchCount: results.length,
+    truncated: results.length >= maxRes,
+    files: [...uniqueFilePaths],
+    results: results.slice(0, maxRes)
+  }, null, 2);
+}
 
 const CONFIG_FILES_ENTRIES = Object.entries({ tsconfig: "tsconfig.json", eslint: ".eslintrc.js", prettier: ".prettierrc", jest: "jest.config.js", vitest: "vitest.config.ts", playwright: "playwright.config.ts", docker: "Dockerfile" });
 
@@ -507,7 +528,7 @@ export function registerTools(server: McpServer) {
       const nodeMap = createNodeLabelMap(loaded.analysis.graph.nodes);
 
       // ⚡ Bolt Optimization: Precompute links for matched nodes to avoid O(N*L) filtering inside map
-      const matchIds = new Set(topMatches.map((n) => n.id));
+      const matchIds = createSetFromMap(topMatches, n => n.id);
 
       const incomingLinksMap = new Map<string, Array<{ from: string, type: string }>>();
       const outgoingLinksMap = new Map<string, Array<{ to: string, type: string }>>();
@@ -580,7 +601,7 @@ export function registerTools(server: McpServer) {
       let filesEntries = Array.from(byFile.entries());
 
       // ⚡ Bolt Optimization: Precompute dependencies for matched nodes to avoid O(N*L) filtering inside map
-      const matchIds = new Set(matches.map((n) => n.id));
+      const matchIds = createSetFromMap(matches, n => n.id);
       const dependenciesMap = new Map<string, Array<{ to: string, type: string }>>();
 
       for (const l of links) {
@@ -1901,8 +1922,12 @@ export function registerTools(server: McpServer) {
         } catch { /* skip */ }
       }
 
+      const uniqueFilePaths = createSetFromMap(results, r => r.file);
       return {
-        content: [{ type: "text" as const, text: JSON.stringify({ query, project: loaded.projectName, matchCount: results.length, truncated: results.length >= maxRes, files: [...new Set(results.map(r => r.file))], results: results.slice(0, maxRes) }, null, 2) }],
+        content: [{
+          type: "text" as const,
+          text: formatSearchResults(query, loaded.projectName, results, maxRes, uniqueFilePaths)
+        }],
       };
     }
   );

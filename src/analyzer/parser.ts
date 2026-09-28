@@ -6,6 +6,7 @@ import { GraphData, GraphNode, GraphLink, AnalysisResult, AIInsight, AnalysisMan
 import { PythonParser } from './pythonParser.js';
 import { PhpParser } from './phpParser.js';
 import { binarySearchClosestPrecedingClass, ClassReference, takeByPriority } from '../utils/arrayUtils.js';
+import { createSetFromMap } from '../utils/set.js';
 
 export class CodeAnalyzer {
   private workspaceRoot: string;
@@ -167,7 +168,7 @@ export class CodeAnalyzer {
     
     // The files array is generated from getFiles traversing unique directories recursively,
     // so duplicates are naturally prevented. The map resolves paths, and the Set enforces uniqueness across edge cases (e.g. symlinks).
-    this.allFiles = new Set(files.map(f => path.resolve(f)));
+    this.allFiles = createSetFromMap(files, f => path.resolve(f));
     const total = files.length;
 
     // Log the files to be indexed
@@ -481,7 +482,7 @@ export class CodeAnalyzer {
     }
 
     // Filter links to only include those where both endpoints are loaded
-    const loadedNodeIds = new Set(loadedNodes.map(n => n.id));
+    const loadedNodeIds = createSetFromMap(loadedNodes, n => n.id);
     const loadedLinks = result.graph.links.filter(
       link => loadedNodeIds.has(link.source) && loadedNodeIds.has(link.target)
     );

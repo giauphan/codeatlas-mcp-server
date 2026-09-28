@@ -288,10 +288,24 @@ export function checkCodeatlasSetup(projectDir: string): CodeatlasSetupInfo {
 
 export function listProjectDirs(): { connected: ProjectDirEntry[]; newDirs: ProjectDirEntry[] } {
   const raw = process.env.CODEATLAS_PROJECT_DIRS || process.env.CODEATLAS_PROJECT_DIR || "";
-  const connectedSet = new Set(raw.split(",").map(s => s.trim()).filter(Boolean).map(s => path.resolve(s)));
+  // Explicit loop to avoid intermediate array allocations.
+  // Trades the concise but highly allocating `raw.split(",").map().filter().map()`
+  // chain for a slightly more verbose but memory-efficient single iteration.
+  const connectedSet = new Set<string>();
+  for (const s of raw.split(",")) {
+    const trimmed = s.trim();
+    if (trimmed) connectedSet.add(path.resolve(trimmed));
+  }
+
   // Always include cwd as connected if it's a git project
   const cwd = path.resolve(process.cwd());
-  if (fs.existsSync(path.join(cwd, ".git")) || fs.existsSync(path.join(cwd, "package.json"))) connectedSet.add(cwd);
+  try {
+    if (fs.existsSync(path.join(cwd, ".git")) || fs.existsSync(path.join(cwd, "package.json"))) {
+      connectedSet.add(cwd);
+    }
+  } catch (err) {
+    console.warn(`[CodeAtlas] Failed to check cwd for git/package.json:`, err);
+  }
 
   const scanRoots = [path.join(os.homedir(), "")];
   const candidates: string[] = [];
