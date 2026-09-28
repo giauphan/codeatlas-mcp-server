@@ -79,7 +79,7 @@ describe("pathUtils", () => {
       fs.symlinkSync(sourceFile, symlinkFile);
       assert.throws(
         () => writeFileSyncNoFollow(symlinkFile, "malicious overwrite"),
-        /Failed to safely open file for writing: ELOOP/
+        /Failed to safely open file for writing: Symlink detected, operation aborted for security \(ELOOP/
       );
     } finally {
       if (fs.existsSync(symlinkFile)) fs.unlinkSync(symlinkFile);

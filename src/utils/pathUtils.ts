@@ -87,8 +87,16 @@ export function appendFileSyncNoFollow(filePath: string, content: string, mode: 
       mode
     );
   } catch (err: unknown) {
-    if (err && typeof err === 'object' && 'code' in err && err.code === 'ENOENT') {
-      throw new Error(`Failed to safely open file for appending: Directory does not exist (${err instanceof Error ? err.message : String(err)})`);
+    if (err && typeof err === 'object' && 'code' in err) {
+      if (err.code === 'ENOENT') {
+        throw new Error(`Failed to safely open file for appending: Directory does not exist (${err instanceof Error ? err.message : String(err)})`);
+      }
+      if (err.code === 'EACCES' || err.code === 'EPERM') {
+        throw new Error(`Failed to safely open file for appending: Permission denied (${err instanceof Error ? err.message : String(err)})`);
+      }
+      if (err.code === 'ELOOP') {
+        throw new Error(`Failed to safely open file for appending: Symlink detected, operation aborted for security (${err instanceof Error ? err.message : String(err)})`);
+      }
     }
     throw new Error(`Failed to safely open file for appending: ${err instanceof Error ? err.message : String(err)}`);
   }
@@ -120,8 +128,16 @@ export function writeFileSyncNoFollow(filePath: string, content: string, mode: n
       mode
     );
   } catch (err: unknown) {
-    if (err && typeof err === 'object' && 'code' in err && err.code === 'ENOENT') {
-      throw new Error(`Failed to safely open file for writing: Directory does not exist (${err instanceof Error ? err.message : String(err)})`);
+    if (err && typeof err === 'object' && 'code' in err) {
+      if (err.code === 'ENOENT') {
+        throw new Error(`Failed to safely open file for writing: Directory does not exist (${err instanceof Error ? err.message : String(err)})`);
+      }
+      if (err.code === 'EACCES' || err.code === 'EPERM') {
+        throw new Error(`Failed to safely open file for writing: Permission denied (${err instanceof Error ? err.message : String(err)})`);
+      }
+      if (err.code === 'ELOOP') {
+        throw new Error(`Failed to safely open file for writing: Symlink detected, operation aborted for security (${err instanceof Error ? err.message : String(err)})`);
+      }
     }
     throw new Error(`Failed to safely open file for writing: ${err instanceof Error ? err.message : String(err)}`);
   }
