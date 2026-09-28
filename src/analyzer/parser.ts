@@ -6,6 +6,7 @@ import { GraphData, GraphNode, GraphLink, AnalysisResult, AIInsight, AnalysisMan
 import { PythonParser } from './pythonParser.js';
 import { PhpParser } from './phpParser.js';
 import { binarySearchClosestPrecedingClass, ClassReference, takeByPriority } from '../utils/arrayUtils.js';
+import { createSetFromMap } from '../utils/set.js';
 
 export class CodeAnalyzer {
   private workspaceRoot: string;
@@ -167,11 +168,8 @@ export class CodeAnalyzer {
     
     // The files array is generated from getFiles traversing unique directories recursively,
     // so duplicates are naturally prevented. The map resolves paths, and the Set enforces uniqueness across edge cases (e.g. symlinks).
-    // Explicit loop for better memory management with large file lists
-    this.allFiles = new Set<string>();
-    for (const f of files) {
-      this.allFiles.add(path.resolve(f));
-    }
+    // Explicit loop for better memory management (reduces temporary array allocations)
+    this.allFiles = createSetFromMap(files, f => path.resolve(f));
     const total = files.length;
 
     // Log the files to be indexed
@@ -485,11 +483,8 @@ export class CodeAnalyzer {
     }
 
     // Filter links to only include those where both endpoints are loaded
-    // Explicit loop for better memory management with large node lists
-    const loadedNodeIds = new Set<string>();
-    for (const n of loadedNodes) {
-      loadedNodeIds.add(n.id);
-    }
+    // Explicit loop for better memory management (reduces temporary array allocations)
+    const loadedNodeIds = createSetFromMap(loadedNodes, n => n.id);
     const loadedLinks = result.graph.links.filter(
       link => loadedNodeIds.has(link.source) && loadedNodeIds.has(link.target)
     );

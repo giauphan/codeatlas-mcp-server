@@ -39,6 +39,7 @@ import { routeTask } from "../cli/taskRouter.js";
 import { CodeAnalyzer } from "../analyzer/parser.js";
 import { SecurityScanner } from "../securityScanner.js";
 import { GraphLink, GraphNode } from "../analyzer/types.js";
+import { createSetFromMap } from '../utils/set.js';
 import {
   listADRs, getADR, saveADR, deleteADR,
   ADR
@@ -507,10 +508,8 @@ export function registerTools(server: McpServer) {
       const nodeMap = createNodeLabelMap(loaded.analysis.graph.nodes);
 
       // ⚡ Bolt Optimization: Precompute links for matched nodes to avoid O(N*L) filtering inside map
-      const matchIds = new Set<string>();
-      for (const n of topMatches) {
-        matchIds.add(n.id);
-      }
+      // Explicit loop for better memory management (reduces temporary array allocations)
+      const matchIds = createSetFromMap(topMatches, n => n.id);
 
       const incomingLinksMap = new Map<string, Array<{ from: string, type: string }>>();
       const outgoingLinksMap = new Map<string, Array<{ to: string, type: string }>>();
@@ -583,10 +582,8 @@ export function registerTools(server: McpServer) {
       let filesEntries = Array.from(byFile.entries());
 
       // ⚡ Bolt Optimization: Precompute dependencies for matched nodes to avoid O(N*L) filtering inside map
-      const matchIds = new Set<string>();
-      for (const n of matches) {
-        matchIds.add(n.id);
-      }
+      // Explicit loop for better memory management (reduces temporary array allocations)
+      const matchIds = createSetFromMap(matches, n => n.id);
       const dependenciesMap = new Map<string, Array<{ to: string, type: string }>>();
 
       for (const l of links) {
@@ -1907,11 +1904,8 @@ export function registerTools(server: McpServer) {
         } catch { /* skip */ }
       }
 
-      // Explicit loop for better memory management with large file lists
-      const uniqueFilePaths = new Set<string>();
-      for (const r of results) {
-        uniqueFilePaths.add(r.file);
-      }
+      // Explicit loop for better memory management (reduces temporary array allocations)
+      const uniqueFilePaths = createSetFromMap(results, r => r.file);
       return {
         content: [{ type: "text" as const, text: JSON.stringify({ query, project: loaded.projectName, matchCount: results.length, truncated: results.length >= maxRes, files: [...uniqueFilePaths], results: results.slice(0, maxRes) }, null, 2) }],
       };
