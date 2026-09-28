@@ -45,6 +45,17 @@ import {
   ADR
 } from "../services/adrService.js";
 
+function formatSearchResults(query: string, projectName: string, results: any[], maxRes: number, uniqueFilePaths: Set<string>): string {
+  return JSON.stringify({
+    query,
+    project: projectName,
+    matchCount: results.length,
+    truncated: results.length >= maxRes,
+    files: [...uniqueFilePaths],
+    results: results.slice(0, maxRes)
+  }, null, 2);
+}
+
 const CONFIG_FILES_ENTRIES = Object.entries({ tsconfig: "tsconfig.json", eslint: ".eslintrc.js", prettier: ".prettierrc", jest: "jest.config.js", vitest: "vitest.config.ts", playwright: "playwright.config.ts", docker: "Dockerfile" });
 
 function escapeRegExp(str: string): string {
@@ -1904,7 +1915,10 @@ export function registerTools(server: McpServer) {
 
       const uniqueFilePaths = createSetFromMap(results, r => r.file);
       return {
-        content: [{ type: "text" as const, text: JSON.stringify({ query, project: loaded.projectName, matchCount: results.length, truncated: results.length >= maxRes, files: [...uniqueFilePaths], results: results.slice(0, maxRes) }, null, 2) }],
+        content: [{
+          type: "text" as const,
+          text: formatSearchResults(query, loaded.projectName, results, maxRes, uniqueFilePaths)
+        }],
       };
     }
   );
