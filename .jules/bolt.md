@@ -88,3 +88,6 @@
 ## 2026-09-20 - Optimize graph traversal BFS using adjacency lists
 **Learning:** In heavily connected graphs or dense source representations (like an AST module or dependency tree), iterating over an entire edge list (`O(E)`) inside every depth level of a Breadth-First Search leads to a debilitating `O(D * E)` bottleneck. Because `links.filter()` loops over the *entire* collection just to check inclusion or type, repeatedly filtering links directly inside a loop magnifies this inefficiency, causing massive GC pressure and execution latency.
 **Action:** Always precompute graph relationships into a neighbor lookup structure (e.g., `Map<string, string[]>`) before starting a graph traversal. This drops the complexity from `O(D * E)` down to `O(V + E)`, drastically reducing the total number of required loop iterations.
+## 2026-10-06 - [Performance improvement] Optimized O(N) array filtering allocations inside cli loops
+**Learning:** Using `.filter().map()` inside of a heavily executed array mapping and file reading commands results in unnecessary allocations of arrays in memory for every iteration of `.filter()`.
+**Action:** When filtering directories inside an array loop that requires file mapping or array mutation, combine the `.filter` inside the main `.map` block via a single `for...of` loop to save GC allocations.
