@@ -45,6 +45,15 @@ import {
   ADR
 } from "../services/adrService.js";
 
+/**
+ * Formats search results into a standardized JSON response string.
+ * @param query The original search query
+ * @param projectName The name of the project being searched
+ * @param results The array of search result objects
+ * @param maxRes The maximum number of results to return
+ * @param uniqueFilePaths A set of unique file paths containing matches
+ * @returns A formatted JSON string representation of the results
+ */
 function formatSearchResults(query: string, projectName: string, results: any[], maxRes: number, uniqueFilePaths: Set<string>): string {
   return JSON.stringify({
     query,
