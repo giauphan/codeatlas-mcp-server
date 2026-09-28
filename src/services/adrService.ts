@@ -1,6 +1,7 @@
 import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
+import { writeFileSyncNoFollow } from "../utils/pathUtils.js";
 
 const ADR_DIR = path.join(os.homedir(), ".codeatlas", "adr");
 
@@ -102,7 +103,7 @@ export function saveADR(adr: ADR): ADR {
   const dir = ensureDir(adr.project);
   const file = path.join(dir, `${adr.id}.json`);
   if (!adr.date) adr.date = new Date().toISOString().split("T")[0];
-  fs.writeFileSync(file, JSON.stringify(adr, null, 2));
+  writeFileSyncNoFollow(file, JSON.stringify(adr, null, 2));
   return adr;
 }
 
