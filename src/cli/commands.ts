@@ -288,7 +288,7 @@ export function checkCodeatlasSetup(projectDir: string): CodeatlasSetupInfo {
 
 export function listProjectDirs(): { connected: ProjectDirEntry[]; newDirs: ProjectDirEntry[] } {
   const raw = process.env.CODEATLAS_PROJECT_DIRS || process.env.CODEATLAS_PROJECT_DIR || "";
-  // Explicit loop for better memory management with large project lists
+  // Explicit loop to avoid intermediate array allocations
   const connectedSet = new Set<string>();
   for (const s of raw.split(",")) {
     const trimmed = s.trim();

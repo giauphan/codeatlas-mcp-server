@@ -508,7 +508,6 @@ export function registerTools(server: McpServer) {
       const nodeMap = createNodeLabelMap(loaded.analysis.graph.nodes);
 
       // ⚡ Bolt Optimization: Precompute links for matched nodes to avoid O(N*L) filtering inside map
-      // Explicit loop for better memory management (reduces temporary array allocations)
       const matchIds = createSetFromMap(topMatches, n => n.id);
 
       const incomingLinksMap = new Map<string, Array<{ from: string, type: string }>>();
@@ -582,7 +581,6 @@ export function registerTools(server: McpServer) {
       let filesEntries = Array.from(byFile.entries());
 
       // ⚡ Bolt Optimization: Precompute dependencies for matched nodes to avoid O(N*L) filtering inside map
-      // Explicit loop for better memory management (reduces temporary array allocations)
       const matchIds = createSetFromMap(matches, n => n.id);
       const dependenciesMap = new Map<string, Array<{ to: string, type: string }>>();
 
@@ -1904,7 +1902,6 @@ export function registerTools(server: McpServer) {
         } catch { /* skip */ }
       }
 
-      // Explicit loop for better memory management (reduces temporary array allocations)
       const uniqueFilePaths = createSetFromMap(results, r => r.file);
       return {
         content: [{ type: "text" as const, text: JSON.stringify({ query, project: loaded.projectName, matchCount: results.length, truncated: results.length >= maxRes, files: [...uniqueFilePaths], results: results.slice(0, maxRes) }, null, 2) }],

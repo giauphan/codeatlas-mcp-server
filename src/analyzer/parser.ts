@@ -168,7 +168,6 @@ export class CodeAnalyzer {
     
     // The files array is generated from getFiles traversing unique directories recursively,
     // so duplicates are naturally prevented. The map resolves paths, and the Set enforces uniqueness across edge cases (e.g. symlinks).
-    // Explicit loop for better memory management (reduces temporary array allocations)
     this.allFiles = createSetFromMap(files, f => path.resolve(f));
     const total = files.length;
 
@@ -483,7 +482,6 @@ export class CodeAnalyzer {
     }
 
     // Filter links to only include those where both endpoints are loaded
-    // Explicit loop for better memory management (reduces temporary array allocations)
     const loadedNodeIds = createSetFromMap(loadedNodes, n => n.id);
     const loadedLinks = result.graph.links.filter(
       link => loadedNodeIds.has(link.source) && loadedNodeIds.has(link.target)
