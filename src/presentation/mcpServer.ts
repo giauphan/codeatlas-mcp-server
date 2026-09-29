@@ -18,6 +18,7 @@ import {
   appendFileSyncNoFollow
 } from "../utils/pathUtils.js";
 import { jaccardSimilarity } from "../utils/mathUtils.js";
+import { safeErrorMessage } from "../utils/errorUtils.js";
 import { getApiUrl } from "../utils/envUtils.js";
 import { takeByPriority } from "../utils/arrayUtils.js";
 import { checkAuth, logActivity } from "../services/authService.js";
@@ -2517,8 +2518,7 @@ export function registerTools(server: McpServer) {
             results.push({ client: "hermes", action: "mcp_config", status: "created" });
           }
         } catch (err: unknown) {
-          const errorMsg = err instanceof Error ? err.message : String(err);
-          results.push({ client: "hermes", action: "mcp_config", status: "error", error: errorMsg });
+          results.push({ client: "hermes", action: "mcp_config", status: "error", error: safeErrorMessage(err) });
         }
 
         // Hermes auto plugin
@@ -2588,8 +2588,7 @@ def register(ctx):
             writeFileSyncNoFollow(path.join(pluginDir, "plugin.yaml"), pluginYaml);
             results.push({ client: "hermes", action: "auto_plugin", status: "installed" });
           } catch (err: unknown) {
-            const errorMsg = err instanceof Error ? err.message : String(err);
-            results.push({ client: "hermes", action: "auto_plugin", status: "error", error: errorMsg });
+            results.push({ client: "hermes", action: "auto_plugin", status: "error", error: safeErrorMessage(err) });
           }
         }
       }
@@ -2628,8 +2627,7 @@ def register(ctx):
             results.push({ client: "claude", action: "mcp_config", status: "created" });
           }
         } catch (err: unknown) {
-          const errorMsg = err instanceof Error ? err.message : String(err);
-          results.push({ client: "claude", action: "mcp_config", status: "error", error: errorMsg });
+          results.push({ client: "claude", action: "mcp_config", status: "error", error: safeErrorMessage(err) });
         }
       }
 
@@ -3028,8 +3026,7 @@ def register(ctx):
             snippet,
           });
         } catch (err: unknown) {
-          const errorMsg = err instanceof Error ? err.message : String(err);
-          results.push({ symbol: node.label, file: absPath, error: errorMsg.substring(0, 200) });
+          results.push({ symbol: node.label, file: absPath, error: safeErrorMessage(err).substring(0, 200) });
         }
       }
 
