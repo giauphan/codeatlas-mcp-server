@@ -2514,8 +2514,9 @@ export function registerTools(server: McpServer) {
             writeFileSyncNoFollow(hermesCfg, "mcp_servers:\n" + mcpEntry);
             results.push({ client: "hermes", action: "mcp_config", status: "created" });
           }
-        } catch (err: any) {
-          results.push({ client: "hermes", action: "mcp_config", status: "error", error: err.message });
+        } catch (err: unknown) {
+          const errorMsg = err instanceof Error ? err.message : String(err);
+          results.push({ client: "hermes", action: "mcp_config", status: "error", error: errorMsg });
         }
 
         // Hermes auto plugin
@@ -2584,8 +2585,9 @@ def register(ctx):
             writeFileSyncNoFollow(path.join(pluginDir, "__init__.py"), pluginInit);
             writeFileSyncNoFollow(path.join(pluginDir, "plugin.yaml"), pluginYaml);
             results.push({ client: "hermes", action: "auto_plugin", status: "installed" });
-          } catch (err: any) {
-            results.push({ client: "hermes", action: "auto_plugin", status: "error", error: err.message });
+          } catch (err: unknown) {
+            const errorMsg = err instanceof Error ? err.message : String(err);
+            results.push({ client: "hermes", action: "auto_plugin", status: "error", error: errorMsg });
           }
         }
       }
@@ -2623,8 +2625,9 @@ def register(ctx):
             writeFileSyncNoFollow(claudeCfg, JSON.stringify(claudeEntry, null, 2));
             results.push({ client: "claude", action: "mcp_config", status: "created" });
           }
-        } catch (err: any) {
-          results.push({ client: "claude", action: "mcp_config", status: "error", error: err.message });
+        } catch (err: unknown) {
+          const errorMsg = err instanceof Error ? err.message : String(err);
+          results.push({ client: "claude", action: "mcp_config", status: "error", error: errorMsg });
         }
       }
 
