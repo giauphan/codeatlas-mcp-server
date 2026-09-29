@@ -2339,7 +2339,8 @@ export function registerTools(server: McpServer) {
       } catch (err: unknown) {
         const e = err as NodeJS.ErrnoException & { status?: number; stdout?: Buffer | string; stderr?: Buffer | string; killed?: boolean };
         const dur = ((Date.now() - startTime) / 1000).toFixed(1);
-        return { content: [{ type: "text" as const, text: JSON.stringify({ script, project: loaded.projectName, exitCode: e.status ?? 1, duration: `${dur}s`, stdout: (e.stdout || "").toString().substring(0, 10000), stderr: (e.stderr || "").toString().substring(0, 5000), error: e.killed ? "TIMEOUT" : e.message?.substring(0, 300) }, null, 2) }] };
+        const exitCode = typeof e.status === 'number' ? e.status : 1;
+        return { content: [{ type: "text" as const, text: JSON.stringify({ script, project: loaded.projectName, exitCode: exitCode, duration: `${dur}s`, stdout: (e.stdout || "").toString().substring(0, 10000), stderr: (e.stderr || "").toString().substring(0, 5000), error: e.killed ? "TIMEOUT" : e.message?.substring(0, 300) }, null, 2) }] };
       }
     }
   );
