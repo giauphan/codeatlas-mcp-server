@@ -18,6 +18,7 @@ import {
   appendFileSyncNoFollow
 } from "../utils/pathUtils.js";
 import { jaccardSimilarity } from "../utils/mathUtils.js";
+import { safeErrorMessage } from "../utils/errorUtils.js";
 import { getApiUrl } from "../utils/envUtils.js";
 import { takeByPriority } from "../utils/arrayUtils.js";
 import { checkAuth, logActivity } from "../services/authService.js";
@@ -845,7 +846,7 @@ export function registerTools(server: McpServer) {
         };
 
         return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
-      } catch (err: any) {
+      } catch (err: unknown) {
         return { content: [{ type: "text" as const, text: `Failed to retrieve system memory: ${err instanceof Error ? err.message : String(err)}` }], isError: true };
       }
     }
@@ -2336,9 +2337,11 @@ export function registerTools(server: McpServer) {
         }
 
         return { content: [{ type: "text" as const, text: JSON.stringify({ script, project: loaded.projectName, exitCode: 0, duration: `${dur}s`, stdout: stdoutStr, stderr: stderrStr }, null, 2) }] };
-      } catch (err: any) {
+      } catch (err: unknown) {
+        const e = err as NodeJS.ErrnoException & { status?: number; stdout?: Buffer | string; stderr?: Buffer | string; killed?: boolean };
         const dur = ((Date.now() - startTime) / 1000).toFixed(1);
-        return { content: [{ type: "text" as const, text: JSON.stringify({ script, project: loaded.projectName, exitCode: err.status || 1, duration: `${dur}s`, stdout: (err.stdout || "").toString().substring(0, 10000), stderr: (err.stderr || "").toString().substring(0, 5000), error: err.killed ? "TIMEOUT" : err.message?.substring(0, 300) }, null, 2) }] };
+        const exitCode = typeof e.status === 'number' ? e.status : 1;
+        return { content: [{ type: "text" as const, text: JSON.stringify({ script, project: loaded.projectName, exitCode: exitCode, duration: `${dur}s`, stdout: (e.stdout || "").toString().substring(0, 10000), stderr: (e.stderr || "").toString().substring(0, 5000), error: e.killed ? "TIMEOUT" : e.message?.substring(0, 300) }, null, 2) }] };
       }
     }
   );
@@ -2503,19 +2506,19 @@ export function registerTools(server: McpServer) {
               results.push({ client: "hermes", action: "mcp_config", status });
             } else if (cfg.includes("mcp_servers:")) {
               cfg = cfg.replace("mcp_servers:", () => "mcp_servers:\n" + mcpEntry);
-              fs.writeFileSync(hermesCfg, cfg);
+              writeFileSyncNoFollow(hermesCfg, cfg);
               results.push({ client: "hermes", action: "mcp_config", status: "updated" });
             } else {
-              fs.writeFileSync(hermesCfg, "\nmcp_servers:\n" + mcpEntry, { flag: "a" });
+              appendFileSyncNoFollow(hermesCfg, "\nmcp_servers:\n" + mcpEntry);
               results.push({ client: "hermes", action: "mcp_config", status: "appended" });
             }
           } else {
             fs.mkdirSync(path.dirname(hermesCfg), { recursive: true });
-            fs.writeFileSync(hermesCfg, "mcp_servers:\n" + mcpEntry);
+            writeFileSyncNoFollow(hermesCfg, "mcp_servers:\n" + mcpEntry);
             results.push({ client: "hermes", action: "mcp_config", status: "created" });
           }
-        } catch (err: any) {
-          results.push({ client: "hermes", action: "mcp_config", status: "error", error: err.message });
+        } catch (err: unknown) {
+          results.push({ client: "hermes", action: "mcp_config", status: "error", error: safeErrorMessage(err) });
         }
 
         // Hermes auto plugin
@@ -2581,11 +2584,11 @@ def register(ctx):
     log.info("Second Brain auto plugin active")
 `;
             const pluginYaml = `name: codeatlas_second_brain\nversion: "1.0"\ndescription: Automatic Second Brain activation\nhooks:\n  - pre_llm_call\n  - post_llm_call\nenabled: true\n`;
-            fs.writeFileSync(path.join(pluginDir, "__init__.py"), pluginInit);
-            fs.writeFileSync(path.join(pluginDir, "plugin.yaml"), pluginYaml);
+            writeFileSyncNoFollow(path.join(pluginDir, "__init__.py"), pluginInit);
+            writeFileSyncNoFollow(path.join(pluginDir, "plugin.yaml"), pluginYaml);
             results.push({ client: "hermes", action: "auto_plugin", status: "installed" });
-          } catch (err: any) {
-            results.push({ client: "hermes", action: "auto_plugin", status: "error", error: err.message });
+          } catch (err: unknown) {
+            results.push({ client: "hermes", action: "auto_plugin", status: "error", error: safeErrorMessage(err) });
           }
         }
       }
@@ -2616,15 +2619,15 @@ def register(ctx):
             }
 
             existing.mcpServers = { ...existing.mcpServers, ...claudeEntry.mcpServers };
-            fs.writeFileSync(claudeCfg, JSON.stringify(existing, null, 2));
+            writeFileSyncNoFollow(claudeCfg, JSON.stringify(existing, null, 2));
             results.push({ client: "claude", action: "mcp_config", status: "updated" });
           } else {
             fs.mkdirSync(path.dirname(claudeCfg), { recursive: true });
-            fs.writeFileSync(claudeCfg, JSON.stringify(claudeEntry, null, 2));
+            writeFileSyncNoFollow(claudeCfg, JSON.stringify(claudeEntry, null, 2));
             results.push({ client: "claude", action: "mcp_config", status: "created" });
           }
-        } catch (err: any) {
-          results.push({ client: "claude", action: "mcp_config", status: "error", error: err.message });
+        } catch (err: unknown) {
+          results.push({ client: "claude", action: "mcp_config", status: "error", error: safeErrorMessage(err) });
         }
       }
 
@@ -3022,8 +3025,8 @@ def register(ctx):
             lines: endLine - startLine + 1,
             snippet,
           });
-        } catch (err: any) {
-          results.push({ symbol: node.label, file: absPath, error: err.message?.substring(0, 200) });
+        } catch (err: unknown) {
+          results.push({ symbol: node.label, file: absPath, error: safeErrorMessage(err).substring(0, 200) });
         }
       }
 
@@ -3565,7 +3568,7 @@ def register(ctx):
         skills,
         bySource: skills.reduce((acc, s) => { acc[s.source] = (acc[s.source] || 0) + 1; return acc; }, {} as Record<string, number>),
       };
-      fs.writeFileSync(BRAIN_SKILLS_PATH, JSON.stringify(inventory, null, 2));
+      writeFileSyncNoFollow(BRAIN_SKILLS_PATH, JSON.stringify(inventory, null, 2));
 
       // Save a compact summary as dream memory for cross-session recall
       try {
