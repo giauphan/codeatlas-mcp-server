@@ -3028,7 +3028,7 @@ def register(ctx):
           });
         } catch (err: unknown) {
           const errorMsg = err instanceof Error ? err.message : String(err);
-          results.push({ symbol: node.label, file: absPath, error: errorMsg?.substring(0, 200) });
+          results.push({ symbol: node.label, file: absPath, error: errorMsg.substring(0, 200) });
         }
       }
 
