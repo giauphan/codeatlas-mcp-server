@@ -3,7 +3,7 @@ import * as path from "path";
 import * as https from "https";
 import * as http from "http";
 import * as os from "os";
-import { getHomePath } from "../utils/pathUtils.js";
+import { getHomePath, writeFileSyncNoFollow } from "../utils/pathUtils.js";
 import { CodeAnalyzer } from "../analyzer/parser.js";
 import { AnalysisResult } from "../analyzer/types.js";
 import { authStorage } from "../context.js";
@@ -262,7 +262,7 @@ export function registerProject(dir: string): void {
     }
     if (!projects.includes(absPath)) {
       projects.push(absPath);
-      fs.writeFileSync(regPath, JSON.stringify(projects, null, 2));
+      writeFileSyncNoFollow(regPath, JSON.stringify(projects, null, 2));
       console.error(`[Project-Registry] 📝 Registered new project: ${absPath}`);
     }
   } catch (err) {
@@ -707,7 +707,7 @@ export function discoverProjects(tenantId?: string): { name: string; dir: string
             return true;
           });
           if (updated) {
-            fs.writeFileSync(regPath, JSON.stringify(filtered, null, 2));
+            writeFileSyncNoFollow(regPath, JSON.stringify(filtered, null, 2));
           }
           for (const dir of filtered) {
             if (fs.existsSync(dir)) {
