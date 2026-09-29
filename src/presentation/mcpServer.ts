@@ -845,7 +845,7 @@ export function registerTools(server: McpServer) {
         };
 
         return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
-      } catch (err: any) {
+      } catch (err: unknown) {
         return { content: [{ type: "text" as const, text: `Failed to retrieve system memory: ${err instanceof Error ? err.message : String(err)}` }], isError: true };
       }
     }
@@ -2336,9 +2336,10 @@ export function registerTools(server: McpServer) {
         }
 
         return { content: [{ type: "text" as const, text: JSON.stringify({ script, project: loaded.projectName, exitCode: 0, duration: `${dur}s`, stdout: stdoutStr, stderr: stderrStr }, null, 2) }] };
-      } catch (err: any) {
+      } catch (err: unknown) {
+        const e = err as any; // Cast to access custom properties from child_process error
         const dur = ((Date.now() - startTime) / 1000).toFixed(1);
-        return { content: [{ type: "text" as const, text: JSON.stringify({ script, project: loaded.projectName, exitCode: err.status || 1, duration: `${dur}s`, stdout: (err.stdout || "").toString().substring(0, 10000), stderr: (err.stderr || "").toString().substring(0, 5000), error: err.killed ? "TIMEOUT" : err.message?.substring(0, 300) }, null, 2) }] };
+        return { content: [{ type: "text" as const, text: JSON.stringify({ script, project: loaded.projectName, exitCode: e.status || 1, duration: `${dur}s`, stdout: (e.stdout || "").toString().substring(0, 10000), stderr: (e.stderr || "").toString().substring(0, 5000), error: e.killed ? "TIMEOUT" : e.message?.substring(0, 300) }, null, 2) }] };
       }
     }
   );
@@ -3025,8 +3026,9 @@ def register(ctx):
             lines: endLine - startLine + 1,
             snippet,
           });
-        } catch (err: any) {
-          results.push({ symbol: node.label, file: absPath, error: err.message?.substring(0, 200) });
+        } catch (err: unknown) {
+          const e = err as Error;
+          results.push({ symbol: node.label, file: absPath, error: e.message?.substring(0, 200) });
         }
       }
 
