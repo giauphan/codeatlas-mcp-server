@@ -67,6 +67,8 @@ export function filterGenesByRelevance(
 
   const scoredGenes: Array<{ gene: { name: string; description: string }; score: number }> = [];
 
+  // ⚡ Bolt Optimization: Replaced chained array methods (.filter().map().filter()) with a single for...of loop
+  // to avoid large intermediate array allocations and redundant .toLowerCase() string allocations.
   for (const gene of genes) {
     const name = gene.name.toLowerCase();
     const description = gene.description.toLowerCase();
