@@ -99,11 +99,7 @@ export function filterGenesByRelevance(
 
   scoredGenes.sort((a, b) => b.score - a.score);
 
-  const result: Array<{ name: string; description: string }> = [];
-  for (let i = 0; i < scoredGenes.length; i++) {
-    result.push(scoredGenes[i].gene);
-  }
-  return result;
+  return scoredGenes.map(({ gene }) => gene);
 }
 
 /** Controls optional query-aware filtering when formatting Brain context. */
