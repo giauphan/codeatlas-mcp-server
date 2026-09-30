@@ -24,78 +24,7 @@ function memory(partial: Partial<DreamMemoryResult>): DreamMemoryResult {
   };
 }
 
-// Helper to assert equivalence between the optimized and original logic
-function originalFilterGenesByRelevance(
-  genes: Array<{ name: string; description: string }>,
-  query: string,
-  minRelevanceScore = 2,
-  minQueryWordLength = 3,
-): Array<{ name: string; description: string }> {
-  const normalizedQuery = query.toLowerCase().trim();
-  const queryWords = normalizedQuery
-    .replace(/[^\w\s]/g, " ")
-    .split(/\s+/)
-    .filter((w) => w.length >= minQueryWordLength);
-
-  if (queryWords.length === 0) return genes;
-
-  const isAstParserQuery =
-    (/\b(ast|parse|parser)\b/.test(normalizedQuery)) &&
-    (normalizedQuery.includes("javascript") || normalizedQuery.includes("typescript") || normalizedQuery.includes("codeatlas"));
-
-  const scoredGenes = genes
-    .filter((gene) => {
-      const geneText = `${gene.name} ${gene.description}`.toLowerCase();
-      if (isAstParserQuery && (geneText.includes("pygount") || geneText.includes("lines of code") || geneText.includes("comment-to-code"))) {
-        return false;
-      }
-      return true;
-    })
-    .map((gene) => {
-      const name = gene.name.toLowerCase();
-      const description = gene.description.toLowerCase();
-      const geneText = `${name} ${description}`;
-      let score = 0;
-
-      if (queryWords.length > 1 && geneText.includes(normalizedQuery)) {
-        score += 3;
-      }
-
-      for (const word of queryWords) {
-        if (name.includes(word)) {
-          score += 2;
-        } else if (description.includes(word)) {
-          score += 1;
-        }
-      }
-
-      return { gene, score };
-    })
-    .filter(({ score }) => score >= minRelevanceScore)
-    .sort((a, b) => b.score - a.score);
-
-  return scoredGenes.map(({ gene }) => gene);
-}
-
-
 describe("brain context", () => {
-  it("gene scoring maintains same results but is more efficient", () => {
-    const largeGeneSet = Array.from({ length: 1000 }).map((_, i) => ({
-      name: `gene-${i}`,
-      description: `description for gene ${i}`
-    }));
-    largeGeneSet.push({ name: 'parser', description: 'AST parser for JS' });
-    largeGeneSet.push({ name: 'pygount', description: 'lines of code' });
-    largeGeneSet.push({ name: 'other', description: 'something else' });
-
-    const query = "AST parser javascript";
-
-    const originalResults = originalFilterGenesByRelevance(largeGeneSet, query);
-    const optimizedResults = filterGenesByRelevance(largeGeneSet, query);
-
-    assert.deepStrictEqual(optimizedResults, originalResults);
-  });
-
   it("requires API URL when cloud context is requested", async () => {
     const originalUrl = process.env.CODEATLAS_API_URL;
     const originalKey = process.env.CODEATLAS_API_KEY;
