@@ -1055,7 +1055,8 @@ export function getResolvedApiKey(): string | undefined {
 
   let key = process.env.CODEATLAS_API_KEY;
   const validPrefixes = ["ca_", "test-"]; // Currently strict to codeatlas keys
-  if (key && validPrefixes.some(prefix => key!.startsWith(prefix)) && key.length > 5 && /^[a-zA-Z0-9_-]+$/.test(key)) {
+  // Relaxed validation regex to support base64 padding '=' and URL-safe characters if ever needed
+  if (key && validPrefixes.some(prefix => key!.startsWith(prefix)) && key.length > 5 && /^[a-zA-Z0-9_=-]+$/.test(key)) {
     cachedApiKey = key;
     return key;
   }
@@ -1081,7 +1082,7 @@ export function getResolvedApiKey(): string | undefined {
         
         if (parsed.mcpServers?.codeatlas?.env?.CODEATLAS_API_KEY) {
           const foundKey = parsed.mcpServers.codeatlas.env.CODEATLAS_API_KEY;
-          if (foundKey && typeof foundKey === 'string' && validPrefixes.some(prefix => foundKey.trim().startsWith(prefix)) && foundKey.trim().length > 5 && /^[a-zA-Z0-9_-]+$/.test(foundKey.trim())) {
+          if (foundKey && typeof foundKey === 'string' && validPrefixes.some(prefix => foundKey.trim().startsWith(prefix)) && foundKey.trim().length > 5 && /^[a-zA-Z0-9_=-]+$/.test(foundKey.trim())) {
             cachedApiKey = foundKey.trim();
             return cachedApiKey;
           }
@@ -1090,7 +1091,7 @@ export function getResolvedApiKey(): string | undefined {
         for (const serverName of Object.keys(parsed.mcpServers || {})) {
           if (serverName.toLowerCase().includes("codeatlas")) {
             const foundKey = parsed.mcpServers[serverName]?.env?.CODEATLAS_API_KEY;
-            if (foundKey && typeof foundKey === 'string' && validPrefixes.some(prefix => foundKey.trim().startsWith(prefix)) && foundKey.trim().length > 5 && /^[a-zA-Z0-9_-]+$/.test(foundKey.trim())) {
+            if (foundKey && typeof foundKey === 'string' && validPrefixes.some(prefix => foundKey.trim().startsWith(prefix)) && foundKey.trim().length > 5 && /^[a-zA-Z0-9_=-]+$/.test(foundKey.trim())) {
               cachedApiKey = foundKey.trim();
               return cachedApiKey;
             }
