@@ -28,7 +28,7 @@ import {
   registerProject,
   getStats,
   fileExists,
-  getResolvedApiKey,
+  getResolvedApiKey, // Centralized secret resolution for robust fallback logic and validation
   syncAnalysisToServer,
   getEpisodicMemoriesFromServer,
   inMemoryAnalysisCache,
