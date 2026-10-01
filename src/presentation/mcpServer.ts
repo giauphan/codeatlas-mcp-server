@@ -2645,8 +2645,9 @@ def register(ctx):
     {},
     async () => {
       const auth = await checkAuth();
+      const resolvedKey = getResolvedApiKey();
       const results: any = {
-        apiKey: getResolvedApiKey() ? "set" : "not_set",
+        apiKey: resolvedKey && resolvedKey.trim().length > 0 ? "set" : "not_set",
         apiUrl: process.env.CODEATLAS_API_URL || null,
         hermes: {},
         claude: {},
@@ -2837,8 +2838,9 @@ def register(ctx):
         if (!apiUrl) {
           results.cloud = "not_configured";
         } else {
+          const currentKey = getResolvedApiKey();
           const resp = await fetch(`${apiUrl}/api/genome/search?limit=1`, {
-            headers: { "x-api-key": getResolvedApiKey() || "", "User-Agent": "codeatlas-enterprise/2.0" },
+            headers: { "x-api-key": (currentKey && currentKey.trim().length > 0) ? currentKey : "", "User-Agent": "codeatlas-enterprise/2.0" },
           });
           results.cloud = resp.ok ? "reachable" : `error_${resp.status}`;
         }
