@@ -19,10 +19,12 @@ describe("WatcherService tests", () => {
   });
 
   it("should handle HTTPS request correctly and parse response", async () => {
+    const { invalidateApiKeyCache } = await import("./projectService.js");
     const originalKey = process.env.CODEATLAS_API_KEY;
     const originalUrl = process.env.CODEATLAS_API_URL;
-    process.env.CODEATLAS_API_KEY = "test-api-key";
+    process.env.CODEATLAS_API_KEY = "test-api-key-012345678901234567890123456789"; // valid length key
     process.env.CODEATLAS_API_URL = "https://127.0.0.1:9";
+    invalidateApiKeyCache();
 
     const originalRequest = httpsWrapper.request;
     let requestOptions: any = null;
@@ -53,7 +55,7 @@ describe("WatcherService tests", () => {
     try {
       const enabled = await isIndexingEnabledForProject("my-project");
       assert.strictEqual(enabled, false);
-      assert.strictEqual(requestOptions.headers["x-api-key"], "test-api-key");
+      assert.strictEqual(requestOptions.headers["x-api-key"], "test-api-key-012345678901234567890123456789");
       assert.ok(requestOptions.path.includes("projectName=my-project"));
     } finally {
       httpsWrapper.request = originalRequest;

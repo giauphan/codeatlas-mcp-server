@@ -1048,17 +1048,25 @@ export function invalidateApiKeyCache(): void {
   cachedApiKey = undefined;
 }
 
+// Centralized, strict key validation logic
+function isValidApiKey(key: string | undefined | null): boolean {
+  if (!key || typeof key !== 'string') return false;
+  const trimmed = key.trim();
+  const validPrefixes = ["ca_", "test-"];
+  return validPrefixes.some(prefix => trimmed.startsWith(prefix)) &&
+         trimmed.length >= 32 &&
+         /^[a-zA-Z0-9_-]+$/.test(trimmed);
+}
+
 export function getResolvedApiKey(): string | undefined {
   if (cachedApiKey !== undefined) {
     return cachedApiKey;
   }
 
   let key = process.env.CODEATLAS_API_KEY;
-  const validPrefixes = ["ca_", "test-"]; // Currently strict to codeatlas keys
-  // Relaxed validation regex to support base64 padding '=' and URL-safe characters if ever needed
-  if (key && validPrefixes.some(prefix => key!.startsWith(prefix)) && key.length > 5 && /^[a-zA-Z0-9_=-]+$/.test(key)) {
-    cachedApiKey = key;
-    return key;
+  if (isValidApiKey(key)) {
+    cachedApiKey = key!.trim();
+    return cachedApiKey;
   }
 
   const homeDir = getHomePath();
@@ -1082,7 +1090,7 @@ export function getResolvedApiKey(): string | undefined {
         
         if (parsed.mcpServers?.codeatlas?.env?.CODEATLAS_API_KEY) {
           const foundKey = parsed.mcpServers.codeatlas.env.CODEATLAS_API_KEY;
-          if (foundKey && typeof foundKey === 'string' && validPrefixes.some(prefix => foundKey.trim().startsWith(prefix)) && foundKey.trim().length > 5 && /^[a-zA-Z0-9_=-]+$/.test(foundKey.trim())) {
+          if (isValidApiKey(foundKey)) {
             cachedApiKey = foundKey.trim();
             return cachedApiKey;
           }
@@ -1091,7 +1099,7 @@ export function getResolvedApiKey(): string | undefined {
         for (const serverName of Object.keys(parsed.mcpServers || {})) {
           if (serverName.toLowerCase().includes("codeatlas")) {
             const foundKey = parsed.mcpServers[serverName]?.env?.CODEATLAS_API_KEY;
-            if (foundKey && typeof foundKey === 'string' && validPrefixes.some(prefix => foundKey.trim().startsWith(prefix)) && foundKey.trim().length > 5 && /^[a-zA-Z0-9_=-]+$/.test(foundKey.trim())) {
+            if (isValidApiKey(foundKey)) {
               cachedApiKey = foundKey.trim();
               return cachedApiKey;
             }
