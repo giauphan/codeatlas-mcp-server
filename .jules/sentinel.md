@@ -41,3 +41,8 @@
 **Vulnerability:** Several MCP tools directly accessed `process.env.CODEATLAS_API_KEY` to authenticate API requests, bypassing the centralized configuration fallback and validation logic in `getResolvedApiKey()`.
 **Learning:** Hardcoding environment variable checks for secrets (like `process.env.CODEATLAS_API_KEY`) across the codebase instead of using a centralized resolution function leads to inconsistent secret management. It bypasses security measures like configuration file fallbacks or specific validation logic.
 **Prevention:** Always use the dedicated secret resolution function (`getResolvedApiKey()`) to retrieve secrets throughout the application to ensure all clients and servers follow the same authentication validation pipeline.
+
+## 2025-02-28 - Performance Bottlenecks in Fallback Secret Scanning
+**Vulnerability:** A centralized secret resolution function (`getResolvedApiKey()`) scanned multiple configuration files via synchronous I/O on every call, creating a significant performance bottleneck when authenticating high-frequency API requests.
+**Learning:** While centralizing secret retrieval is crucial for security and consistent validation, performing synchronous file reads (e.g., `fs.readFileSync`, `fs.existsSync`) continuously without caching can severely degrade application performance and introduce denial-of-service (DoS) risks in hot paths.
+**Prevention:** Implement memoization or a caching layer for resolved secrets, ensuring that synchronous file I/O is only performed on cold starts, and cached values are returned on subsequent calls.
