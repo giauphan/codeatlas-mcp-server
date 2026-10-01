@@ -1035,12 +1035,12 @@ export async function loadAnalysisAsync(
  * Resolves the CodeAtlas API key using a centralized fallback mechanism.
  *
  * Behavior:
- * 1. Checks `process.env.CODEATLAS_API_KEY`. If valid (starts with 'ca_' or 'test-'), returns it.
+ * 1. Checks `process.env.CODEATLAS_API_KEY`. If valid (starts with 'ca_' or 'test-' followed by alphanumeric characters), returns it.
  * 2. If missing or invalid, falls back to reading IDE-specific configuration files
  *    (Cursor, Gemini, CodeAtlas, Claude) from the user's home directory.
  * 3. Extracts and returns the key from the first valid configuration found.
  *
- * Performance: Caches or performs synchronous file I/O on cold starts. Frequent calls in hot paths should be avoided or memoized if I/O becomes a bottleneck.
+ * Performance: Uses a module-level variable to cache the resolved key, preventing synchronous file I/O operations on subsequent calls. This ensures high performance in hot paths (like API requests) after the initial cold start.
  */
 let cachedApiKey: string | undefined = undefined;
 
@@ -1055,7 +1055,7 @@ export function getResolvedApiKey(): string | undefined {
 
   let key = process.env.CODEATLAS_API_KEY;
   const validPrefixes = ["ca_", "test-"]; // Currently strict to codeatlas keys
-  if (key && validPrefixes.some(prefix => key!.startsWith(prefix))) {
+  if (key && validPrefixes.some(prefix => key!.startsWith(prefix)) && key.length > 5 && /^[a-zA-Z0-9_-]+$/.test(key)) {
     cachedApiKey = key;
     return key;
   }
@@ -1081,7 +1081,7 @@ export function getResolvedApiKey(): string | undefined {
         
         if (parsed.mcpServers?.codeatlas?.env?.CODEATLAS_API_KEY) {
           const foundKey = parsed.mcpServers.codeatlas.env.CODEATLAS_API_KEY;
-          if (foundKey && typeof foundKey === 'string' && foundKey.trim().length > 0) {
+          if (foundKey && typeof foundKey === 'string' && validPrefixes.some(prefix => foundKey.trim().startsWith(prefix)) && foundKey.trim().length > 5 && /^[a-zA-Z0-9_-]+$/.test(foundKey.trim())) {
             cachedApiKey = foundKey.trim();
             return cachedApiKey;
           }
@@ -1090,7 +1090,7 @@ export function getResolvedApiKey(): string | undefined {
         for (const serverName of Object.keys(parsed.mcpServers || {})) {
           if (serverName.toLowerCase().includes("codeatlas")) {
             const foundKey = parsed.mcpServers[serverName]?.env?.CODEATLAS_API_KEY;
-            if (foundKey && typeof foundKey === 'string' && foundKey.trim().length > 0) {
+            if (foundKey && typeof foundKey === 'string' && validPrefixes.some(prefix => foundKey.trim().startsWith(prefix)) && foundKey.trim().length > 5 && /^[a-zA-Z0-9_-]+$/.test(foundKey.trim())) {
               cachedApiKey = foundKey.trim();
               return cachedApiKey;
             }
