@@ -1044,6 +1044,11 @@ export async function loadAnalysisAsync(
  */
 let cachedApiKey: string | undefined = undefined;
 
+/**
+ * Invalidate the API key cache.
+ * Call this function when underlying configuration files have been modified externally
+ * and the application needs to reload the API key from disk.
+ */
 export function invalidateApiKeyCache(): void {
   cachedApiKey = undefined;
 }
