@@ -1044,13 +1044,18 @@ export async function loadAnalysisAsync(
  */
 let cachedApiKey: string | undefined = undefined;
 
+export function invalidateApiKeyCache(): void {
+  cachedApiKey = undefined;
+}
+
 export function getResolvedApiKey(): string | undefined {
   if (cachedApiKey !== undefined) {
     return cachedApiKey;
   }
 
   let key = process.env.CODEATLAS_API_KEY;
-  if (key && (key.startsWith("ca_") || key.startsWith("test-"))) {
+  const validPrefixes = ["ca_", "test-"]; // Currently strict to codeatlas keys
+  if (key && validPrefixes.some(prefix => key!.startsWith(prefix))) {
     cachedApiKey = key;
     return key;
   }
@@ -1093,7 +1098,7 @@ export function getResolvedApiKey(): string | undefined {
         }
       }
     } catch (err) {
-      if (process.env.DEBUG === "true") {
+      if (process.env.DEBUG === "true" || process.env.DEBUG_CONFIG_PARSING === "true") {
         console.debug(`[getResolvedApiKey] Failed to parse config file ${filePath}: ${err}`);
       }
     }
