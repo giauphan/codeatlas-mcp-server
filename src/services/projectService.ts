@@ -1042,9 +1042,16 @@ export async function loadAnalysisAsync(
  *
  * Performance: Caches or performs synchronous file I/O on cold starts. Frequent calls in hot paths should be avoided or memoized if I/O becomes a bottleneck.
  */
+let cachedApiKey: string | undefined = undefined;
+
 export function getResolvedApiKey(): string | undefined {
+  if (cachedApiKey !== undefined) {
+    return cachedApiKey;
+  }
+
   let key = process.env.CODEATLAS_API_KEY;
   if (key && (key.startsWith("ca_") || key.startsWith("test-"))) {
+    cachedApiKey = key;
     return key;
   }
 
@@ -1070,7 +1077,8 @@ export function getResolvedApiKey(): string | undefined {
         if (parsed.mcpServers?.codeatlas?.env?.CODEATLAS_API_KEY) {
           const foundKey = parsed.mcpServers.codeatlas.env.CODEATLAS_API_KEY;
           if (foundKey && typeof foundKey === 'string' && foundKey.trim().length > 0) {
-            return foundKey.trim();
+            cachedApiKey = foundKey.trim();
+            return cachedApiKey;
           }
         }
         
@@ -1078,13 +1086,16 @@ export function getResolvedApiKey(): string | undefined {
           if (serverName.toLowerCase().includes("codeatlas")) {
             const foundKey = parsed.mcpServers[serverName]?.env?.CODEATLAS_API_KEY;
             if (foundKey && typeof foundKey === 'string' && foundKey.trim().length > 0) {
-              return foundKey.trim();
+              cachedApiKey = foundKey.trim();
+              return cachedApiKey;
             }
           }
         }
       }
-    } catch {
-      // ignore
+    } catch (err) {
+      if (process.env.DEBUG === "true") {
+        console.debug(`[getResolvedApiKey] Failed to parse config file ${filePath}: ${err}`);
+      }
     }
   }
 
