@@ -1031,6 +1031,17 @@ export async function loadAnalysisAsync(
   }
 }
 
+/**
+ * Resolves the CodeAtlas API key using a centralized fallback mechanism.
+ *
+ * Behavior:
+ * 1. Checks `process.env.CODEATLAS_API_KEY`. If valid (starts with 'ca_' or 'test-'), returns it.
+ * 2. If missing or invalid, falls back to reading IDE-specific configuration files
+ *    (Cursor, Gemini, CodeAtlas, Claude) from the user's home directory.
+ * 3. Extracts and returns the key from the first valid configuration found.
+ *
+ * Performance: Caches or performs synchronous file I/O on cold starts. Frequent calls in hot paths should be avoided or memoized if I/O becomes a bottleneck.
+ */
 export function getResolvedApiKey(): string | undefined {
   let key = process.env.CODEATLAS_API_KEY;
   if (key && (key.startsWith("ca_") || key.startsWith("test-"))) {
