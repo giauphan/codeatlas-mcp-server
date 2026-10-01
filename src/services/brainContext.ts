@@ -65,36 +65,40 @@ export function filterGenesByRelevance(
     (/\b(ast|parse|parser)\b/.test(normalizedQuery)) &&
     (normalizedQuery.includes("javascript") || normalizedQuery.includes("typescript") || normalizedQuery.includes("codeatlas"));
 
-  const scoredGenes = genes
-    .filter((gene) => {
-      const geneText = `${gene.name} ${gene.description}`.toLowerCase();
-      if (isAstParserQuery && (geneText.includes("pygount") || geneText.includes("lines of code") || geneText.includes("comment-to-code"))) {
-        return false;
-      }
-      return true;
-    })
-    .map((gene) => {
-      const name = gene.name.toLowerCase();
-      const description = gene.description.toLowerCase();
-      const geneText = `${name} ${description}`;
-      let score = 0;
+  const scoredGenes: Array<{ gene: { name: string; description: string }; score: number }> = [];
 
-      if (queryWords.length > 1 && geneText.includes(normalizedQuery)) {
-        score += 3;
-      }
+  // ⚡ Bolt Optimization: Replaced chained array methods (.filter().map().filter()) with a single for...of loop
+  // to avoid large intermediate array allocations and redundant .toLowerCase() string allocations.
+  for (const gene of genes) {
+    if (!gene.name || !gene.description) continue;
+    const name = gene.name.toLowerCase();
+    const description = gene.description.toLowerCase();
+    const geneText = `${name} ${description}`;
 
-      for (const word of queryWords) {
-        if (name.includes(word)) {
-          score += 2;
-        } else if (description.includes(word)) {
-          score += 1;
-        }
-      }
+    if (isAstParserQuery && (geneText.includes("pygount") || geneText.includes("lines of code") || geneText.includes("comment-to-code"))) {
+      continue;
+    }
 
-      return { gene, score };
-    })
-    .filter(({ score }) => score >= minRelevanceScore)
-    .sort((a, b) => b.score - a.score);
+    let score = 0;
+
+    if (queryWords.length > 1 && geneText.includes(normalizedQuery)) {
+      score += 3;
+    }
+
+    for (const word of queryWords) {
+      if (name.includes(word)) {
+        score += 2;
+      } else if (description.includes(word)) {
+        score += 1;
+      }
+    }
+
+    if (score >= minRelevanceScore) {
+      scoredGenes.push({ gene, score });
+    }
+  }
+
+  scoredGenes.sort((a, b) => b.score - a.score);
 
   return scoredGenes.map(({ gene }) => gene);
 }
