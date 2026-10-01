@@ -47,7 +47,7 @@ mock.module("https", {
 });
 
 // Import dynamically after mock.module is registered
-const { syncAnalysisToServer, getEpisodicMemoriesFromServer } = await import("./projectService.js");
+const { syncAnalysisToServer, getEpisodicMemoriesFromServer, invalidateApiKeyCache } = await import("./projectService.js");
 
 describe("projectService network protocol selection", () => {
   let originalApiKey: string | undefined;
@@ -61,10 +61,12 @@ describe("projectService network protocol selection", () => {
   after(() => {
     process.env.CODEATLAS_API_KEY = originalApiKey;
     process.env.CODEATLAS_API_URL = originalApiUrl;
+    invalidateApiKeyCache();
   });
 
   beforeEach(() => {
-    process.env.CODEATLAS_API_KEY = "test-key";
+    process.env.CODEATLAS_API_KEY = "test-key-012345678901234567890123456789"; // Minimum 32 chars for valid format
+    invalidateApiKeyCache();
     httpCalls = [];
     httpsCalls = [];
   });

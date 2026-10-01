@@ -1031,10 +1031,47 @@ export async function loadAnalysisAsync(
   }
 }
 
+/**
+ * Resolves the CodeAtlas API key using a centralized fallback mechanism.
+ *
+ * Behavior:
+ * 1. Checks `process.env.CODEATLAS_API_KEY`. If valid (starts with 'ca_' or 'test-' followed by alphanumeric characters), returns it.
+ * 2. If missing or invalid, falls back to reading IDE-specific configuration files
+ *    (Cursor, Gemini, CodeAtlas, Claude) from the user's home directory.
+ * 3. Extracts and returns the key from the first valid configuration found.
+ *
+ * Performance: Uses a module-level variable to cache the resolved key, preventing synchronous file I/O operations on subsequent calls. This ensures high performance in hot paths (like API requests) after the initial cold start.
+ */
+let cachedApiKey: string | undefined = undefined;
+
+/**
+ * Invalidate the API key cache.
+ * Call this function when underlying configuration files have been modified externally
+ * and the application needs to reload the API key from disk.
+ */
+export function invalidateApiKeyCache(): void {
+  cachedApiKey = undefined;
+}
+
+// Centralized, strict key validation logic
+function isValidApiKey(key: string | undefined | null): boolean {
+  if (!key || typeof key !== 'string') return false;
+  const trimmed = key.trim();
+  const validPrefixes = ["ca_", "test-"];
+  return validPrefixes.some(prefix => trimmed.startsWith(prefix)) &&
+         trimmed.length >= 32 &&
+         /^[a-zA-Z0-9_-]+$/.test(trimmed);
+}
+
 export function getResolvedApiKey(): string | undefined {
+  if (cachedApiKey !== undefined) {
+    return cachedApiKey;
+  }
+
   let key = process.env.CODEATLAS_API_KEY;
-  if (key && (key.startsWith("ca_") || key.startsWith("test-"))) {
-    return key;
+  if (isValidApiKey(key)) {
+    cachedApiKey = key!.trim();
+    return cachedApiKey;
   }
 
   const homeDir = getHomePath();
@@ -1058,22 +1095,26 @@ export function getResolvedApiKey(): string | undefined {
         
         if (parsed.mcpServers?.codeatlas?.env?.CODEATLAS_API_KEY) {
           const foundKey = parsed.mcpServers.codeatlas.env.CODEATLAS_API_KEY;
-          if (foundKey && typeof foundKey === 'string' && foundKey.trim().length > 0) {
-            return foundKey.trim();
+          if (isValidApiKey(foundKey)) {
+            cachedApiKey = foundKey.trim();
+            return cachedApiKey;
           }
         }
         
         for (const serverName of Object.keys(parsed.mcpServers || {})) {
           if (serverName.toLowerCase().includes("codeatlas")) {
             const foundKey = parsed.mcpServers[serverName]?.env?.CODEATLAS_API_KEY;
-            if (foundKey && typeof foundKey === 'string' && foundKey.trim().length > 0) {
-              return foundKey.trim();
+            if (isValidApiKey(foundKey)) {
+              cachedApiKey = foundKey.trim();
+              return cachedApiKey;
             }
           }
         }
       }
-    } catch {
-      // ignore
+    } catch (err) {
+      if (process.env.DEBUG === "true" || process.env.DEBUG_CONFIG_PARSING === "true") {
+        console.debug(`[getResolvedApiKey] Failed to parse config file ${filePath}: ${err}`);
+      }
     }
   }
 
