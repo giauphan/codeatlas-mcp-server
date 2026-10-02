@@ -1052,8 +1052,8 @@ export function getResolvedApiKey(): string | undefined {
       if (filePath.indexOf('\0') !== -1 || filePath.includes('..')) {
         continue;
       }
-      if (fs.existsSync(filePath)) {
-        const content = fs.readFileSync(filePath, "utf8");
+      if (fsWrapper.existsSync(filePath)) {
+        const content = fsWrapper.readFileSync(filePath, "utf8");
         const parsed = JSON.parse(content);
         
         if (parsed.mcpServers?.codeatlas?.env?.CODEATLAS_API_KEY) {
