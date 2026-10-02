@@ -1,6 +1,6 @@
-import { describe, it } from "node:test";
+import { describe, it, beforeEach, afterEach } from "node:test";
 import * as assert from "node:assert";
-import { getWorkspaceFromAncestors, fsWrapper, isSystemIdeDirectory } from "./projectService.js";
+import { getWorkspaceFromAncestors, fsWrapper, isSystemIdeDirectory, getResolvedApiKey } from "./projectService.js";
 
 // Helper to temporarily stub fsWrapper functions
 function stubFsWrapper(stubs: { existsSync?: (p: string) => boolean; readFileSync?: (p: string, encoding: "utf8") => string; readdirSync?: (p: string) => string[] }) {
@@ -189,5 +189,77 @@ describe("Workspace Path Resolution & Discovery Tests", () => {
         restore();
       }
     });
+  });
+});
+
+describe("getResolvedApiKey", () => {
+  let originalEnvKey: string | undefined;
+
+  beforeEach(() => {
+    originalEnvKey = process.env.CODEATLAS_API_KEY;
+    delete process.env.CODEATLAS_API_KEY;
+  });
+
+  afterEach(() => {
+    if (originalEnvKey === undefined) {
+      delete process.env.CODEATLAS_API_KEY;
+    } else {
+      process.env.CODEATLAS_API_KEY = originalEnvKey;
+    }
+  });
+
+  it("returns key from process.env if it starts with ca_", () => {
+    process.env.CODEATLAS_API_KEY = "ca_test_123";
+    assert.strictEqual(getResolvedApiKey(), "ca_test_123");
+  });
+
+  it("returns key from process.env if it starts with test-", () => {
+    process.env.CODEATLAS_API_KEY = "test-123";
+    assert.strictEqual(getResolvedApiKey(), "test-123");
+  });
+
+  it("ignores invalid process.env key and falls back to searching configs", () => {
+    process.env.CODEATLAS_API_KEY = "invalid-key-no-prefix";
+    // We expect it to try to find a config and likely return undefined
+    // since we haven't stubbed config files for this test.
+    const res = getResolvedApiKey();
+    assert.ok(res !== "invalid-key-no-prefix");
+  });
+
+  it("returns key from parsed config file if present", () => {
+    const restore = stubFsWrapper({
+      existsSync: (p: string) => p.includes("mcp_config.json"),
+      readFileSync: (p: string) => {
+        if (p.includes("mcp_config.json")) {
+          return JSON.stringify({
+            mcpServers: {
+              codeatlas: {
+                env: {
+                  CODEATLAS_API_KEY: "ca_from_config"
+                }
+              }
+            }
+          });
+        }
+        return "";
+      }
+    });
+
+    try {
+      assert.strictEqual(getResolvedApiKey(), "ca_from_config");
+    } finally {
+      restore();
+    }
+  });
+
+  it("returns undefined if no config files have the key", () => {
+    const restore = stubFsWrapper({
+      existsSync: () => false
+    });
+    try {
+      assert.strictEqual(getResolvedApiKey(), undefined);
+    } finally {
+      restore();
+    }
   });
 });
