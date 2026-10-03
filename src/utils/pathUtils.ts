@@ -75,7 +75,7 @@ export function getZedSettingsPath(): string {
  * @param mode - The file mode to use if creating a new file (defaults to 0o600).
  * @throws {Error} If the file cannot be opened securely (e.g. if it is a symlink).
  */
-export function appendFileSyncNoFollow(filePath: string, content: string, mode: number = 0o600): void {
+export function appendFileSyncNoFollow(filePath: string, content: string, mode: number = 0o600, encoding: BufferEncoding = "utf-8"): void {
   let fd: number;
   try {
     fd = fs.openSync(
@@ -93,13 +93,13 @@ export function appendFileSyncNoFollow(filePath: string, content: string, mode: 
     throw new Error(`Failed to safely open file for appending: ${err.message}`);
   }
   try {
-    fs.writeFileSync(fd, content);
+    fs.writeFileSync(fd, content, { encoding });
   } finally {
     fs.closeSync(fd);
   }
 }
 
-export function writeFileSyncNoFollow(filePath: string, content: string, mode: number = 0o600): void {
+export function writeFileSyncNoFollow(filePath: string, content: string, mode: number = 0o600, encoding: BufferEncoding = "utf-8"): void {
   const fd = fs.openSync(
     filePath,
     fs.constants.O_CREAT |   // Create file if it doesn't exist
@@ -109,7 +109,7 @@ export function writeFileSyncNoFollow(filePath: string, content: string, mode: n
     mode
   );
   try {
-    fs.writeFileSync(fd, content);
+    fs.writeFileSync(fd, content, { encoding });
   } finally {
     fs.closeSync(fd);
   }
