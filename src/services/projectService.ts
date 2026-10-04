@@ -1031,10 +1031,28 @@ export async function loadAnalysisAsync(
   }
 }
 
+let cachedApiKey: string | undefined;
+
+/**
+ * Retrieves the CodeAtlas API key by checking the environment variable first,
+ * and falling back to known configuration files if it's missing.
+ *
+ * Resolution order:
+ * 1. `process.env.CODEATLAS_API_KEY` (if it starts with 'ca_' or 'test-')
+ * 2. `~/.gemini/antigravity/mcp_config.json`
+ * 3. `~/.cursor/mcp.json`
+ * 4. `~/.codeatlas/config.json`
+ * 5. Claude Desktop config paths (OS dependent)
+ *
+ * @returns {string | undefined} The resolved API key or undefined if not found.
+ */
 export function getResolvedApiKey(): string | undefined {
+  if (cachedApiKey) return cachedApiKey;
+
   let key = process.env.CODEATLAS_API_KEY;
   if (key && (key.startsWith("ca_") || key.startsWith("test-"))) {
-    return key;
+    cachedApiKey = key;
+    return cachedApiKey;
   }
 
   const homeDir = getHomePath();
@@ -1059,7 +1077,8 @@ export function getResolvedApiKey(): string | undefined {
         if (parsed.mcpServers?.codeatlas?.env?.CODEATLAS_API_KEY) {
           const foundKey = parsed.mcpServers.codeatlas.env.CODEATLAS_API_KEY;
           if (foundKey && typeof foundKey === 'string' && foundKey.trim().length > 0) {
-            return foundKey.trim();
+            cachedApiKey = foundKey.trim();
+            return cachedApiKey;
           }
         }
         
@@ -1067,7 +1086,8 @@ export function getResolvedApiKey(): string | undefined {
           if (serverName.toLowerCase().includes("codeatlas")) {
             const foundKey = parsed.mcpServers[serverName]?.env?.CODEATLAS_API_KEY;
             if (foundKey && typeof foundKey === 'string' && foundKey.trim().length > 0) {
-              return foundKey.trim();
+              cachedApiKey = foundKey.trim();
+              return cachedApiKey;
             }
           }
         }
