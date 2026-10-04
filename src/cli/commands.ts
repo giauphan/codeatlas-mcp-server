@@ -12,6 +12,7 @@ import * as path from "path";
 import * as os from "os";
 import * as readline from "readline";
 import { checkSpawnResult } from "../utils/processUtils.js";
+import { getResolvedApiKey } from "../services/projectService.js";
 import {
   getHomePath,
   getHermesConfigPath,
@@ -67,7 +68,7 @@ export async function cloudFetch(method: string, path_: string, body?: any): Pro
     "User-Agent": "codeatlas-enterprise-cli/2.0",
     "Content-Type": "application/json",
   };
-  const apiKey = process.env.CODEATLAS_API_KEY;
+  const apiKey = getResolvedApiKey();
   if (apiKey) headers["x-api-key"] = apiKey;
   try {
     const controller = new AbortController();
@@ -443,7 +444,7 @@ export function checkFeaturesDiff(): {
     astParsers: ["TypeScript", "JavaScript", "Python", "PHP"],
     adrCount,
     localMode: !process.env.CODEATLAS_API_URL,
-    cloudSync: Boolean(process.env.CODEATLAS_API_URL && process.env.CODEATLAS_API_KEY),
+    cloudSync: Boolean(process.env.CODEATLAS_API_URL && getResolvedApiKey()),
     connectedClients
   };
 }
@@ -608,8 +609,10 @@ export async function cmdDoctor(): Promise<void> {
 
   // 4. Environment & Cloud Services
   console.log(`\n${bold("4. Environment & Cloud Services")}`);
-  const hasApiKey = Boolean(process.env.CODEATLAS_API_KEY);
-  console.log(`  ${hasApiKey ? ok() : warn()} CODEATLAS_API_KEY: ${hasApiKey ? "Set" : "not set (local mode only)"}`);
+  const apiKey = getResolvedApiKey();
+  const hasApiKey = Boolean(apiKey);
+  const keySource = apiKey === process.env.CODEATLAS_API_KEY ? "(from env)" : "(from config)";
+  console.log(`  ${hasApiKey ? ok() : warn()} API Key resolved: ${hasApiKey ? "Set " + keySource : "not set (local mode only)"}`);
   countCheck(hasApiKey ? "ok" : "warn");
 
   if (API_URL) {
@@ -789,9 +792,14 @@ export async function cmdBrainContext(): Promise<void> {
   const project = process.env.CODEATLAS_PROJECT || (cwd ? path.basename(cwd) : "default");
   const limit = payload.limit || 5;
 
-  if (!process.env.CODEATLAS_API_URL || !process.env.CODEATLAS_API_KEY) {
-    // Silently exit if not configured
-    process.exit(0);
+  try {
+    if (!process.env.CODEATLAS_API_URL || !getResolvedApiKey()) {
+      // Silently exit if not configured
+      process.exit(0);
+    }
+  } catch (err) {
+    console.error(`Failed to resolve API key: `, err instanceof Error ? err.message : String(err));
+    process.exit(1);
   }
 
   try {
@@ -819,9 +827,14 @@ export async function cmdBrainSave(): Promise<void> {
     }
   }
 
-  if (!process.env.CODEATLAS_API_URL || !process.env.CODEATLAS_API_KEY) {
-    // Silently exit if not configured
-    process.exit(0);
+  try {
+    if (!process.env.CODEATLAS_API_URL || !getResolvedApiKey()) {
+      // Silently exit if not configured
+      process.exit(0);
+    }
+  } catch (err) {
+    console.error(`Failed to resolve API key: `, err instanceof Error ? err.message : String(err));
+    process.exit(1);
   }
 
   const cwd = payload.cwd || process.env.CLAUDE_PROJECT_DIR || process.cwd();

@@ -1031,10 +1031,39 @@ export async function loadAnalysisAsync(
   }
 }
 
+/**
+ * Retrieves the CodeAtlas API key by checking the environment variable first,
+ * and falling back to known configuration files if it's missing.
+ *
+ * Resolution order:
+ * 1. `process.env.CODEATLAS_API_KEY` (if it starts with 'ca_' or 'test-')
+ * 2. `~/.gemini/antigravity/mcp_config.json`
+ * 3. `~/.cursor/mcp.json`
+ * 4. `~/.codeatlas/config.json`
+ * 5. Claude Desktop config paths (OS dependent)
+ *
+ * @returns {string | undefined} The resolved API key or undefined if not found.
+ */
+let cachedApiKey: string | undefined;
+let cachedApiKeyTimestamp: number = 0;
+const API_KEY_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+export function invalidateApiKeyCache(): void {
+  cachedApiKey = undefined;
+  cachedApiKeyTimestamp = 0;
+}
+
 export function getResolvedApiKey(): string | undefined {
+  const now = Date.now();
+  if (cachedApiKey && (now - cachedApiKeyTimestamp < API_KEY_CACHE_TTL)) {
+    return cachedApiKey;
+  }
+
   let key = process.env.CODEATLAS_API_KEY;
   if (key && (key.startsWith("ca_") || key.startsWith("test-"))) {
-    return key;
+    cachedApiKey = key;
+    cachedApiKeyTimestamp = now;
+    return cachedApiKey;
   }
 
   const homeDir = getHomePath();
@@ -1059,7 +1088,10 @@ export function getResolvedApiKey(): string | undefined {
         if (parsed.mcpServers?.codeatlas?.env?.CODEATLAS_API_KEY) {
           const foundKey = parsed.mcpServers.codeatlas.env.CODEATLAS_API_KEY;
           if (foundKey && typeof foundKey === 'string' && foundKey.trim().length > 0) {
-            return foundKey.trim();
+            console.error(`[Config] 🔑 Resolved CodeAtlas API Key from configuration file: ${filePath}`);
+            cachedApiKey = foundKey.trim();
+            cachedApiKeyTimestamp = now;
+            return cachedApiKey;
           }
         }
         
@@ -1067,16 +1099,20 @@ export function getResolvedApiKey(): string | undefined {
           if (serverName.toLowerCase().includes("codeatlas")) {
             const foundKey = parsed.mcpServers[serverName]?.env?.CODEATLAS_API_KEY;
             if (foundKey && typeof foundKey === 'string' && foundKey.trim().length > 0) {
-              return foundKey.trim();
+              console.error(`[Config] 🔑 Resolved CodeAtlas API Key from configuration file: ${filePath} (server: ${serverName})`);
+              cachedApiKey = foundKey.trim();
+              cachedApiKeyTimestamp = now;
+              return cachedApiKey;
             }
           }
         }
       }
-    } catch {
-      // ignore
+    } catch (err) {
+      console.error(`[Config] ⚠️ Failed to read or parse config file ${filePath}: `, err instanceof Error ? err.message : String(err));
     }
   }
 
+  console.error(`[Config] ℹ️ API key not found in env or any of the fallback paths`);
   return undefined;
 }
 

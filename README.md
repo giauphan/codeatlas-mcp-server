@@ -206,3 +206,15 @@ MIT © [Giau Phan](mailto:giauphan012@gmail.com)
 
 - Report bugs or request features: [GitHub Issues](https://github.com/giauphan/codeatlas-mcp-server/issues)
 - For questions: [Discussions](https://github.com/giauphan/codeatlas-mcp-server/discussions)
+
+## Configuration & API Key Resolution
+
+The server resolves the `CODEATLAS_API_KEY` securely and automatically. It checks the following locations in order:
+
+1. The `CODEATLAS_API_KEY` environment variable.
+2. `~/.gemini/antigravity/mcp_config.json`
+3. `~/.cursor/mcp.json`
+4. `~/.codeatlas/config.json`
+5. Claude Desktop configurations (e.g. `~/.config/Claude/claude_desktop_config.json`)
+
+This centralized resolution ensures smooth operation across different clients and setups without needing redundant manual configuration.
