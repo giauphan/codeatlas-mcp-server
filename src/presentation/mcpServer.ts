@@ -1060,7 +1060,7 @@ export function registerTools(server: McpServer) {
       try {
         const serverUrl = getApiUrl();
         const apiKey = getResolvedApiKey();
-        if (!apiKey) throw new Error("CODEATLAS_API_KEY not set");
+        if (!apiKey) throw new Error("CODEATLAS_API_KEY could not be resolved from environment or configuration files");
 
         const qs = new URLSearchParams({ query, limit: String(limit || 10) });
         if (project) qs.set("project", project);
@@ -1094,7 +1094,7 @@ export function registerTools(server: McpServer) {
       try {
         const serverUrl = getApiUrl();
         const apiKey = getResolvedApiKey();
-        if (!apiKey) throw new Error("CODEATLAS_API_KEY not set");
+        if (!apiKey) throw new Error("CODEATLAS_API_KEY could not be resolved from environment or configuration files");
 
         const url = `${serverUrl.replace(/\/+$/, "")}/api/genome/gene/${encodeURIComponent(geneId)}`;
         const resp = await fetch(url, {
@@ -1129,7 +1129,7 @@ export function registerTools(server: McpServer) {
       try {
         const serverUrl = getApiUrl();
         const apiKey = getResolvedApiKey();
-        if (!apiKey) throw new Error("CODEATLAS_API_KEY not set");
+        if (!apiKey) throw new Error("CODEATLAS_API_KEY could not be resolved from environment or configuration files");
 
         const qs = new URLSearchParams({ problem });
         if (project) qs.set("project", project);
@@ -1166,7 +1166,7 @@ export function registerTools(server: McpServer) {
       try {
         const serverUrl = getApiUrl();
         const apiKey = getResolvedApiKey();
-        if (!apiKey) throw new Error("CODEATLAS_API_KEY not set");
+        if (!apiKey) throw new Error("CODEATLAS_API_KEY could not be resolved from environment or configuration files");
 
         const url = `${serverUrl.replace(/\/+$/, "")}/api/genome/immune`;
         const resp = await fetch(url, {
@@ -2478,7 +2478,7 @@ export function registerTools(server: McpServer) {
 
       const key = apiKey || getResolvedApiKey();
       if (!key) return { content: [{ type: "text" as const, text: JSON.stringify({
-        success: false, error: "CODEATLAS_API_KEY not set. Provide apiKey parameter or set env var."
+        success: false, error: "CODEATLAS_API_KEY not set. Provide apiKey parameter or configure it in the environment/config files."
       }, null, 2) }] };
 
       const results: any[] = [];
@@ -2837,8 +2837,10 @@ def register(ctx):
         if (!apiUrl) {
           results.cloud = "not_configured";
         } else {
+          const resolvedKey = getResolvedApiKey();
+          if (!resolvedKey) throw new Error("CODEATLAS_API_KEY not resolved");
           const resp = await fetch(`${apiUrl}/api/genome/search?limit=1`, {
-            headers: { "x-api-key": getResolvedApiKey() || "", "User-Agent": "codeatlas-enterprise/2.0" },
+            headers: { "x-api-key": resolvedKey, "User-Agent": "codeatlas-enterprise/2.0" },
           });
           results.cloud = resp.ok ? "reachable" : `error_${resp.status}`;
         }
