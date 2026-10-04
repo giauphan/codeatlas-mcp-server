@@ -609,8 +609,10 @@ export async function cmdDoctor(): Promise<void> {
 
   // 4. Environment & Cloud Services
   console.log(`\n${bold("4. Environment & Cloud Services")}`);
-  const hasApiKey = Boolean(process.env.CODEATLAS_API_KEY);
-  console.log(`  ${hasApiKey ? ok() : warn()} CODEATLAS_API_KEY: ${hasApiKey ? "Set" : "not set (local mode only)"}`);
+  const apiKey = getResolvedApiKey();
+  const hasApiKey = Boolean(apiKey);
+  const keySource = apiKey === process.env.CODEATLAS_API_KEY ? "(from env)" : "(from config)";
+  console.log(`  ${hasApiKey ? ok() : warn()} API Key resolved: ${hasApiKey ? "Set " + keySource : "not set (local mode only)"}`);
   countCheck(hasApiKey ? "ok" : "warn");
 
   if (API_URL) {
