@@ -792,9 +792,14 @@ export async function cmdBrainContext(): Promise<void> {
   const project = process.env.CODEATLAS_PROJECT || (cwd ? path.basename(cwd) : "default");
   const limit = payload.limit || 5;
 
-  if (!process.env.CODEATLAS_API_URL || !getResolvedApiKey()) {
-    // Silently exit if not configured
-    process.exit(0);
+  try {
+    if (!process.env.CODEATLAS_API_URL || !getResolvedApiKey()) {
+      // Silently exit if not configured
+      process.exit(0);
+    }
+  } catch (err) {
+    console.error(`Failed to resolve API key: `, err instanceof Error ? err.message : String(err));
+    process.exit(1);
   }
 
   try {
@@ -822,9 +827,14 @@ export async function cmdBrainSave(): Promise<void> {
     }
   }
 
-  if (!process.env.CODEATLAS_API_URL || !getResolvedApiKey()) {
-    // Silently exit if not configured
-    process.exit(0);
+  try {
+    if (!process.env.CODEATLAS_API_URL || !getResolvedApiKey()) {
+      // Silently exit if not configured
+      process.exit(0);
+    }
+  } catch (err) {
+    console.error(`Failed to resolve API key: `, err instanceof Error ? err.message : String(err));
+    process.exit(1);
   }
 
   const cwd = payload.cwd || process.env.CLAUDE_PROJECT_DIR || process.cwd();

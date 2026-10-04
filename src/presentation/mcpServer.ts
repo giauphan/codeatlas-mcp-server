@@ -2838,7 +2838,7 @@ def register(ctx):
           results.cloud = "not_configured";
         } else {
           const resolvedKey = getResolvedApiKey();
-          if (!resolvedKey) throw new Error("CODEATLAS_API_KEY not resolved");
+          if (!resolvedKey) throw new Error("CODEATLAS_API_KEY not resolved from environment or configuration files. Please check diagnostic logs.");
           const resp = await fetch(`${apiUrl}/api/genome/search?limit=1`, {
             headers: { "x-api-key": resolvedKey, "User-Agent": "codeatlas-enterprise/2.0" },
           });
