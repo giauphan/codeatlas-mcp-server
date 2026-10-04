@@ -175,7 +175,7 @@ try:
                 continue
             try:
                 line = json.loads(raw)
-            except json.JSONDecodeError:
+            except Exception:
                 continue
 
             if line.get('isMeta'):

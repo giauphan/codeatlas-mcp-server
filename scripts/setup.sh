@@ -128,7 +128,7 @@ try:
                 continue
             try:
                 line = json.loads(raw)
-            except json.JSONDecodeError:
+            except Exception:
                 continue
 
             if line.get('isMeta'):
@@ -249,7 +249,7 @@ readarray -t HOOK_FIELDS < <(python3 -c '
 import json, os, sys
 try:
     payload = json.loads(os.environ.get("HOOK_INPUT", ""))
-except json.JSONDecodeError:
+except Exception:
     payload = {}
 print(payload.get("prompt", "session context"))
 print(payload.get("cwd") or os.environ.get("CLAUDE_PROJECT_DIR") or os.getcwd())
@@ -285,7 +285,7 @@ import os
 def load(name):
     try:
         return json.loads(os.environ.get(name, ""))
-    except json.JSONDecodeError:
+    except Exception:
         return {}
 
 
@@ -425,7 +425,7 @@ import json, os
 sp=os.path.expanduser("~/.claude/settings.json")
 try:
     with open(sp) as f: s=json.load(f)
-except: s={"hooks":{}}
+except Exception: s={"hooks":{}}
 hd=os.path.expanduser("~/.claude/hooks")
 hk=s.setdefault("hooks",{})
 for ev,hp in [("UserPromptSubmit",f"{hd}/brain-context.sh"),("PostToolUse",f"{hd}/brain-save.sh"),("PreToolUse",f"{hd}/task-router.sh")]:

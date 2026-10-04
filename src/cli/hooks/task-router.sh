@@ -24,7 +24,7 @@ try:
         print("true")
     else:
         print("false")
-except:
+except Exception:
     print("false")
 ' 2>/dev/null | grep -q "true"; then
 
@@ -36,7 +36,7 @@ def main():
     input_str = sys.argv[1]
     try:
         data = json.loads(input_str)
-    except json.JSONDecodeError:
+    except Exception:
         data = {}
     
     tool = data.get("tool") or data.get("tool_name", "")
