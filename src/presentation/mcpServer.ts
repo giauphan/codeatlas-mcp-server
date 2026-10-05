@@ -1901,8 +1901,9 @@ export function registerTools(server: McpServer) {
         } catch { /* skip */ }
       }
 
+      const uniqueFiles = new Set(results.map(r => r.file));
       return {
-        content: [{ type: "text" as const, text: JSON.stringify({ query, project: loaded.projectName, matchCount: results.length, truncated: results.length >= maxRes, files: [...new Set(results.map(r => r.file))], results: results.slice(0, maxRes) }, null, 2) }],
+        content: [{ type: "text" as const, text: JSON.stringify({ query, project: loaded.projectName, matchCount: results.length, truncated: results.length >= maxRes, files: Array.from(uniqueFiles), results: results.slice(0, maxRes) }, null, 2) }],
       };
     }
   );
