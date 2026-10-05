@@ -2510,7 +2510,8 @@ export function registerTools(server: McpServer) {
               results.push({ client: "hermes", action: "mcp_config", status: "appended" });
             }
           } else {
-            fs.mkdirSync(path.dirname(hermesCfg), { recursive: true });
+            const hermesDir = path.dirname(hermesCfg);
+            if (!fs.existsSync(hermesDir)) fs.mkdirSync(hermesDir, { recursive: true });
             writeFileSyncNoFollow(hermesCfg, "mcp_servers:\n" + mcpEntry);
             results.push({ client: "hermes", action: "mcp_config", status: "created" });
           }
@@ -2522,7 +2523,9 @@ export function registerTools(server: McpServer) {
         if (autoPlugin) {
           try {
             const pluginDir = getHermesPluginDir();
-            if (!fs.existsSync(pluginDir)) fs.mkdirSync(pluginDir, { recursive: true });
+            if (!fs.existsSync(pluginDir)) {
+                fs.mkdirSync(pluginDir, { recursive: true });
+            }
             const pluginInit = `"""CodeAtlas Second Brain Plugin — Auto activation on every turn"""
 import json, os, urllib.request, urllib.parse, logging
 from typing import Any
@@ -2619,7 +2622,8 @@ def register(ctx):
             writeFileSyncNoFollow(claudeCfg, JSON.stringify(existing, null, 2));
             results.push({ client: "claude", action: "mcp_config", status: "updated" });
           } else {
-            fs.mkdirSync(path.dirname(claudeCfg), { recursive: true });
+            const claudeDir = path.dirname(claudeCfg);
+            if (!fs.existsSync(claudeDir)) fs.mkdirSync(claudeDir, { recursive: true });
             writeFileSyncNoFollow(claudeCfg, JSON.stringify(claudeEntry, null, 2));
             results.push({ client: "claude", action: "mcp_config", status: "created" });
           }
@@ -3558,7 +3562,8 @@ def register(ctx):
       }
 
       // Default: sync
-      fs.mkdirSync(path.dirname(BRAIN_SKILLS_PATH), { recursive: true });
+      const brainSkillsDir = path.dirname(BRAIN_SKILLS_PATH);
+      if (!fs.existsSync(brainSkillsDir)) fs.mkdirSync(brainSkillsDir, { recursive: true });
       const inventory = {
         syncedAt: new Date().toISOString(),
         totalSkills: skills.length,
