@@ -65,37 +65,38 @@ export function filterGenesByRelevance(
     (/\b(ast|parse|parser)\b/.test(normalizedQuery)) &&
     (normalizedQuery.includes("javascript") || normalizedQuery.includes("typescript") || normalizedQuery.includes("codeatlas"));
 
-  const scoredGenes = genes
-    .filter((gene) => {
-      const geneText = `${gene.name} ${gene.description}`.toLowerCase();
-      if (isAstParserQuery && (geneText.includes("pygount") || geneText.includes("lines of code") || geneText.includes("comment-to-code"))) {
-        return false;
+  const scoredGenes: Array<{ gene: { name: string; description: string }; score: number }> = [];
+
+  // ⚡ Bolt Optimization: Replaced chained .filter().map().filter() with a single loop
+  for (const gene of genes) {
+    const name = gene.name.toLowerCase();
+    const description = gene.description.toLowerCase();
+    const geneText = `${name} ${description}`;
+
+    if (isAstParserQuery && (geneText.includes("pygount") || geneText.includes("lines of code") || geneText.includes("comment-to-code"))) {
+      continue;
+    }
+
+    let score = 0;
+
+    if (queryWords.length > 1 && geneText.includes(normalizedQuery)) {
+      score += 3;
+    }
+
+    for (const word of queryWords) {
+      if (name.includes(word)) {
+        score += 2;
+      } else if (description.includes(word)) {
+        score += 1;
       }
-      return true;
-    })
-    .map((gene) => {
-      const name = gene.name.toLowerCase();
-      const description = gene.description.toLowerCase();
-      const geneText = `${name} ${description}`;
-      let score = 0;
+    }
 
-      if (queryWords.length > 1 && geneText.includes(normalizedQuery)) {
-        score += 3;
-      }
+    if (score >= minRelevanceScore) {
+      scoredGenes.push({ gene, score });
+    }
+  }
 
-      for (const word of queryWords) {
-        if (name.includes(word)) {
-          score += 2;
-        } else if (description.includes(word)) {
-          score += 1;
-        }
-      }
-
-      return { gene, score };
-    })
-    .filter(({ score }) => score >= minRelevanceScore)
-    .sort((a, b) => b.score - a.score);
-
+  scoredGenes.sort((a, b) => b.score - a.score);
   return scoredGenes.map(({ gene }) => gene);
 }
 
