@@ -46,6 +46,7 @@ describe("Dreaming Service - HTTPS Client", () => {
     requestMock = null;
     delete process.env.CODEATLAS_API_KEY;
     process.env.CODEATLAS_API_URL = "https://127.0.0.1:9";
+    process.env.CODEATLAS_ALLOW_CUSTOM_URL = "true";
   });
 
   afterEach(() => {
