@@ -3,6 +3,7 @@ import * as path from 'path';
 import * as https from 'https';
 import * as http from 'http';
 import { loadAnalysisAsync, registerOnProjectLoaded, getWorkspaceFromAncestors, getResolvedApiKey, isSystemIdeDirectory } from './projectService.js';
+import { getApiUrl } from '../utils/envUtils.js';
 
 export const httpsWrapper = {
   request: (options: any, callback: (res: any) => void) => {
@@ -22,8 +23,7 @@ export async function isIndexingEnabledForProject(projectName: string): Promise<
 
   return new Promise<boolean>((resolve) => {
     try {
-      const serverUrlStr = process.env.CODEATLAS_API_URL;
-            if (!serverUrlStr) throw new Error("CODEATLAS_API_URL not set");
+      const serverUrlStr = getApiUrl();
       const serverUrl = new URL(serverUrlStr);
       const options = {
         hostname: serverUrl.hostname,

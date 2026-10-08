@@ -65,6 +65,7 @@ describe("projectService network protocol selection", () => {
 
   beforeEach(() => {
     process.env.CODEATLAS_API_KEY = "test-key";
+    process.env.CODEATLAS_ALLOW_CUSTOM_URL = "true";
     httpCalls = [];
     httpsCalls = [];
   });
