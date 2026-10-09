@@ -88,3 +88,6 @@
 ## 2026-09-20 - Optimize graph traversal BFS using adjacency lists
 **Learning:** In heavily connected graphs or dense source representations (like an AST module or dependency tree), iterating over an entire edge list (`O(E)`) inside every depth level of a Breadth-First Search leads to a debilitating `O(D * E)` bottleneck. Because `links.filter()` loops over the *entire* collection just to check inclusion or type, repeatedly filtering links directly inside a loop magnifies this inefficiency, causing massive GC pressure and execution latency.
 **Action:** Always precompute graph relationships into a neighbor lookup structure (e.g., `Map<string, string[]>`) before starting a graph traversal. This drops the complexity from `O(D * E)` down to `O(V + E)`, drastically reducing the total number of required loop iterations.
+## 2024-10-09 - [Prevent Intermediate Array Allocations in Set Creation]
+**Learning:** Creating a Set from a mapped array (`new Set(array.map(...))`) creates a full intermediate array in memory before populating the Set. This causes unnecessary memory allocations and garbage collection overhead, particularly for large datasets.
+**Action:** Always replace `new Set(array.map(...))` with a `for...of` loop using `Set.add()`. This iterates the source once and populates the Set directly, preventing the intermediate array allocation entirely.
