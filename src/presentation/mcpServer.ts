@@ -560,11 +560,19 @@ export function registerTools(server: McpServer) {
         return { content: [{ type: "text" as const, text: "No analysis data found. Run 'analyze' tool first." }] };
       }
 
-      const searchRegex = new RegExp(escapeRegExp(filePath.replace(/\\/g, "/")), 'i');
-      const matches = loaded.analysis.graph.nodes.filter((n) => {
-        const fp = (n.filePath || n.id).replace(/\\/g, "/");
-        return searchRegex.test(fp);
-      });
+      // ⚡ Bolt Optimization: Avoid O(N) string allocations from .replace(/\\/g, "/") inside the loop
+      // by making the Regex flexible enough to match either forward or backward slashes.
+      // Combined into a single for...of loop to prevent chaining allocations.
+      const normalizedPath = filePath.replace(/\\/g, "/");
+      const flexRegexStr = escapeRegExp(normalizedPath).replace(/\//g, "[\\\\/]");
+      const searchRegex = new RegExp(flexRegexStr, 'i');
+
+      const matches: typeof loaded.analysis.graph.nodes = [];
+      for (const n of loaded.analysis.graph.nodes) {
+        if (searchRegex.test(n.filePath || n.id)) {
+          matches.push(n);
+        }
+      }
 
       const links = loaded.analysis.graph.links;
       const nodeMap = createNodeLabelMap(loaded.analysis.graph.nodes);
