@@ -63,3 +63,19 @@ export function takeByPriority<T extends { type: string }>(nodes: T[], max?: num
 
   return max !== undefined ? sorted.slice(0, max) : sorted;
 }
+
+/**
+ * ⚡ Bolt Optimization: Replace chained array operations with a single pass bounded generator
+ * Takes an iterable and returns an array containing at most `count` elements.
+ * This avoids spreading massive iterables into large arrays when only a slice is needed.
+ */
+export function takeFromIterable<T>(iterable: Iterable<T>, count: number): T[] {
+  const result: T[] = [];
+  let i = 0;
+  for (const item of iterable) {
+    if (i >= count) break;
+    result.push(item);
+    i++;
+  }
+  return result;
+}
