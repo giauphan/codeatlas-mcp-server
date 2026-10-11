@@ -1,0 +1,12 @@
+<<<<<<< SEARCH
+      if (parsedUrl.hostname === "::1" || parsedUrl.hostname.toLowerCase().startsWith("fd") || parsedUrl.hostname.toLowerCase().startsWith("fc")) {
+          console.warn("[SecurityScanner] SSRF Attempt Blocked: Internal IPv6 address rejected");
+          return findings;
+      }
+=======
+      // IPv6 URL hostnames include brackets, e.g., "[::1]"
+      if (parsedUrl.hostname === "[::1]" || parsedUrl.hostname.toLowerCase().startsWith("[fd") || parsedUrl.hostname.toLowerCase().startsWith("[fc")) {
+          console.warn("[SecurityScanner] SSRF Attempt Blocked: Internal IPv6 address rejected");
+          return findings;
+      }
+>>>>>>> REPLACE

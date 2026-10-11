@@ -93,12 +93,38 @@ export class SecurityScanner {
       return findings;
     }
 
-    // 🛡️ Ensure destination matches the intended AI provider service to prevent credential exfiltration
+    // 🛡️ Ensure destination matches the intended AI provider service to prevent credential exfiltration and SSRF
     try {
       const parsedUrl = new URL(aiUrl);
-      if (parsedUrl.protocol !== "https:" && parsedUrl.hostname !== "localhost" && parsedUrl.hostname !== "127.0.0.1") {
+      const isLocal = parsedUrl.hostname === "localhost" || parsedUrl.hostname === "127.0.0.1";
+
+      if (parsedUrl.protocol !== "https:" && !isLocal) {
         console.warn("[SecurityScanner] Insecure AI scan URL protocol rejected");
         return findings;
+      }
+
+      // Prevent SSRF to internal network infrastructure
+      const ipParts = parsedUrl.hostname.split('.');
+      if (ipParts.length === 4 && ipParts.every(p => !isNaN(parseInt(p, 10)))) {
+        const a = parseInt(ipParts[0], 10);
+        const b = parseInt(ipParts[1], 10);
+        const isInternalIP =
+          a === 10 ||
+          (a === 172 && b >= 16 && b <= 31) ||
+          (a === 192 && b === 168) ||
+          (a === 169 && b === 254) ||
+          (a === 127 && parsedUrl.hostname !== "127.0.0.1"); // Block 127.0.0.0/8 except exact 127.0.0.1
+
+        if (isInternalIP && !isLocal) {
+          console.warn("[SecurityScanner] SSRF Attempt Blocked: Internal IP address rejected");
+          return findings;
+        }
+      }
+
+      // IPv6 URL hostnames include brackets, e.g., "[::1]"
+      if (parsedUrl.hostname === "[::1]" || parsedUrl.hostname.toLowerCase().startsWith("[fd") || parsedUrl.hostname.toLowerCase().startsWith("[fc")) {
+          console.warn("[SecurityScanner] SSRF Attempt Blocked: Internal IPv6 address rejected");
+          return findings;
       }
     } catch {
       console.warn("[SecurityScanner] Invalid AI scan URL rejected");
