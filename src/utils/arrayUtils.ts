@@ -63,3 +63,17 @@ export function takeByPriority<T extends { type: string }>(nodes: T[], max?: num
 
   return max !== undefined ? sorted.slice(0, max) : sorted;
 }
+
+/**
+ * ⚡ Bolt Optimization: Safely extract a subset of elements from a large Iterable
+ * without allocating a massive intermediate array using Array.from().
+ * Uses an early break to prevent full traversal.
+ */
+export function takeFromIterable<T>(iterable: Iterable<T>, max: number): T[] {
+  const result: T[] = [];
+  for (const item of iterable) {
+    if (result.length >= max) break;
+    result.push(item);
+  }
+  return result;
+}
