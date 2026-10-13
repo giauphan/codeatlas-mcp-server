@@ -1,0 +1,5 @@
+🚨 Severity: MEDIUM
+💡 Vulnerability: Direct access to `process.env.CODEATLAS_API_KEY` bypasses fallback configuration resolution and security keystore fetches, leading to inconsistent application state and potential leakage if environment variables are dumped or mistyped.
+🎯 Impact: Features may fail unexpectedly across different components if the key is stored in config files instead of environment variables. Direct `process.env` access also skips any centralization security hooks.
+🔧 Fix: Replaced all inline `process.env.CODEATLAS_API_KEY` lookups in `src/presentation/mcpServer.ts` and `src/cli/commands.ts` with calls to the centralized `getResolvedApiKey()` utility from `projectService`.
+✅ Verification: `pnpm run build`, `pnpm run test`, and `pnpm lint` pass successfully. Code reviews confirm that all dynamic accesses to the API key now correctly go through the central resolver function.
