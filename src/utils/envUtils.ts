@@ -25,7 +25,7 @@ export function getApiUrl(): string {
       throw new Error("unsupported protocol");
     }
     // 🛡️ Ensure destination matches the intended CodeAtlas brand or local testing environment
-    const allowedHosts = ["localhost", "127.0.0.1", "::1", "api.codeatlas.ai", "opencode.ai"];
+    const allowedHosts = ["localhost", "127.0.0.1", "[::1]", "api.codeatlas.ai", "opencode.ai"];
     if (
       !allowedHosts.includes(parsedUrl.hostname) &&
       !parsedUrl.hostname.endsWith(".codeatlas.ai") &&
@@ -38,7 +38,7 @@ export function getApiUrl(): string {
         );
       }
     }
-    if (parsedUrl.protocol === "http:" && parsedUrl.hostname !== "localhost" && parsedUrl.hostname !== "127.0.0.1" && parsedUrl.hostname !== "::1") {
+    if (parsedUrl.protocol === "http:" && parsedUrl.hostname !== "localhost" && parsedUrl.hostname !== "127.0.0.1" && parsedUrl.hostname !== "[::1]") {
       throw new Error("unsupported protocol: HTTPS is required for non-local destinations");
     }
   } catch (err: any) {
