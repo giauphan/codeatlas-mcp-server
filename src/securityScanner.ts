@@ -96,7 +96,7 @@ export class SecurityScanner {
     // 🛡️ Ensure destination matches the intended AI provider service to prevent credential exfiltration
     try {
       const parsedUrl = new URL(aiUrl);
-      if (parsedUrl.protocol !== "https:" && parsedUrl.hostname !== "localhost" && parsedUrl.hostname !== "127.0.0.1") {
+      if (parsedUrl.protocol !== "https:" && parsedUrl.hostname !== "localhost" && parsedUrl.hostname !== "127.0.0.1" && parsedUrl.hostname !== "[::1]") {
         console.warn("[SecurityScanner] Insecure AI scan URL protocol rejected");
         return findings;
       }
