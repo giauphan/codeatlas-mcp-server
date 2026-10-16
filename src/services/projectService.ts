@@ -4,6 +4,7 @@ import * as https from "https";
 import * as http from "http";
 import * as os from "os";
 import { getHomePath, writeFileSyncNoFollow } from "../utils/pathUtils.js";
+import { getApiUrl } from "../utils/envUtils.js";
 import { CodeAnalyzer } from "../analyzer/parser.js";
 import { AnalysisResult } from "../analyzer/types.js";
 import { authStorage } from "../context.js";
@@ -1090,8 +1091,7 @@ export async function syncAnalysisToServer(projectName: string, analysis: any, b
   return new Promise((resolve, reject) => {
     try {
       const payload = JSON.stringify({ projectName, analysis, businessRule, changeDescription });
-      const serverUrlStr = process.env.CODEATLAS_API_URL;
-      if (!serverUrlStr) throw new Error("CODEATLAS_API_URL not set");
+      const serverUrlStr = getApiUrl();
       const serverUrl = new URL(serverUrlStr);
       
       const options = {
@@ -1147,8 +1147,7 @@ export async function getEpisodicMemoriesFromServer(projectName: string, eventTy
 
   return new Promise((resolve, reject) => {
     try {
-      const serverUrlStr = process.env.CODEATLAS_API_URL;
-      if (!serverUrlStr) throw new Error("CODEATLAS_API_URL not set");
+      const serverUrlStr = getApiUrl();
       const serverUrl = new URL(serverUrlStr);
       
       let pathStr = `/api/projects/memory?projectName=${encodeURIComponent(projectName)}`;
