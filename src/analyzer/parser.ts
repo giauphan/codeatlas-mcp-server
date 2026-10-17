@@ -540,7 +540,8 @@ export class CodeAnalyzer {
   }
 
   private getFiles(dir: string, fileList: string[] = [], depth: number = 0): string[] {
-    if (!fs.existsSync(dir)) return fileList;
+    // ⚡ Bolt Optimization: Removed fs.existsSync(dir) check to avoid redundant O(D) stat syscalls
+    // by using the EAFP pattern inside the readdirSync try/catch block.
     
     // Safety: max recursion depth = 20 levels (prevents runaway on broad paths)
     const MAX_DEPTH = 20;
@@ -557,7 +558,11 @@ export class CodeAnalyzer {
     let entries: fs.Dirent[];
     try {
       entries = fs.readdirSync(dir, { withFileTypes: true });
-    } catch {
+    } catch (err: unknown) {
+      const error = err as NodeJS.ErrnoException;
+      if (error.code !== 'ENOENT' && error.code !== 'EACCES') {
+        console.warn(`[CodeAnalyzer] Unexpected error reading directory ${dir}: ${error.message}`);
+      }
       return fileList;
     }
     
