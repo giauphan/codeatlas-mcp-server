@@ -481,7 +481,10 @@ export class CodeAnalyzer {
     }
 
     // Filter links to only include those where both endpoints are loaded
-    const loadedNodeIds = new Set(loadedNodes.map(n => n.id));
+    const loadedNodeIds = new Set<string>();
+    for (const n of loadedNodes) {
+      loadedNodeIds.add(n.id);
+    }
     const loadedLinks = result.graph.links.filter(
       link => loadedNodeIds.has(link.source) && loadedNodeIds.has(link.target)
     );
