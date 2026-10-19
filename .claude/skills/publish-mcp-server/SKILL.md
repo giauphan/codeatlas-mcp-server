@@ -1,52 +1,67 @@
 ---
 name: publish-mcp-server
-description: Use when publishing codeatlas-mcp-server to npm, updating package documentation, troubleshooting npm authentication/2FA, or validating the Second Brain install-hooks command.
+description: Explain and maintain the automated CodeAtlas MCP Server npm release pipeline, npm validation, rollback, and Claude hook command documentation.
 ---
 
-# Publish CodeAtlas MCP Server
+# CodeAtlas MCP Server npm Releases
 
-## Before publishing
+## Release process
 
-1. Update `package.json` to a new unused semver version. Check with `npm view codeatlas-mcp-server versions --json`.
-2. Ensure the root `README.md` documents npm installation, environment variables, and `codeatlas-mcp install-hooks`.
-3. Build and inspect the exact package:
-   ```bash
-   npm run build
-   npm pack --dry-run
-   npm pack
-   tar -tzf codeatlas-mcp-server-<version>.tgz
-   ```
-4. Confirm only intended files are included. Never package `.env`, credentials, tokens, service-account files, or unrelated local data. Remove the temporary tarball.
+The supported release process is automated by
+`.github/workflows/publish.yml`. A push to `main` or manual dispatch runs its
+CI job, then semantic-release analyzes Conventional Commits on `main` and
+publishes only if a release is warranted. `feat` selects a minor release;
+`fix` and `perf` select patch; breaking changes select major. Docs-only commits
+normally do not create a release.
 
-## Authentication
+Do not direct contributors to bump `package.json` with `npm version` or run a
+separate `npm publish` command. Manual workflow dispatch runs the same release
+automation and commit analysis. The workflow determines the version and tag.
+The package manifest version, Git release tags, and live npm version may differ
+at a given checkout; verify published metadata with npm when discussing the
+current release.
 
-Keep the npm token only in the user-level config, never in the repository:
+Before describing changes to the release process, inspect:
 
-```bash
-printf '%s\n' '//registry.npmjs.org/:_authToken=TOKEN' > ~/.npmrc
-chmod 600 ~/.npmrc
-npm whoami
-```
+- `.github/workflows/publish.yml`
+- `.github/workflows/ci.yml`
+- `.github/workflows/npm-rollback.yml`
+- `.releaserc.json`
+- `package.json`
 
-The account must own or have write permission for `codeatlas-mcp-server`. If publish returns E403 mentioning 2FA, use `npm publish --otp=123456`, or create a granular token with package Read and write permission and explicitly enabled 2FA bypass. A 404 on PUT usually means the authenticated account/token lacks package write permission; do not change the version to work around it.
+For job dependencies, npm validation retries, and rollback behavior, use
+[the pipeline runbook](../../../docs/PIPELINE.md).
 
-## Publish and verify
+## npm authentication and validation
 
-```bash
-npm publish
-npm view codeatlas-mcp-server version
-npm view codeatlas-mcp-server readme
-```
+The GitHub release workflow uses its protected `npm` environment and secrets.
+Never print or commit npm tokens. Troubleshoot authentication by checking
+workflow environment/secrets access and package permissions. Do not work around
+authentication by choosing a different version.
 
-Do not publish on the user's behalf without explicit authorization.
+After semantic-release creates a version output, the workflow fetches that
+version from npm with `npm pack --prefer-online`, retrying 10 times at 15-second
+intervals. It checks required files in the tarball, absence of test files, the
+`latest` dist-tag, and global CLI installation. The validation job is skipped
+when semantic-release produced no version output.
 
-## Verify Second Brain hooks
+## Manual rollback
 
-```bash
-codeatlas-mcp install-hooks --dry-run
-codeatlas-mcp install-hooks
-```
+`.github/workflows/npm-rollback.yml` is manually dispatched with a known-good
+version and optional bad version to deprecate. It verifies the target exists,
+moves the npm `latest` tag, and may deprecate the bad version. It does not
+revert commits, remove Git tags, or delete a published version.
 
-Restart Claude Code before checking `~/.claude/hooks/brain-*.sh`, hook commands in `~/.claude/settings.json`, and `~/.claude/brain-save.log`. Confirm commands use `$HOME`-based paths, not a machine-specific `/home/<user>` path.
+## Claude hooks command references
 
-Rollback by restoring the timestamped `settings.json.bak-install-*` backup, removing installed brain hook scripts, and restarting Claude Code. Never run the real installer while untrusted hook output is polluting the current session; restart first.
+Do not document a `codeatlas-mcp install-hooks` command: it is not a declared
+package executable or supported CLI command. In a repository checkout,
+`npm run setup:hooks` runs `scripts/setup-hooks.js`; the CLI also recognizes
+`codeatlas-enterprise setup-hook` / `setup-hooks` for hook setup. Check the
+current package contents and CLI implementation before promising that a
+checkout-only script is available in an installed npm package. The separately
+published `codeatlas-setup-claude` binary is declared in `package.json`.
+
+Do not run publishing, rollback, or live hook installation as part of
+documentation work. Describe their behavior from the checked-in workflow and
+CLI source; make no external npm or user-machine changes.

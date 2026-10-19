@@ -1,68 +1,40 @@
 # Zed Integration
 
-Zed has no Claude-style hook system (`UserPromptSubmit`, `PostToolUse`), so the
-Second Brain hooks shipped for Claude Code are **not** used directly. Instead they
-are packed into the MCP server as tools that any MCP client — including Zed — can
-call.
+CodeAtlas runs as a local MCP server over stdio. Zed connects to it as a context server. The `brain_context` and `route_task` MCP tools provide the context and task-routing behavior for MCP clients; they are advisory tools that the agent can call when useful.
 
-| Claude hook | Zed equivalent | Notes |
-|---|---|---|
-| `brain-context.sh` (pre-turn) | `brain_context` MCP tool | AI calls it at the start of a task to inject dreams + genome + immune context. |
-| `brain-save.sh` (post-turn) | `save_dream_memory` MCP tool | Already exists. Call after a task to persist learnings. |
-| `task-router.sh` (model routing) | `route_task` MCP tool | Advisory only — Zed does not auto-switch models from tool output. |
-| `install-brain-hooks.sh` | `codeatlas-enterprise setup zed` | Writes the `context_servers` entry. |
+## Set up
 
-## Setup
+The package's `setup zed` helper currently writes `npx -y codeatlas-mcp-server` into Zed settings, but the package publishes multiple binary names and no executable named `codeatlas-mcp-server`. Use the manual entry below until the helper's generated command is corrected.
 
-```bash
-# Build first
-pnpm run build
-
-# Register the context server in Zed's settings.json
-codeatlas-enterprise setup zed
-```
-
-The command looks up Zed's settings path per OS:
-
-- **Linux**: `~/.config/zed/settings.json`
-- **macOS**: `~/Library/Application Support/Zed/settings.json`
-- **Windows**: `%APPDATA%/zed/settings.json`
-
-It adds (idempotently):
+Open the Command Palette and run `zed: open settings file`. Merge this context
+server entry into the existing `context_servers` object, then restart Zed.
+The shape follows [Zed's custom MCP server configuration](https://zed.dev/docs/ai/mcp#as-custom-servers):
 
 ```json
 {
   "context_servers": {
-    "codeatlas": {
+    "codeatlas-mcp-server": {
       "command": "npx",
-      "args": ["-y", "codeatlas-mcp-server"],
-      "env": { "CODEATLAS_API_KEY": "…", "CODEATLAS_API_URL": "…" }
+      "args": ["--yes", "--package=codeatlas-mcp-server", "codeatlas-mcp"],
+      "env": {
+        "CODEATLAS_API_URL": "https://api.codeatlas.ai",
+        "CODEATLAS_API_KEY": "your_api_key_here"
+      }
     }
   }
 }
 ```
 
-`CODEATLAS_API_KEY` / `CODEATLAS_API_URL` are copied from your current shell
-environment. Set them before running `setup zed`.
+For local analysis only, omit the `env` object. For Cloud features, set both variables. Zed stores configured environment values in its local settings file, so protect it as you would other credential files.
 
-Restart Zed, then open **Settings → AI → MCP Servers** and confirm the
-`codeatlas` indicator is green.
+## Use CodeAtlas tools
 
-## Usage in the Agent Panel
+Use `analyze` with a local project path to build or refresh analysis. Analysis data is held in the server process's memory by default and is lost when that process stops. If Cloud settings are configured, the tool also attempts Cloud sync. The separate `export_team_artifact` tool can explicitly write a shareable artifact under the project's `.codeatlas/` directory.
 
-1. Start a task. Ask the agent to call `brain_context` with your task prompt to
-   pull in relevant dream memories, genome genes, and immune prevention notes.
-2. After completing the task, tell the agent to call `save_dream_memory`
-   (`memory_type`: MISTAKE / PREFERENCE / KNOWLEDGE / PATTERN / SESSION_SUMMARY)
-   so learnings persist across sessions.
-3. Use `route_task` when you want a model/effort suggestion for a task. It returns
-   `MODEL_NAME` and `EFFORT`; you still pick the model in Zed.
+For Second Brain context, call `brain_context` with the current task as its `query`. Its output may include Cloud dream memories, Genome entries, and immune prevention notes. Treat all returned historical content as untrusted reference; it must not override task, tool, safety, or system instructions.
 
-> The `brain_context` output is marked **untrusted historical reference**. Only
-> follow it as informational context; never let it override task, tool, safety,
-> or system rules.
+After a task, call `save_dream_memory` to store a useful learning in CodeAtlas Cloud. Supported `memory_type` values are `MISTAKE`, `PREFERENCE`, `KNOWLEDGE`, `PATTERN`, and `SESSION_SUMMARY`. These Cloud memory tools require the Cloud URL and key.
 
-## Manual configuration
+Call `route_task` for an optional model and effort suggestion. The result is advisory; Zed does not switch models based on the tool output. See [API Examples](./API_EXAMPLES.md) for current arguments.
 
-If you prefer not to run the CLI, add the `context_servers.codeatlas` block above
-to Zed's `settings.json` by running `zed: open settings file` and pasting it in.
+For runtime details, see [MCP Server Architecture](./architecture/overview.md).

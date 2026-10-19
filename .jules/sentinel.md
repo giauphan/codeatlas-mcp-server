@@ -1,3 +1,12 @@
+# Historical security engineering notes
+
+These entries record earlier findings and recommendations. They are not a
+current vulnerability inventory or a description of the supported stdio
+authentication model. Recheck each claim against the current source before
+acting on it. Use the [security policy](../SECURITY.md),
+[architecture overview](../docs/architecture/overview.md), and
+[scanner guide](../docs/architecture/scanner.md) for current behavior.
+
 ## 2024-07-29 - [Authentication Bypass via Mock Fallback]
 **Vulnerability:** The `checkAuth` function used for authorization fell back to granting full privileges via a mock local user if no authentication context was found and `CODEATLAS_MULTI_TENANT` was not explicitly enabled.
 **Learning:** Returning mock authentication credentials as a default fallback allows attackers to easily bypass authentication simply by not providing any credentials.

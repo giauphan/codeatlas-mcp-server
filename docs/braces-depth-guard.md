@@ -13,7 +13,10 @@ The root dependency key and installed path are both named `braces`, while the
 adapter manifest keeps its own identity as `@codeatlas/braces-compat`. This
 local alias is a compatibility mechanism; the adapter is not an upstream
 `braces` release. The scoped fork remains separately identified in the
-dependency manifest and lockfiles.
+dependency manifest and both `package-lock.json` and `pnpm-lock.yaml`. Keep
+those lockfiles aligned when changing the adapter or fork pin; the adapter is
+used only by development tooling and is not part of the runtime dependency
+graph.
 
 The pinned candidate is `@dieub/braces-depth-guard@3.0.3-pn.3`, from
 <https://github.com/dieub/braces-depth-guard>. It preserves the upstream

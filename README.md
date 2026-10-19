@@ -1,208 +1,101 @@
 # CodeAtlas MCP Server
 
-Local-first MCP server for AI-powered codebase intelligence — AST analysis, dependency graphs, and semantic search. Your source code never leaves your machine.
+CodeAtlas is a local MCP server for codebase analysis, dependency and call graphs, search, and project context. It reads project files on the machine where it runs, keeps analysis data in process memory by default, and can optionally sync analysis and memory to CodeAtlas Cloud when configured.
 
 [![CI](https://github.com/giauphan/codeatlas-mcp-server/actions/workflows/ci.yml/badge.svg)](https://github.com/giauphan/codeatlas-mcp-server/actions/workflows/ci.yml)
 [![Node.js Version](https://img.shields.io/badge/node-%3E%3D20.0.0-brightgreen)](https://nodejs.org/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 [![GitHub Release](https://img.shields.io/github/v/release/giauphan/codeatlas-mcp-server)](https://github.com/giauphan/codeatlas-mcp-server/releases)
 
-## 📌 What is CodeAtlas MCP Server?
+## What it does
 
-A **Model Context Protocol (MCP)** server that provides:
-- **AST Analysis**: Parse TypeScript, Python, PHP, and more.
-- **Dependency Graphs**: Visualize call chains and module relationships.
-- **Semantic Search**: Find code by meaning, not just syntax.
-- **Local-First**: Your code stays on your machine; no telemetry by default.
-- **Cloud Optional**: Connect to [codeatlas-platform](https://github.com/giauphan/codeatlas-platform) for dream memory, genome immune system, and skills sync.
+- Parses supported source files and builds a code structure and relationship graph.
+- Provides MCP tools for project analysis, code search, dependency and call relationships, impact analysis, and security scanning.
+- Holds analyzed project data in the server process's memory. By default, analysis data is not saved as a local analysis file.
+- Offers optional CodeAtlas Cloud features such as dream memories and Genome search. Cloud tools require `CODEATLAS_API_URL` and an API key.
 
-### Why Use It?
-| Use Case | Benefit |
-|---|---|
-| **AI IDE Integration** | Claude Desktop, Cursor, VSCode — get context-aware code intelligence. |
-| **Codebase Audits** | Automate dependency analysis, security scans, and refactoring insights. |
-| **Semantic Search** | Find functions, classes, or modules by intent, not just name. |
-| **Multi-Language Support** | Works with TypeScript, Python, PHP, and more via AST parsers. |
+The source code is read locally for analysis. When cloud sync is configured, analysis results and any cloud tools you call are sent to the configured CodeAtlas API. The `export_team_artifact` tool can explicitly write a shareable analysis artifact to `.codeatlas/`. Review the [runtime architecture](./docs/architecture/overview.md) for local and Cloud data flows.
 
----
+## Install and run
 
-## 🏗 Architecture
+The package requires Node.js 20 or newer. It publishes several executable names, so select one explicitly when using `npx`:
 
-```
-AI IDE → MCP stdio/SSE → Parser (AST) → Dependency Graph → Code Search
-                          │
-                    codeatlas-platform (HTTP) → Dreams + Genome
-```
-
-| Layer | Components |
-|---|---|
-| **Parser** | TypeScript, Python, PHP AST analysis |
-| **Graph** | Dependency graph with chunked force layout |
-| **Search** | Semantic code search with regex safety |
-| **Cloud** | Optional: connect to codeatlas-platform for dreams/genome |
-
----
-
-## 🔧 Quick Start
-
-### 1. Install
 ```bash
-# Clone the repo
-git clone https://github.com/giauphan/codeatlas-mcp-server.git
-cd codeatlas-mcp-server
-
-# Install dependencies (requires Node.js 20+)
-pnpm install
+npx --yes --package=codeatlas-mcp-server codeatlas-mcp
 ```
 
-### 2. Configure
+To run from a checkout:
+
 ```bash
-# Copy env template
-cp .env.example .env
-
-# Edit .env (Oracle DB optional for persistent memory)
-# Cloud features require both variables; no default URL is used
-# Set CODEATLAS_API_URL to your CodeAtlas API base URL
-# Set CODEATLAS_API_KEY to your CodeAtlas API key
+npm ci
+npm run build
+npm start
 ```
 
-### 3. Build
-```bash
-pnpm run build
-```
+The MCP server uses **stdio transport**. Configure it in an MCP client such as Claude Desktop or Zed. This package does not expose an HTTP or SSE MCP endpoint.
 
-### 4. Run
-```bash
-# Local-only mode (no cloud)
-pnpm start
+## Configure an MCP client
 
-# With cloud connection (requires codeatlas-platform running)
-CODEATLAS_API_URL=http://localhost:8080 CODEATLAS_API_KEY=your_api_key_here pnpm start
-```
+Claude Desktop example:
 
----
-
-## 📡 MCP Tools (30+)
-
-| Category | Tools |
-|---|---|
-| **Code Analysis** | `analyze_project`, `code_search`, `file_info` |
-| **AST** | `parse_file`, `find_symbol`, `get_dependencies` |
-| **Graphs** | `dependency_graph`, `call_graph` |
-| **Security** | `scan_vulnerabilities` |
-| **Cloud** | `save_dream_memory`, `query_dream_memories`, `sync_dreams` |
-| **Skills** | `search_skills`, `get_skill`, `install_skill` |
-
-### Example: Connect to Claude Desktop
-Add to `claude-desktop-config.json`:
 ```json
 {
   "mcpServers": {
     "codeatlas": {
       "command": "npx",
-      "args": [
-        "-y",
-        "codeatlas-mcp-server"
-      ]
+      "args": ["--yes", "--package=codeatlas-mcp-server", "codeatlas-mcp"]
     }
   }
 }
 ```
 
-### Example: Connect to Cursor/VSCode (SSE)
-Add to `settings.json`:
-```json
-{
-  "mcp.sse": {
-    "codeatlas": "npx codeatlas-mcp-server"
-  }
-}
-```
+See [Zed Integration](./docs/ZED_INTEGRATION.md) for the client configuration. The package also provides the `codeatlas`, `codeatlas-mcp`, `codeatlas-enterprise`, and `codeatlas-setup-claude` executables.
 
-### Connect to Zed (MCP context server)
-Zed has no Claude-style hooks, so the Second Brain hooks are exposed as MCP tools instead.
+## Cloud configuration
 
-**Option A — automatic setup:**
+Local code analysis can run without cloud credentials. Cloud features need both a configured API URL and a key. The API URL has no implicit default; set it explicitly:
+
 ```bash
-codeatlas-enterprise setup zed
-```
-This writes a `codeatlas` entry into Zed's `context_servers` (passing `CODEATLAS_API_KEY`/`CODEATLAS_API_URL` from your environment). Restart Zed afterward.
-
-**Option B — manual:** add to Zed `settings.json` (open via `zed: open settings file`):
-```json
-{
-  "context_servers": {
-    "codeatlas": {
-      "command": "npx",
-      "args": ["-y", "codeatlas-mcp-server"],
-      "env": { "CODEATLAS_API_KEY": "your_api_key_here" }
-    }
-  }
-}
+export CODEATLAS_API_URL="https://api.codeatlas.ai"
+export CODEATLAS_API_KEY="your_api_key_here"
+npx --yes --package=codeatlas-mcp-server codeatlas-mcp
 ```
 
-Then in Zed's Agent Panel, call the `brain_context` tool at the start of a task to inject Second Brain memory, and `save_dream_memory` after a task to persist learnings. `route_task` suggests a model/effort (advisory only — Zed does not auto-switch models). See [Zed Integration](./docs/ZED_INTEGRATION.md).
+For normal MCP startup, you can also place these in a `.env` file in the working directory or `~/.codeatlas/.env`; existing process variables take precedence. One-shot CLI commands run before dotenv loading, so export their settings in the launching environment. The server may resolve a missing key from supported MCP client configuration files, and some setup tools persist configuration locally. Treat local configuration files as sensitive.
 
----
+| Variable | Behavior |
+|---|---|
+| `CODEATLAS_API_URL` | CodeAtlas API base URL; no implicit default in the server. Recognized hosts include `api.codeatlas.ai`, subdomains of `codeatlas.ai` and `codeatlas-local.dev`, `opencode.ai`, and loopback hosts. |
+| `CODEATLAS_API_KEY` | Credential for Cloud API calls; a missing key may be resolved from supported local client configuration. |
+| `CODEATLAS_ALLOW_CUSTOM_URL` | Set to `true` to allow other API hosts. Remote destinations still require HTTPS; HTTP is allowed only for `localhost`, `127.0.0.1`, or `[::1]`. |
+| `CODEATLAS_SCAN_AI_URL`, `CODEATLAS_SCAN_AI_KEY` | Optional AI security-scan endpoint and Bearer credential. `OPENCODE_BASE_URL` and `OPENCODE_API_KEY` are fallbacks. This endpoint is separate from the CodeAtlas API. |
+| `CODEATLAS_SCAN_AI_MODEL` | Optional model label sent to the configured scan endpoint; it does not select a provider. |
 
+See the [scanner guide](./docs/architecture/scanner.md) for AI request contents and destination rules.
 
-## 🔒 Security & Environment Variables
+## MCP tools
 
-CodeAtlas MCP Server is designed with a local-first architecture and several security hardening measures to protect your credentials and codebase data:
+Tools cover project analysis and structure, entity and code search, dependency and call graphs, feature tracing, impact analysis, vulnerability scanning, project context, architecture decisions, and optional Cloud memory and Genome features. The available tools are registered in the server at runtime; consult the MCP client tool list for the current set. See [API Examples](./docs/API_EXAMPLES.md) for current tool names and argument examples.
 
-- **No Disk Persistence**: Credentials like `CODEATLAS_API_KEY` are kept entirely in-memory and are **never** persisted to `.env` files or disk. You must supply your key via environment variables.
-- **Strict Destination Validation**: When connecting to cloud features, the destination AI and backend URLs are strictly validated. Credentials can only flow to trusted official domains (`*.codeatlas.ai`, `opencode.ai`) or local addresses (`localhost`, `127.0.0.1`).
-- **Telemetry & Logging**: Potential credential leaks are sanitized and redacted from all console and error logs.
-
-### Required & Optional Environment Variables
-
-| Variable | Description | Default |
-|---|---|---|
-| `CODEATLAS_API_KEY` | Secret key to connect to CodeAtlas Cloud services for AI memory and scan features. | (none) |
-| `CODEATLAS_API_URL` | Target URL for CodeAtlas Cloud. Validated via allowlists to prevent credential exfiltration. | `https://api.codeatlas.ai` |
-| `CODEATLAS_ALLOW_CUSTOM_URL` | Set to `true` to allow sending credentials to self-hosted or unlisted destinations. Required for private network deployments. | `false` |
-| `CODEATLAS_SCAN_AI_KEY` | Key for deep AI security scanning using an external LLM. | (none) |
-| `CODEATLAS_SCAN_AI_URL` | Endpoint for deep AI security scanning. | (none) |
-
-## 📚 Documentation
+## Documentation
 
 | Guide | Description |
 |---|---|
-| [Development Guide](./docs/DEVELOPMENT.md) | Full environment setup, commands, and troubleshooting. |
-| [Deployment Guide](./docs/DEPLOYMENT.md) | PM2, systemd, Nginx TLS, and healthchecks. |
-| [API Examples](./docs/API_EXAMPLES.md) | Auth, dream memory, and MCP config examples. |
+| [Runtime architecture](./docs/architecture/overview.md) | Startup, local analysis, persistence, and optional Cloud paths. |
+| [CI and npm release pipeline](./docs/PIPELINE.md) | Continuous integration, package release, and rollback workflows. |
+| [Development Guide](./docs/DEVELOPMENT.md) | Environment setup, commands, and troubleshooting. |
+| [Deployment Guide](./docs/DEPLOYMENT.md) | Deployment notes for supported runtimes. |
+| [API Examples](./docs/API_EXAMPLES.md) | MCP configuration and current tool examples. |
+| [Zed Integration](./docs/ZED_INTEGRATION.md) | Register and use CodeAtlas from Zed. |
 
----
+## Contributing
 
-## 🤝 Contributing
+See [CONTRIBUTING.md](./CONTRIBUTING.md) for guidelines. The package declares Node.js 20 or newer; CI also exercises Node.js 22.
 
-See [CONTRIBUTING.md](./CONTRIBUTING.md) for guidelines.
-
----
-
-## 📜 License
+## License
 
 MIT © [Giau Phan](mailto:giauphan012@gmail.com)
 
----
+## Related project
 
-## 🔗 Related Projects
-
-- [codeatlas-platform](https://github.com/giauphan/codeatlas-platform) — HTTP server for dream memory and genome.
-- [codeatlas-mcp](https://www.npmjs.com/package/codeatlas-mcp) — npm package for easy installation.
-
----
-
-## ⚠️ Known Limitations
-
-- **Oracle DB Required for Persistent Memory**: Local-only mode works without Oracle, but dream memory persistence requires it.
-- **Cloud Dream Query Filters**: When querying memories with `scope`, `tags`, or `memory_type` filters, the backend performs vector hybrid search on the query text plus SQL filtering on the other parameters. The `tags` parameter is passed as a JSON string to the upstream API. The `related_ids` parameter is also supported for filtering by related memory IDs.
-- **Multi-Tenant Not Supported**: Only single-tenant mode available.
-- **Security**: No built-in rate limiting; use a reverse proxy (Nginx) in production.
-
----
-
-## 🐛 Issues & Support
-
-- Report bugs or request features: [GitHub Issues](https://github.com/giauphan/codeatlas-mcp-server/issues)
-- For questions: [Discussions](https://github.com/giauphan/codeatlas-mcp-server/discussions)
+- [codeatlas-platform](https://github.com/giauphan/codeatlas-platform) — CodeAtlas Cloud API and services used by optional cloud features.
