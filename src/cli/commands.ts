@@ -253,10 +253,24 @@ export function checkCodeatlasSetup(projectDir: string): CodeatlasSetupInfo {
   }
   const agentsDir = path.join(projectDir, ".claude", "agents");
   let agentCount = 0;
-  if (fs.existsSync(agentsDir)) { try { agentCount = fs.readdirSync(agentsDir).filter((x: string) => x.endsWith(".md")).length; } catch {} }
+  if (fs.existsSync(agentsDir)) {
+    try {
+      const entries = fs.readdirSync(agentsDir);
+      for (const e of entries) {
+        if (e.endsWith(".md")) agentCount++;
+      }
+    } catch {}
+  }
   // Alternative agent location
   const agentsDir2 = path.join(projectDir, ".agents", "agents");
-  if (agentCount === 0 && fs.existsSync(agentsDir2)) { try { agentCount = fs.readdirSync(agentsDir2).filter((x: string) => x.endsWith(".md")).length; } catch {} }
+  if (agentCount === 0 && fs.existsSync(agentsDir2)) {
+    try {
+      const entries = fs.readdirSync(agentsDir2);
+      for (const e of entries) {
+        if (e.endsWith(".md")) agentCount++;
+      }
+    } catch {}
+  }
 
   // Rule file per active agent
   const agent = detectActiveAgent(projectDir);
@@ -288,7 +302,17 @@ export function checkCodeatlasSetup(projectDir: string): CodeatlasSetupInfo {
 
 export function listProjectDirs(): { connected: ProjectDirEntry[]; newDirs: ProjectDirEntry[] } {
   const raw = process.env.CODEATLAS_PROJECT_DIRS || process.env.CODEATLAS_PROJECT_DIR || "";
-  const connectedSet = new Set(raw.split(",").map(s => s.trim()).filter(Boolean).map(s => path.resolve(s)));
+
+  const connectedSet = new Set<string>();
+  if (raw) {
+    for (const s of raw.split(",")) {
+      const trimmed = s.trim();
+      if (trimmed) {
+        connectedSet.add(path.resolve(trimmed));
+      }
+    }
+  }
+
   // Always include cwd as connected if it's a git project
   const cwd = path.resolve(process.cwd());
   if (fs.existsSync(path.join(cwd, ".git")) || fs.existsSync(path.join(cwd, "package.json"))) connectedSet.add(cwd);
@@ -317,8 +341,20 @@ export function listProjectDirs(): { connected: ProjectDirEntry[]; newDirs: Proj
     return { dir, name: path.basename(dir), isGit, branch, codeatlasSetup: checkCodeatlasSetup(dir) };
   }
 
-  const connected: ProjectDirEntry[] = [...connectedSet].filter(d => fs.existsSync(d)).map(toEntry);
-  const newDirs: ProjectDirEntry[] = candidates.filter(c => !connectedSet.has(path.resolve(c))).map(toEntry);
+  const connected: ProjectDirEntry[] = [];
+  for (const d of connectedSet) {
+    if (fs.existsSync(d)) {
+      connected.push(toEntry(d));
+    }
+  }
+
+  const newDirs: ProjectDirEntry[] = [];
+  for (const c of candidates) {
+    if (!connectedSet.has(path.resolve(c))) {
+      newDirs.push(toEntry(c));
+    }
+  }
+
   return { connected, newDirs };
 }
 
@@ -411,7 +447,9 @@ export function checkFeaturesDiff(): {
   if (fs.existsSync(adrDir)) {
     try {
       const entries = fs.readdirSync(adrDir, { recursive: true });
-      adrCount = entries.filter((e: any) => typeof e === "string" && e.endsWith(".md")).length;
+      for (const e of entries) {
+        if (typeof e === "string" && e.endsWith(".md")) adrCount++;
+      }
     } catch {}
   }
 

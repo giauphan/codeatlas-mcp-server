@@ -192,6 +192,16 @@ console.log(add(1, 2));
       assert.ok(parsed.files, "Files output expected");
     });
 
+    it("get_file_entities matches mixed separators and escapes filename punctuation", async () => {
+      const forward = await tools["get_file_entities"].handler({ project: PROJECT_DIR, filePath: "src/index.ts" });
+      const backward = await tools["get_file_entities"].handler({ project: PROJECT_DIR, filePath: "src\\INDEX.ts" });
+      const forwardFiles = JSON.parse(forward.content[0].text).files;
+      assert.ok(forwardFiles.length > 0);
+      assert.deepStrictEqual(JSON.parse(backward.content[0].text).files, forwardFiles);
+      const mismatch = await tools["get_file_entities"].handler({ project: PROJECT_DIR, filePath: "src/indexXts" });
+      assert.strictEqual(JSON.parse(mismatch.content[0].text).filesFound, 0);
+    });
+
     it("sync_system_memory activates successfully", async () => {
       const res = await tools["sync_system_memory"].handler({ project: PROJECT_DIR, enableEnterpriseSync: false });
       assert.ok(res.content?.[0]?.text);

@@ -63,3 +63,21 @@ export function takeByPriority<T extends { type: string }>(nodes: T[], max?: num
 
   return max !== undefined ? sorted.slice(0, max) : sorted;
 }
+
+/**
+ * Returns the same prefix as Array.from(iterable).slice(0, max), without
+ * consuming the whole iterable for a nonnegative finite limit.
+ * Negative limits require the full iterable to preserve slice semantics.
+ */
+export function takeFromIterable<T>(iterable: Iterable<T>, max = Infinity): T[] {
+  if (max < 0) return Array.from(iterable).slice(0, max);
+  const limit = Math.trunc(max);
+  if (!limit) return [];
+
+  const result: T[] = [];
+  for (const item of iterable) {
+    result.push(item);
+    if (result.length >= limit) break;
+  }
+  return result;
+}

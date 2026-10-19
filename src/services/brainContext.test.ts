@@ -75,6 +75,15 @@ describe("brain context", () => {
     assert.deepStrictEqual(filterGenesByRelevance(genes, "to a"), genes);
   });
 
+  it("retains matching genes with an empty field and preserves equal-score order", () => {
+    const genes = [
+      { name: "Parser first", description: "" },
+      { name: "Parser second", description: "" },
+      { name: "", description: "Parser" },
+    ];
+    assert.deepStrictEqual(filterGenesByRelevance(genes, "parser", 1), genes);
+  });
+
   it("normalizes special characters before matching", () => {
     const parserGene = { name: "AST parser", description: "Parses TypeScript." };
     const databaseGene = { name: "Database indexes", description: "Optimizes queries." };

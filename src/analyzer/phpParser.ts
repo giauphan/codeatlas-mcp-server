@@ -31,6 +31,8 @@ export class PhpParser {
     const calls: { name: string; line: number }[] = [];
 
     const lines = code.split(/\r?\n/);
+    const callRegex = /(?:(\w+)::(\w+)|->(\w+))\s*\(/g;
+    const standaloneCallRegex = /\b(\w+)\s*\(/g;
 
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i].trim();
@@ -101,7 +103,7 @@ export class PhpParser {
       }
 
       // Static/instance method calls: ClassName::method() or $this->method()
-      const callRegex = /(?:(\w+)::(\w+)|->(\w+))\s*\(/g;
+      callRegex.lastIndex = 0;
       let callMatch;
       while ((callMatch = callRegex.exec(line)) !== null) {
         const callName = callMatch[2] || callMatch[3];
@@ -111,7 +113,7 @@ export class PhpParser {
       }
 
       // Standalone function calls: func_name()
-      const standaloneCallRegex = /\b(\w+)\s*\(/g;
+      standaloneCallRegex.lastIndex = 0;
       let scMatch;
       while ((scMatch = standaloneCallRegex.exec(line)) !== null) {
         const name = scMatch[1];

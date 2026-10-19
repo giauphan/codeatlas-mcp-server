@@ -1,6 +1,38 @@
 import { describe, it } from 'node:test';
 import * as assert from 'node:assert';
-import { binarySearchClosestPrecedingClass } from './arrayUtils.js';
+import { binarySearchClosestPrecedingClass, takeFromIterable } from './arrayUtils.js';
+
+describe('takeFromIterable', () => {
+  it('preserves slice limits and insertion order', () => {
+    const values = new Map([['first', 3], ['second', 1], ['third', 2]]);
+    for (const limit of [undefined, 0, -0, 0.5, 1, 1.9, 3, 10, -0.5, -1, -1.9, -10, NaN, Infinity, -Infinity]) {
+      assert.deepStrictEqual(
+        takeFromIterable(values.values(), limit),
+        Array.from(values.values()).slice(0, limit),
+        `limit: ${limit}`,
+      );
+    }
+    assert.deepStrictEqual(takeFromIterable([], 2), []);
+  });
+
+  it('stops pulling as soon as a positive limit is reached', () => {
+    function* values() {
+      yield 'first';
+      yield 'second';
+      throw new Error('Read beyond requested limit');
+    }
+    assert.deepStrictEqual(takeFromIterable(values(), 2), ['first', 'second']);
+  });
+
+  it('does not pull items for a limit that truncates to zero', () => {
+    function* values() {
+      throw new Error('Read an item for a zero limit');
+      yield 'unused';
+    }
+    assert.deepStrictEqual(takeFromIterable(values(), 0), []);
+    assert.deepStrictEqual(takeFromIterable(values(), 0.9), []);
+  });
+});
 
 describe('binarySearchClosestPrecedingClass', () => {
   it('should find the closest preceding class', () => {
