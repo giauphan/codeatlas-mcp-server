@@ -249,7 +249,9 @@ readarray -t HOOK_FIELDS < <(python3 -c '
 import json, os, sys
 try:
     payload = json.loads(os.environ.get("HOOK_INPUT", ""))
-except json.JSONDecodeError:
+except (ValueError, RecursionError):
+    payload = {}
+if not isinstance(payload, dict):
     payload = {}
 print(payload.get("prompt", "session context"))
 print(payload.get("cwd") or os.environ.get("CLAUDE_PROJECT_DIR") or os.getcwd())
@@ -284,8 +286,9 @@ import os
 
 def load(name):
     try:
-        return json.loads(os.environ.get(name, ""))
-    except json.JSONDecodeError:
+        data = json.loads(os.environ.get(name, ""))
+        return data if isinstance(data, dict) else {}
+    except (ValueError, RecursionError):
         return {}
 
 
@@ -293,8 +296,12 @@ def text(value, length=500):
     return " ".join(str(value or "").split())[:length]
 
 
-dreams = load("DREAMS").get("memories", [])
-genes = load("GENOME").get("genes", [])
+def objects(value):
+    return [item for item in value if isinstance(item, dict)] if isinstance(value, list) else []
+
+
+dreams = objects(load("DREAMS").get("memories", []))
+genes = objects(load("GENOME").get("genes", []))
 immune = text(load("IMMUNE").get("context"), 1200)
 
 # Drop memories whose type is not a known engineering type, so unrelated notes

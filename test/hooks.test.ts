@@ -51,6 +51,30 @@ describe("bash hook scripts", () => {
     assert.ok(result.stdout.includes("Parser uses ESTree"));
   });
 
+  for (const [label, response] of [
+    ["deeply nested JSON", "[".repeat(1200) + "0" + "]".repeat(1200)],
+    ["non-object JSON", "null"],
+    ["null collections", '{"memories":null,"genes":null}'],
+    ["non-object collection entries", '{"memories":[null],"genes":[3]}'],
+  ]) {
+    it(`brain-context.sh ignores ${label} API responses`, () => {
+      const result = spawnSync("bash", [path.join(HOOKS_DIR, "brain-context.sh")], {
+        encoding: "utf8",
+        input: "{}",
+        env: {
+          PATH: `${path.join(HOOKS_DIR, "..", "fixtures", "hook-bin")}:${process.env.PATH ?? ""}`,
+          CODEATLAS_INJECT_BRAIN_CONTEXT: "1",
+          CODEATLAS_API_URL: "http://127.0.0.1:3381",
+          CODEATLAS_API_KEY: "test-key",
+          CODEATLAS_TEST_CURL_RESPONSE: response,
+        },
+      });
+      assert.strictEqual(result.status, 0, result.stderr);
+      assert.strictEqual(result.stdout, "");
+      assert.strictEqual(result.stderr, "");
+    });
+  }
+
   it("brain-save.sh skips read-only tools without contacting API", async () => {
     const file = path.join(HOOKS_DIR, "brain-save.sh");
     const home = fs.mkdtempSync(path.join(os.tmpdir(), "codeatlas-brain-save-"));

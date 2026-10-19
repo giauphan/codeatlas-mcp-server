@@ -1,4 +1,5 @@
 import { queryDreamMemories, type DreamMemoryResult } from "./dreamingService.js";
+import { getResolvedApiKey } from "./projectService.js";
 import { getApiUrl } from "../utils/envUtils.js";
 
 const ALLOWED_TYPES = new Set(["MISTAKE", "PREFERENCE", "KNOWLEDGE", "PATTERN", "SESSION_SUMMARY"]);
@@ -160,6 +161,7 @@ export function formatBrainContext(
 
 async function fetchJson(url: string, apiKey: string): Promise<any> {
   const resp = await fetch(url, {
+    redirect: "error",
     headers: { "x-api-key": apiKey, "User-Agent": "codeatlas-enterprise/2.0" },
   });
   if (!resp.ok) {
@@ -173,7 +175,7 @@ export async function loadBrainContext(input: BrainContextInput): Promise<BrainC
   const project = input.project || process.env.CODEATLAS_PROJECT;
   const limit = Math.min(Math.max(input.limit ?? 5, 1), 10);
   const serverUrl = getApiUrl();
-  const apiKey = process.env.CODEATLAS_API_KEY;
+  const apiKey = getResolvedApiKey();
 
   const dreams = await queryDreamMemories({ query, project, limit }).catch(() => [] as DreamMemoryResult[]);
 

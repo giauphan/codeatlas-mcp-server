@@ -1,3 +1,4 @@
+import { getApiUrl } from "../utils/envUtils.js";
 import * as fs from "fs";
 import * as path from "path";
 import * as https from "https";
@@ -1032,10 +1033,8 @@ export async function loadAnalysisAsync(
 }
 
 export function getResolvedApiKey(): string | undefined {
-  let key = process.env.CODEATLAS_API_KEY;
-  if (key && (key.startsWith("ca_") || key.startsWith("test-"))) {
-    return key;
-  }
+  const key = process.env.CODEATLAS_API_KEY?.trim();
+  if (key) return key;
 
   const homeDir = getHomePath();
   const pathsToTry = [
@@ -1090,12 +1089,11 @@ export async function syncAnalysisToServer(projectName: string, analysis: any, b
   return new Promise((resolve, reject) => {
     try {
       const payload = JSON.stringify({ projectName, analysis, businessRule, changeDescription });
-      const serverUrlStr = process.env.CODEATLAS_API_URL;
-      if (!serverUrlStr) throw new Error("CODEATLAS_API_URL not set");
+      const serverUrlStr = getApiUrl();
       const serverUrl = new URL(serverUrlStr);
       
       const options = {
-        hostname: serverUrl.hostname,
+        hostname: serverUrl.hostname.replace(/^\[|\]$/g, ""),
         port: serverUrl.port || (serverUrl.protocol === "https:" ? 443 : 80),
         path: `/api/projects/sync`,
         method: "POST",
@@ -1147,8 +1145,7 @@ export async function getEpisodicMemoriesFromServer(projectName: string, eventTy
 
   return new Promise((resolve, reject) => {
     try {
-      const serverUrlStr = process.env.CODEATLAS_API_URL;
-      if (!serverUrlStr) throw new Error("CODEATLAS_API_URL not set");
+      const serverUrlStr = getApiUrl();
       const serverUrl = new URL(serverUrlStr);
       
       let pathStr = `/api/projects/memory?projectName=${encodeURIComponent(projectName)}`;
@@ -1157,7 +1154,7 @@ export async function getEpisodicMemoriesFromServer(projectName: string, eventTy
       }
 
       const options = {
-        hostname: serverUrl.hostname,
+        hostname: serverUrl.hostname.replace(/^\[|\]$/g, ""),
         port: serverUrl.port || (serverUrl.protocol === "https:" ? 443 : 80),
         path: pathStr,
         method: "GET",

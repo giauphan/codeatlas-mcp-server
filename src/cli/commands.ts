@@ -11,6 +11,8 @@ import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
 import * as readline from "readline";
+import { getResolvedApiKey } from "../services/projectService.js";
+import { getApiUrl } from "../utils/envUtils.js";
 import { checkSpawnResult } from "../utils/processUtils.js";
 import {
   getHomePath,
@@ -59,32 +61,35 @@ export function ask(query: string): Promise<string> {
 }
 
 export async function cloudFetch(method: string, path_: string, body?: any): Promise<{ ok: boolean; status: number; data: any }> {
-  if (!API_URL) {
+  if (!process.env.CODEATLAS_API_URL) {
     return { ok: false, status: 0, data: { error: "CODEATLAS_API_URL not set" } };
   }
-  const url = `${API_URL.replace(/\/+$/, "")}${path_}`;
   const headers: Record<string, string> = {
     "User-Agent": "codeatlas-enterprise-cli/2.0",
     "Content-Type": "application/json",
   };
-  const apiKey = process.env.CODEATLAS_API_KEY;
+  const apiKey = getResolvedApiKey();
   if (apiKey) headers["x-api-key"] = apiKey;
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
   try {
+    const url = `${getApiUrl()}${path_}`;
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 6000);
+    timeoutId = setTimeout(() => controller.abort(), 6000);
     const resp = await fetch(url, {
+      redirect: "error",
       method,
       headers,
       body: body ? JSON.stringify(body) : undefined,
       signal: controller.signal,
     });
-    clearTimeout(timeoutId);
     let data: any;
     try { data = await resp.json(); } catch { data = await resp.text(); }
     return { ok: resp.ok, status: resp.status, data };
   } catch (err: any) {
     if (err.name === "AbortError") return { ok: false, status: 0, data: { error: "Timeout" } };
     return { ok: false, status: 0, data: { error: err.message || "Network error" } };
+  } finally {
+    clearTimeout(timeoutId);
   }
 }
 
@@ -481,7 +486,7 @@ export function checkFeaturesDiff(): {
     astParsers: ["TypeScript", "JavaScript", "Python", "PHP"],
     adrCount,
     localMode: !process.env.CODEATLAS_API_URL,
-    cloudSync: Boolean(process.env.CODEATLAS_API_URL && process.env.CODEATLAS_API_KEY),
+    cloudSync: Boolean(process.env.CODEATLAS_API_URL && getResolvedApiKey()),
     connectedClients
   };
 }
@@ -646,7 +651,7 @@ export async function cmdDoctor(): Promise<void> {
 
   // 4. Environment & Cloud Services
   console.log(`\n${bold("4. Environment & Cloud Services")}`);
-  const hasApiKey = Boolean(process.env.CODEATLAS_API_KEY);
+  const hasApiKey = Boolean(getResolvedApiKey());
   console.log(`  ${hasApiKey ? ok() : warn()} CODEATLAS_API_KEY: ${hasApiKey ? "Set" : "not set (local mode only)"}`);
   countCheck(hasApiKey ? "ok" : "warn");
 
@@ -827,7 +832,7 @@ export async function cmdBrainContext(): Promise<void> {
   const project = process.env.CODEATLAS_PROJECT || (cwd ? path.basename(cwd) : "default");
   const limit = payload.limit || 5;
 
-  if (!process.env.CODEATLAS_API_URL || !process.env.CODEATLAS_API_KEY) {
+  if (!process.env.CODEATLAS_API_URL || !getResolvedApiKey()) {
     // Silently exit if not configured
     process.exit(0);
   }
@@ -857,7 +862,7 @@ export async function cmdBrainSave(): Promise<void> {
     }
   }
 
-  if (!process.env.CODEATLAS_API_URL || !process.env.CODEATLAS_API_KEY) {
+  if (!process.env.CODEATLAS_API_URL || !getResolvedApiKey()) {
     // Silently exit if not configured
     process.exit(0);
   }

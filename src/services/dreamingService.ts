@@ -1,3 +1,4 @@
+import { getApiUrl } from "../utils/envUtils.js";
 import * as https from "https";
 import * as http from "http";
 import { getResolvedApiKey } from "./projectService.js";
@@ -56,12 +57,11 @@ export async function saveDreamMemory(params: DreamMemoryInput): Promise<{ succe
   return new Promise<{ success: boolean; id: string }>((resolve, reject) => {
     try {
       const payload: string = JSON.stringify(params);
-      const serverUrlStr: string | undefined = process.env.CODEATLAS_API_URL;
-      if (!serverUrlStr) throw new Error("CODEATLAS_API_URL not set");
+      const serverUrlStr: string = getApiUrl();
       const serverUrl: URL = new URL(serverUrlStr);
 
       const options: https.RequestOptions = {
-        hostname: serverUrl.hostname,
+        hostname: serverUrl.hostname.replace(/^\[|\]$/g, ""),
         port: serverUrl.port || (serverUrl.protocol === "https:" ? 443 : 80),
         path: "/api/dreams/save",
         method: "POST",
@@ -130,8 +130,7 @@ export async function queryDreamMemories(params: DreamMemoryQuery): Promise<Drea
 
   return new Promise<DreamMemoryResult[]>((resolve, reject) => {
     try {
-      const serverUrlStr: string | undefined = process.env.CODEATLAS_API_URL;
-      if (!serverUrlStr) throw new Error("CODEATLAS_API_URL not set");
+      const serverUrlStr: string = getApiUrl();
       const serverUrl: URL = new URL(serverUrlStr);
 
       const queryParams: URLSearchParams = new URLSearchParams();
@@ -154,7 +153,7 @@ export async function queryDreamMemories(params: DreamMemoryQuery): Promise<Drea
       }
 
       const options: https.RequestOptions = {
-        hostname: serverUrl.hostname,
+        hostname: serverUrl.hostname.replace(/^\[|\]$/g, ""),
         port: serverUrl.port || (serverUrl.protocol === "https:" ? 443 : 80),
         path: "/api/dreams/query?" + queryParams.toString(),
         method: "GET",
