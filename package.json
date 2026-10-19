@@ -3,6 +3,12 @@
   "version": "3.0.1",
   "description": "Local-first MCP server for CodeAtlas — AST analysis, codebase intelligence, semantic memory, and A2A orchestration.",
   "type": "module",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js"
+    },
+    "./*": "./*"
+  },
   "bin": {
     "codeatlas-enterprise": "dist/index.js",
     "codeatlas-mcp": "dist/index.js",

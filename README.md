@@ -34,6 +34,8 @@ npm start
 
 The MCP server uses **stdio transport**. Configure it in an MCP client such as Claude Desktop or Zed. This package does not expose an HTTP or SSE MCP endpoint.
 
+The package root is exported as ESM and points to the same CLI/server entry. Importing it runs that entry; use the executable for normal MCP startup.
+
 ## Configure an MCP client
 
 Claude Desktop example:
