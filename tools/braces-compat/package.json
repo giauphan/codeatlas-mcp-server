@@ -1,0 +1,10 @@
+{
+  "name": "@codeatlas/braces-compat",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Local braces API adapter for the reviewed depth-guard fork",
+  "main": "index.cjs",
+  "peerDependencies": {
+    "@dieub/braces-depth-guard": "3.0.3-pn.3"
+  }
+}

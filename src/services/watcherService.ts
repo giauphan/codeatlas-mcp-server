@@ -17,6 +17,39 @@ export let indexTimeout: NodeJS.Timeout | null = null;
 export let watcher: any = null;
 export const activeWatchedPaths = new Set<string>();
 
+const ignoredDirectoryNames = new Set([
+  'node_modules',
+  'dist',
+  'build',
+  '.git',
+  'logs',
+  '__pycache__',
+  '.venv'
+]);
+
+export function shouldIgnoreWatcherPath(filePath: string): boolean {
+  const components = filePath.split(/[\\/]+/).filter(Boolean);
+  const basename = components.at(-1) ?? '';
+
+  return components.some((component) =>
+    (component.startsWith('.') && component !== '.' && component !== '..') ||
+    ignoredDirectoryNames.has(component)
+  ) || basename === '.env' || basename.endsWith('.log') || basename.endsWith('.pyc');
+}
+
+function shouldIgnoreWatchedPath(filePath: string): boolean {
+  const matchingRoot = [...activeWatchedPaths]
+    .sort((left, right) => right.length - left.length)
+    .find((root) => {
+      const relativePath = path.relative(root, filePath);
+      return relativePath === '' ||
+        (relativePath !== '..' && !relativePath.startsWith(`..${path.sep}`) && !path.isAbsolute(relativePath));
+    });
+
+  if (!matchingRoot) return true;
+  return shouldIgnoreWatcherPath(path.relative(matchingRoot, filePath));
+}
+
 export async function isIndexingEnabledForProject(projectName: string): Promise<boolean> {
   const apiKey = getResolvedApiKey();
   if (!apiKey) return true;
@@ -97,19 +130,7 @@ export function startWatcher() {
   }
 
   watcher = chokidar.watch(watchPaths, {
-      ignored: [
-        /(^|[\\/\\\\])\\./,
-        '**/node_modules/**',
-        '**/dist/**',
-        '**/build/**',
-        '**/.git/**',
-        '**/logs/**',
-        '**/*.log',
-        '**/__pycache__/**',
-        '**/*.pyc',
-        '**/.venv/**',
-        '**/.env'
-      ],
+      ignored: shouldIgnoreWatchedPath,
       persistent: true,
       ignoreInitial: true
     });
