@@ -10,8 +10,12 @@
 import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
+import { createHash, randomUUID } from "node:crypto";
+import { spawnSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
 import * as readline from "readline";
 import { checkSpawnResult } from "../utils/processUtils.js";
+import { resolveProjectIdentity } from "../services/projectIdentity.js";
 import {
   getHomePath,
   getHermesConfigPath,
@@ -193,6 +197,176 @@ export function checkClaudeHooks(): DiagnosticResult & { connected: string[]; mi
   } catch (err: any) {
     return { status: "fail", detail: `error reading settings: ${err.message}`, connected: [], missing: ["brain-context", "task-router", "brain-save"] };
   }
+}
+
+const CLAUDE_HOOK_EVENTS = ["SessionStart", "UserPromptSubmit", "PostToolUse", "PostToolUseFailure", "Stop", "PreCompact"] as const;
+type ClaudeHookEventKey = typeof CLAUDE_HOOK_EVENTS[number];
+
+export function summarizeClaudeHookRoutes(settings: unknown): Record<ClaudeHookEventKey, string[]> {
+  const root = settings && typeof settings === "object" ? settings as Record<string, any> : {};
+  const hooks = root.hooks && typeof root.hooks === "object" ? root.hooks as Record<string, unknown> : {};
+  const summary = {} as Record<ClaudeHookEventKey, string[]>;
+
+  for (const eventName of CLAUDE_HOOK_EVENTS) {
+    const groups = Array.isArray(hooks[eventName]) ? hooks[eventName] as unknown[] : [];
+    const routes = new Set<string>();
+    for (const group of groups) {
+      const hooksList = Array.isArray((group as any)?.hooks) ? (group as any).hooks : [group];
+      for (const hook of hooksList) {
+        const command = typeof (hook as any)?.command === "string" ? (hook as any).command : typeof hook === "string" ? hook : "";
+        const args = Array.isArray((hook as any)?.args) ? (hook as any).args.filter((arg: unknown) => typeof arg === "string") as string[] : [];
+        const routeText = [command, ...args].join(" ");
+        const hookName = ["brain-context", "brain-save", "task-router"].find((name) => routeText.includes(name));
+        const packagedNative = /[\\/]index\.js["']?\s+hook\s+(?:brain-context|brain-save|task-router)\s*$/.test(routeText);
+        if (!hookName || (!packagedNative && !/codeatlas|brain-(?:context|save)\.sh|task-router\.sh/i.test(routeText))) continue;
+        const implementation = packagedNative || /^codeatlas(?:-enterprise|-mcp)?(?:\s|$)/i.test(command) ? "native_cli" : command.endsWith(".sh") ? "shell_script" : "external";
+        routes.add(`${implementation}:${hookName}`);
+      }
+    }
+    summary[eventName] = [...routes].sort();
+  }
+  return summary;
+}
+
+export interface MemoryPipelineRuntimeDiagnostics {
+  gitCommit: string;
+  nodeVersion: string;
+  packageVersion: string;
+  cliEntryPath: string;
+  cliEntrySha256: string;
+  builtCliPath: string;
+  builtCliSha256: string;
+  pathCommand: string;
+  pathCommandRealpath: string;
+  pathCommandSha256: string;
+}
+
+function sha256File(filePath: string): string {
+  try {
+    return createHash("sha256").update(fs.readFileSync(filePath)).digest("hex");
+  } catch {
+    return "unavailable";
+  }
+}
+
+export function getMemoryPipelineRuntimeDiagnostics(): MemoryPipelineRuntimeDiagnostics {
+  const entryPath = process.argv[1] ? path.resolve(process.argv[1]) : "unavailable";
+  let packagePath = "";
+  let searchDir = entryPath === "unavailable" ? process.cwd() : path.dirname(entryPath);
+  for (let depth = 0; depth < 6; depth++) {
+    const candidate = path.join(searchDir, "package.json");
+    if (fs.existsSync(candidate)) {
+      try {
+        if (JSON.parse(fs.readFileSync(candidate, "utf8")).name === "codeatlas-mcp-server") {
+          packagePath = candidate;
+          break;
+        }
+      } catch { /* continue searching parent directories */ }
+    }
+    const parent = path.dirname(searchDir);
+    if (parent === searchDir) break;
+    searchDir = parent;
+  }
+  let packageVersion = "unknown";
+  if (packagePath) {
+    try { packageVersion = JSON.parse(fs.readFileSync(packagePath, "utf8")).version ?? "unknown"; } catch { /* keep unknown */ }
+  }
+
+  const commandLookup = spawnSync("which", ["codeatlas"], { encoding: "utf8", timeout: 1_000 });
+  const pathCommand = commandLookup.status === 0 ? commandLookup.stdout.trim() : "unavailable";
+  let pathCommandRealpath = "unavailable";
+  if (pathCommand !== "unavailable") {
+    try { pathCommandRealpath = fs.realpathSync(pathCommand); } catch { pathCommandRealpath = pathCommand; }
+  }
+  const builtCliPath = packagePath ? path.join(path.dirname(packagePath), "dist", "index.js") : "unavailable";
+  const gitResult = packagePath
+    ? spawnSync("git", ["-C", path.dirname(packagePath), "rev-parse", "--short", "HEAD"], { encoding: "utf8", timeout: 1_000 })
+    : undefined;
+
+  return {
+    gitCommit: gitResult?.status === 0 ? gitResult.stdout.trim() : "unavailable",
+    nodeVersion: process.version,
+    packageVersion,
+    cliEntryPath: entryPath,
+    cliEntrySha256: entryPath === "unavailable" ? "unavailable" : sha256File(entryPath),
+    builtCliPath,
+    builtCliSha256: builtCliPath === "unavailable" ? "unavailable" : sha256File(builtCliPath),
+    pathCommand,
+    pathCommandRealpath,
+    pathCommandSha256: pathCommandRealpath === "unavailable" ? "unavailable" : sha256File(pathCommandRealpath),
+  };
+}
+
+export function readMemoryPipelineOutcomes(): { save: string; load: string; trace_id?: string } {
+  const tracePath = path.join(os.homedir(), ".codeatlas", "memory-pipeline-events.jsonl");
+  const latest: { save: string; load: string; trace_id?: string } = { save: "unknown", load: "unknown" };
+  try {
+    const lines = fs.readFileSync(tracePath, "utf8").trim().split("\n").slice(-200);
+    for (const line of lines) {
+      try {
+        const record = JSON.parse(line);
+        const statuses = new Set(["acknowledged", "queued", "filtered", "skipped_empty", "invalid_payload", "unsupported_event", "unavailable", "empty", "suppressed", "injected", "error"]);
+        if (record?.kind === "save" && statuses.has(record.status)) latest.save = record.status;
+        if (record?.kind === "load" && statuses.has(record.status)) {
+          latest.load = record.status;
+          if (typeof record.trace_id === "string" && /^[A-Za-z0-9._:-]{1,255}$/.test(record.trace_id)) latest.trace_id = record.trace_id;
+        }
+      } catch { /* ignore malformed trace records */ }
+    }
+  } catch { /* no local outcome history */ }
+  return latest;
+}
+
+export function readMemoryPipelineMetrics(): { capture_received: number; bootstrap_attempt: number; injected: number; readable: number; observations: number } {
+  const metrics = { capture_received: 0, bootstrap_attempt: 0, injected: 0, readable: 0, observations: 0 };
+  const tracePath = path.join(os.homedir(), ".codeatlas", "memory-pipeline-events.jsonl");
+  try {
+    const lines = fs.readFileSync(tracePath, "utf8").trim().split("\n").slice(-200);
+    for (const line of lines) {
+      try {
+        const record = JSON.parse(line);
+        if (!record || typeof record !== "object" || Array.isArray(record)) continue;
+        metrics.observations++;
+        for (const key of ["capture_received", "bootstrap_attempt", "injected", "readable"] as const) {
+          if (record[key] === true) metrics[key]++;
+        }
+      } catch { /* ignore malformed trace records */ }
+    }
+  } catch { /* no local outcome history */ }
+  return metrics;
+}
+
+export function getHooksDoctorJson(): Record<string, unknown> {
+  const settingsPath = getClaudeSettingsPath();
+  let settings: unknown = null;
+  try { if (fs.existsSync(settingsPath)) settings = JSON.parse(fs.readFileSync(settingsPath, "utf8")); } catch { /* safely report unavailable */ }
+  const routes = summarizeClaudeHookRoutes(settings);
+  const routeValues = Object.values(routes).flat();
+  const contextRegistered = routeValues.some((route) => route.endsWith(":brain-context"));
+  const captureRegistered = routeValues.some((route) => route.endsWith(":brain-save"));
+  const runtime = getMemoryPipelineRuntimeDiagnostics();
+  const cwd = process.env.CLAUDE_PROJECT_DIR || process.cwd();
+  let identity: Record<string, unknown> = { status: "unavailable" };
+  try {
+    // The canonical root stays local; diagnostics expose only its stable identifier and derivation source.
+    const resolved = resolveProjectIdentity(cwd);
+    identity = { status: "resolved", project_id: resolved.project_id, source: resolved.identity_source };
+  } catch { /* report identity unavailable without exposing paths */ }
+  return {
+    schema_version: 1,
+    hooks: {
+      configured: contextRegistered && captureRegistered,
+      context_registered: contextRegistered,
+      capture_registered: captureRegistered,
+      available: runtime.pathCommandRealpath !== "unavailable",
+      resolved_command_path: runtime.pathCommandRealpath,
+      registration: routes,
+    },
+    endpoint: { url_present: Boolean(process.env.CODEATLAS_API_URL), key_present: Boolean(process.env.CODEATLAS_API_KEY) },
+    project_identity: identity,
+    last_outcomes: readMemoryPipelineOutcomes(),
+    pipeline_metrics: readMemoryPipelineMetrics(),
+  };
 }
 
 export type AgentKind = "claude" | "codex" | "agents" | "gemini" | "cursor" | "generic";
@@ -457,6 +631,7 @@ import {
   stepHealthCheck
 } from "./steps.js";
 import { cmdSetupClaude, cmdSetupZed } from "./setupClaude.js";
+import { decodeClaudeHookEvent } from "./hooks/eventDecoder.js";
 
 /* ── CLI Commands ───────────────────────────────────────────────── */
 
@@ -496,6 +671,11 @@ export async function cmdSetup(): Promise<void> {
 }
 
 export async function cmdDoctor(): Promise<void> {
+  if (process.argv[3] === "hooks" && process.argv[4] === "--json") {
+    const diagnostics = getHooksDoctorJson();
+    process.stdout.write(`${JSON.stringify(diagnostics)}\n`);
+    return;
+  }
   console.log(`\n${bold("CodeAtlas Second Brain — Health Check & Diagnostics")}`);
   console.log("=".repeat(60));
 
@@ -600,6 +780,20 @@ export async function cmdDoctor(): Promise<void> {
   const claudeHooks = checkClaudeHooks();
   console.log(`  ${claudeHooks.status === "ok" ? ok() : warn()} Claude Code Hooks: ${claudeHooks.detail}`);
   countCheck(claudeHooks.status);
+  let hookSettings: unknown = null;
+  try {
+    const hookSettingsPath = getClaudeSettingsPath();
+    if (fs.existsSync(hookSettingsPath)) hookSettings = JSON.parse(fs.readFileSync(hookSettingsPath, "utf8"));
+  } catch { /* report empty routes below; checkClaudeHooks includes parse status */ }
+  const hookRoutes = summarizeClaudeHookRoutes(hookSettings);
+  for (const [eventName, routes] of Object.entries(hookRoutes)) {
+    if (routes.length > 0) console.log(`    ${eventName}: ${routes.join(", ")}`);
+  }
+  const runtime = getMemoryPipelineRuntimeDiagnostics();
+  console.log(`  Memory pipeline runtime: git=${runtime.gitCommit} node=${runtime.nodeVersion} package=${runtime.packageVersion}`);
+  console.log(`    CLI entry: ${runtime.cliEntryPath} sha256=${runtime.cliEntrySha256}`);
+  console.log(`    Built CLI: ${runtime.builtCliPath} sha256=${runtime.builtCliSha256}`);
+  console.log(`    PATH codeatlas: ${runtime.pathCommand} realpath=${runtime.pathCommandRealpath} sha256=${runtime.pathCommandSha256}`);
 
   const hermesPluginPath = path.join(getHermesPluginDir(), "__init__.py");
   const hermesPlugin = fs.existsSync(hermesPluginPath);
@@ -647,11 +841,11 @@ export async function cmdDoctor(): Promise<void> {
   console.log(`  • AST Analysis Engines: ${diff.astParsers.join(", ")}`);
   console.log(`  • ADR System: ${diff.adrCount} records at ~/.codeatlas/adr`);
   console.log(`  • Execution Mode: ${diff.cloudSync ? "Cloud Synchronized" : (diff.localMode ? "Local-First / Standalone" : "Hybrid")}`);
-  console.log(`  • Second Brain Hooks: ${claudeHooks.status === "ok" ? "Fully Automated" : "Partial / Manual"}`);
+  console.log(`  • Claude hook registration: ${claudeHooks.status === "ok" ? "configured" : "partial"} (registration does not confirm memory-pipeline health)`);
 
   console.log(`\n${bold("Result:")} ${passed}/${total} checks passed`);
   if (claudeMcp.status === "ok" && (claudeHooks.status === "ok" || hermesPlugin)) {
-    console.log(`${green("All systems operational. Your Second Brain is ready.")}`);
+    console.log(`${green("Configured integrations are present. Use 'doctor hooks --json' to inspect memory-pipeline outcomes.")}`);
   } else {
     console.log(`${yellow("Tip: Run 'codeatlas setup claude' or 'codeatlas init' to enable missing integrations.")}`);
   }
@@ -728,10 +922,8 @@ export async function runCLI(): Promise<void> {
     // Install Claude hooks using the setup-hooks script
     console.log("🚀 Installing CodeAtlas hooks for Claude CLI...");
     try {
-      // Run from repo root so scripts/setup-hooks.js resolves correctly
-      const { spawnSync } = await import("child_process");
-      const result = spawnSync(process.execPath, ["scripts/setup-hooks.js"], { stdio: "inherit", cwd: process.cwd(), shell: false });
-      checkSpawnResult(result);
+      const { installClaudeHooks } = await import("../../scripts/claude-hook-settings.js");
+      installClaudeHooks();
       console.log("✅ Hooks installed successfully!");
     } catch (error) {
       console.error(`${fail()} Failed to install hooks: ${error}`);
@@ -742,7 +934,8 @@ export async function runCLI(): Promise<void> {
     console.log("🔍 Validating CodeAtlas hooks installation...");
     const { spawnSync } = await import("child_process");
     try {
-      const result = spawnSync(process.execPath, ["scripts/validate-hooks.js"], { stdio: "inherit", cwd: process.cwd(), shell: false });
+      const validator = fileURLToPath(new URL("../../scripts/validate-hooks.js", import.meta.url));
+      const result = spawnSync(process.execPath, [validator], { stdio: "inherit", shell: false });
       checkSpawnResult(result);
       console.log("✅ Hooks validation completed successfully!");
     } catch (error) {
@@ -773,6 +966,13 @@ Without a command, runs the MCP server.
 /* ── Brain Context & Save Commands ───────────────────────────────── */
 
 export async function cmdBrainContext(): Promise<void> {
+  const startedAt = performance.now();
+  let bootstrapAttempt = false;
+  const report = (event: Parameters<typeof reportMemoryPipelineEvent>[0]) => reportMemoryPipelineEvent({
+    ...event,
+    duration_ms: Math.max(0, Math.round(performance.now() - startedAt)),
+    ...(bootstrapAttempt ? { bootstrap_attempt: true } : {}),
+  });
   const input = await readStdin();
   let payload: any = {};
 
@@ -784,81 +984,152 @@ export async function cmdBrainContext(): Promise<void> {
     }
   }
 
-  const prompt = payload.prompt || payload.query || "session context";
-  const cwd = payload.cwd || process.env.CLAUDE_PROJECT_DIR || process.cwd();
-  const project = process.env.CODEATLAS_PROJECT || (cwd ? path.basename(cwd) : "default");
-  const limit = payload.limit || 5;
-
-  if (!process.env.CODEATLAS_API_URL || !process.env.CODEATLAS_API_KEY) {
-    // Silently exit if not configured
-    process.exit(0);
+  if (process.env.CODEATLAS_INJECT_BRAIN_CONTEXT !== "1") {
+    report({ kind: "load", status: "suppressed", reason: "disabled", trace_id: randomUUID() });
+    return;
   }
 
+  const hookEventName: "SessionStart" | "UserPromptSubmit" = payload?.hook_event_name === "SessionStart" ? "SessionStart" : "UserPromptSubmit";
+  const cwd = typeof payload?.cwd === "string" ? payload.cwd : process.env.CLAUDE_PROJECT_DIR || process.cwd();
+  const promptValue = typeof payload?.prompt === "string" ? payload.prompt : typeof payload?.query === "string" ? payload.query : "";
+  const prompt = promptValue.slice(0, 2_000);
+  const sessionId = typeof payload?.session_id === "string" && payload.session_id.length > 0 ? payload.session_id.slice(0, 256) : `unknown-${createHash("sha256").update(path.resolve(cwd)).digest("hex").slice(0, 16)}`;
+  const traceId = randomUUID();
+  if (!process.env.CODEATLAS_API_URL || !process.env.CODEATLAS_API_KEY) {
+    report({ kind: "load", status: "unavailable", reason: "not_configured", trace_id: traceId });
+    return;
+  }
+
+  let failureStage = "project_identity";
   try {
+    const identity = resolveProjectIdentity(cwd);
     const { loadBrainContext, formatBrainContext } = await import("../services/brainContext.js");
-    const result = await loadBrainContext({ query: prompt, project, limit });
-    console.log(formatBrainContext(result));
-    process.exit(0);
-  } catch (err) {
-    // Fail silently - hooks should not break Claude
-    console.error("Brain context error:", err instanceof Error ? err.message : String(err));
-    process.exit(0);
+    const { prepareContextPacket, commitContextPacket } = await import("./hooks/contextPacket.js");
+    failureStage = "context_fetch";
+    bootstrapAttempt = true;
+    const result = await loadBrainContext({ query: prompt, project: identity.project, project_id: identity.project_id, display_name: identity.project, workspace_path: identity.workspace_path, trace_id: traceId, limit: 5 });
+    if (result.retrievalStatus && /_error$/.test(result.retrievalStatus)) {
+      report({ kind: "load", status: "error", reason: result.retrievalStatus, trace_id: traceId, project_id: identity.project_id });
+      return;
+    }
+    if (result.componentStatuses && Object.values(result.componentStatuses).some((status) => /_error$/.test(status))) {
+      report({ kind: "load", status: "error", reason: "partial_retrieval_failure", trace_id: traceId, project_id: identity.project_id });
+    }
+    const maxCharsRaw = Number(process.env.CODEATLAS_CONTEXT_MAX_CHARS);
+    const maxChars = Number.isFinite(maxCharsRaw) && maxCharsRaw >= 500 && maxCharsRaw <= 20_000 ? Math.trunc(maxCharsRaw) : 6_000;
+    failureStage = "context_format";
+    const packet = formatBrainContext(result, { query: prompt, minRelevanceScore: payload?.minRelevanceScore, maxChars });
+    if (packet === "No Second Brain context found for this query.") {
+      report({ kind: "load", status: "empty", reason: result.checkpointStatus === "empty" ? "checkpoint_empty" : "no_matching_context", trace_id: traceId, project_id: identity.project_id });
+      return;
+    }
+    const packetInput = { projectId: identity.project_id, sessionId, eventName: hookEventName, content: packet };
+    failureStage = "cache_prepare";
+    const decision = await prepareContextPacket(packetInput);
+    if (decision.status === "suppressed") {
+      report({ kind: "load", status: "suppressed", reason: "duplicate", trace_id: traceId, project_id: identity.project_id });
+      return;
+    }
+    const hostOutput = JSON.stringify({ hookSpecificOutput: { hookEventName, additionalContext: packet } });
+    failureStage = "host_output";
+    await new Promise<void>((resolve, reject) => process.stdout.write(`${hostOutput}\n`, (error) => error ? reject(error) : resolve()));
+    failureStage = "cache_commit";
+    await commitContextPacket(packetInput, decision.contentHash);
+    report({ kind: "load", status: "injected", reason: "context_available", trace_id: traceId, project_id: identity.project_id, packet_chars: packet.length, injected: true, readable: true });
+  } catch {
+    report({ kind: "load", status: "error", reason: failureStage, trace_id: traceId });
   }
 }
 
+function reportMemoryPipelineEvent(event: { kind: "save" | "load"; status: string; reason: string; trace_id: string; project_id?: string; packet_chars?: number; duration_ms?: number; capture_received?: boolean; bootstrap_attempt?: boolean; injected?: boolean; readable?: boolean }): void {
+  const safe = {
+    timestamp: new Date().toISOString(),
+    kind: event.kind,
+    status: event.status,
+    reason: event.reason,
+    trace_id: event.trace_id,
+    ...(event.project_id && /^[A-Za-z0-9._:-]{1,255}$/.test(event.project_id) ? { project_id: event.project_id } : {}),
+    ...(Number.isInteger(event.packet_chars) ? { packet_chars: event.packet_chars } : {}),
+    ...(Number.isFinite(event.duration_ms) ? { duration_ms: Math.max(0, Math.trunc(event.duration_ms!)) } : {}),
+    ...(event.capture_received ? { capture_received: true } : {}),
+    ...(event.bootstrap_attempt ? { bootstrap_attempt: true } : {}),
+    ...(event.injected ? { injected: true } : {}),
+    ...(event.readable ? { readable: true } : {}),
+  };
+  try {
+    const dir = path.join(os.homedir(), ".codeatlas");
+    fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
+    try { fs.chmodSync(dir, 0o700); } catch { /* best effort */ }
+    const file = path.join(dir, "memory-pipeline-events.jsonl");
+    fs.appendFileSync(file, `${JSON.stringify(safe)}\n`, { mode: 0o600 });
+    try { fs.chmodSync(file, 0o600); } catch { /* best effort */ }
+  } catch { /* diagnostics must never break a host hook */ }
+  console.error(`[CodeAtlas hook] ${event.kind}_status=${event.status} reason=${event.reason} trace_id=${event.trace_id}`);
+}
+
 export async function cmdBrainSave(): Promise<void> {
+  const startedAt = performance.now();
   const input = await readStdin();
-  let payload: any = {};
-  
-  if (input) {
-    try {
-      payload = JSON.parse(input);
-    } catch {
-      // Invalid JSON, exit silently
+  const event = decodeClaudeHookEvent(input);
+  const report = (details: { status: string; reason: string; trace_id: string; project_id?: string }) => reportMemoryPipelineEvent({
+    kind: "save", ...details,
+    duration_ms: Math.max(0, Math.round(performance.now() - startedAt)),
+    ...(event.status === "capture" || event.status === "lifecycle" ? { capture_received: true } : {}),
+  });
+  const traceId = event.status === "capture" ? event.eventId ?? event.idempotencyKey ?? randomUUID() : randomUUID();
+
+  if (event.status !== "capture" && event.status !== "lifecycle") {
+    report({ status: event.status, reason: "reason" in event ? event.reason : "skipped", trace_id: traceId });
+    process.exit(0);
+  }
+
+  if (event.status === "lifecycle") {
+    if (!process.env.CODEATLAS_API_URL || !process.env.CODEATLAS_API_KEY) {
+      report({ status: "unavailable", reason: "not_configured", trace_id: traceId });
       process.exit(0);
     }
+    try {
+      const { resolveProjectIdentity } = await import("../services/projectIdentity.js");
+      const { captureTranscriptCheckpoint } = await import("./hooks/sessionSpool.js");
+      const identity = resolveProjectIdentity(event.cwd);
+      const result = await captureTranscriptCheckpoint({ identity, sessionId: event.sessionId, cwd: event.cwd, transcriptPath: event.transcriptPath, trigger: event.eventName });
+      report({ status: result.status, reason: "lifecycle_capture", trace_id: traceId, project_id: identity.project_id });
+    } catch {
+      report({ status: "error", reason: "local_capture_failed", trace_id: traceId });
+    }
+    process.exit(0);
+  }
+
+  if (!event.sessionId || !event.idempotencyKey) {
+    report({ status: "invalid_payload", reason: "missing_session_context", trace_id: traceId });
+    process.exit(0);
   }
 
   if (!process.env.CODEATLAS_API_URL || !process.env.CODEATLAS_API_KEY) {
-    // Silently exit if not configured
+    report({ status: "unavailable", reason: "not_configured", trace_id: traceId });
     process.exit(0);
   }
 
-  const cwd = payload.cwd || process.env.CLAUDE_PROJECT_DIR || process.cwd();
-  const project = process.env.CODEATLAS_PROJECT || (cwd ? path.basename(cwd) : "default");
-  const toolName = payload.tool_name || "unknown";
-  const sessionId = payload.session_id || payload.sessionId || "";
-
-  // Extract content from tool response
-  let content = "";
-  let memoryType: "KNOWLEDGE" | "MISTAKE" | "PREFERENCE" | "PATTERN" | "SESSION_SUMMARY" = "KNOWLEDGE";
-  
-  if (payload.response) {
-    const response = typeof payload.response === "string" ? payload.response : JSON.stringify(payload.response);
-    content = response.slice(0, 1000);
-    
-    // Detect mistakes from errors
-    if (payload.error || response.toLowerCase().includes("error") || response.toLowerCase().includes("failed")) {
-      memoryType = "MISTAKE";
-    }
-  }
-
-  if (!content) {
-    // Nothing to save
-    process.exit(0);
-  }
-
+  const cwd = event.cwd || process.env.CLAUDE_PROJECT_DIR || process.cwd();
   try {
-    const { saveDreamMemory } = await import("../services/dreamingService.js");
-    await saveDreamMemory({
-      memory_type: memoryType,
-      content: `[${toolName}] ${content}`,
-      importance: 5,
-      session_id: sessionId,
-      project,
+    const { resolveProjectIdentity } = await import("../services/projectIdentity.js");
+    const { captureSessionEvents } = await import("./hooks/sessionSpool.js");
+    const identity = resolveProjectIdentity(cwd);
+    const result = await captureSessionEvents({
+      identity,
+      sessionId: event.sessionId,
+      events: [{
+        event_id: event.eventId ?? event.idempotencyKey,
+        session_id: event.sessionId,
+        content: `[${event.toolName}] ${event.content}`,
+        actor_role: "TOOL",
+        memory_type_hint: event.memoryType,
+        tool_name: event.toolName,
+      }],
     });
+    report({ status: result.status, reason: "tool_capture", trace_id: traceId, project_id: identity.project_id });
   } catch {
-    // Fail silently - hooks should not break Claude
+    report({ status: "error", reason: "local_capture_failed", trace_id: traceId });
     process.exit(0);
   }
 }

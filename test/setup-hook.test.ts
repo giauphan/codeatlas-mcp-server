@@ -49,9 +49,9 @@ describe("setup-hook command", () => {
       const sessionStartHooks = settings.hooks.SessionStart[0].hooks;
       const postToolUseHooks = settings.hooks.PostToolUse[0].hooks;
 
-      assert.ok(preToolUseHooks.some((h: any) => h.command === "codeatlas" && h.args?.includes("task-router")));
-      assert.ok(sessionStartHooks.some((h: any) => h.command === "codeatlas" && h.args?.includes("brain-context")));
-      assert.ok(postToolUseHooks.some((h: any) => h.command === "codeatlas" && h.args?.includes("brain-save")));
+      assert.ok(preToolUseHooks.some((h: any) => h.command?.endsWith("hook task-router")));
+      assert.ok(sessionStartHooks.some((h: any) => h.command?.endsWith("hook brain-context")));
+      assert.ok(postToolUseHooks.some((h: any) => h.command?.endsWith("hook brain-save")));
       
     } finally {
       // Clean up temp directory

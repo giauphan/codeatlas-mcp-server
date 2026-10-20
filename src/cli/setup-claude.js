@@ -10,7 +10,7 @@ import { existsSync } from 'fs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
-const REPO_ROOT = join(__dirname, '..', '..', '..');
+const REPO_ROOT = join(__dirname, '..', '..');
 const SETUP_SCRIPT = join(REPO_ROOT, 'scripts', 'setup-hooks.js');
 
 console.log('🚀 CodeAtlas MCP Server - Claude Hooks Setup');

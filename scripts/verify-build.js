@@ -1,5 +1,6 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
+import { verifyBuildManifest } from "./build-manifest.js";
 
 const root = process.argv[2] || "dist";
 const files = [];
@@ -14,12 +15,13 @@ function walk(directory) {
 
 try {
   walk(root);
+  verifyBuildManifest(root);
 } catch (error) {
   console.error(`::error::Unable to inspect ${root}: ${error.message}`);
   process.exit(1);
 }
 
-const testFiles = files.filter((file) => /\.(test|spec)\.(js|js\.map)$/.test(file));
+const testFiles = files.filter((file) => /\.(test|spec)\.(js|js\.map)$/.test(file) || file.endsWith(".ts"));
 const sourceMaps = files.filter((file) => file.endsWith(".map"));
 const unsafeFiles = files.filter((file) => {
   if (!/\.(js|sh)$/.test(file)) return false;
@@ -42,4 +44,4 @@ if (testFiles.length || sourceMaps.length || unsafeFiles.length) {
   process.exit(1);
 }
 
-console.log(`Build validation passed: ${files.length} files checked; no test files, source maps, or hardcoded URL fallbacks.`);
+console.log(`Build validation passed: ${files.length} files checked; source/artifact hashes match; no test files, TypeScript, source maps, or hardcoded URL fallbacks.`);

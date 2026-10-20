@@ -4,6 +4,7 @@ import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
 import * as child_process from "child_process";
+import { randomUUID } from "node:crypto";
 import {
   getHomePath,
   getHermesConfigPath,
@@ -35,6 +36,7 @@ import {
 } from "../services/projectService.js";
 import { saveDreamMemory, queryDreamMemories, DreamMemoryResult } from "../services/dreamingService.js";
 import { loadBrainContext, formatBrainContext } from "../services/brainContext.js";
+import { resolveProjectIdentity } from "../services/projectIdentity.js";
 import { routeTask } from "../cli/taskRouter.js";
 import { CodeAnalyzer } from "../analyzer/parser.js";
 import { SecurityScanner } from "../securityScanner.js";
@@ -48,6 +50,13 @@ const CONFIG_FILES_ENTRIES = Object.entries({ tsconfig: "tsconfig.json", eslint:
 
 function escapeRegExp(str: string): string {
   return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function resolveMemoryToolIdentity(project?: string, projectId?: string) {
+  const suppliedPath = project && fs.existsSync(path.resolve(project)) ? path.resolve(project) : undefined;
+  const workspacePath = suppliedPath ?? process.env.CODEATLAS_PROJECT_DIR ?? process.cwd();
+  const displayName = suppliedPath ? process.env.CODEATLAS_PROJECT : project ?? process.env.CODEATLAS_PROJECT;
+  return resolveProjectIdentity(workspacePath, projectId, displayName);
 }
 
 // ⚡ Bolt Optimization: Use explicit for-loops to instantiate Maps/Sets to avoid the
@@ -861,13 +870,15 @@ export function registerTools(server: McpServer) {
       importance: z.number().min(1).max(10).optional().describe("Importance level from 1 (low) to 10 (critical). Defaults to 5."),
       session_id: z.string().max(255).optional().describe("Optional session identifier for grouping related memories"),
       project: z.string().max(255).optional().describe("Optional project name to associate this memory with"),
+      project_id: z.string().max(255).optional().describe("Optional canonical project ID; normally resolved from the workspace"),
       scope: z.string().max(500).optional().describe("Optional hierarchical feature scope, e.g. auth/login or Auth/Login. Lowercase recommended for consistency."),
       tags: z.array(z.string().max(100)).max(100).optional().describe("Optional tags for filtering related memories"),
       related_ids: z.array(z.string().max(100)).max(100).optional().describe("Optional IDs of related dream memories or code entities"),
     },
-    async ({ memory_type, content, importance, session_id, project, scope, tags, related_ids }: { memory_type: "MISTAKE" | "PREFERENCE" | "KNOWLEDGE" | "PATTERN" | "SESSION_SUMMARY"; content: string; importance?: number; session_id?: string; project?: string; scope?: string; tags?: string[]; related_ids?: string[] }) => {
+    async ({ memory_type, content, importance, session_id, project, project_id, scope, tags, related_ids }: { memory_type: "MISTAKE" | "PREFERENCE" | "KNOWLEDGE" | "PATTERN" | "SESSION_SUMMARY"; content: string; importance?: number; session_id?: string; project?: string; project_id?: string; scope?: string; tags?: string[]; related_ids?: string[] }) => {
       const auth = await checkAuth();
-      await logActivity(auth, "save_dream_memory", { memory_type, content: content.substring(0, 100), importance, session_id, project, scope, tags, related_ids });
+      const identity = resolveMemoryToolIdentity(project, project_id);
+      await logActivity(auth, "save_dream_memory", { memory_type, content_chars: content.length, importance, session_id, project: identity.project, project_id: identity.project_id, scope, tags, related_ids });
 
       try {
         const result = await saveDreamMemory({
@@ -875,7 +886,10 @@ export function registerTools(server: McpServer) {
           content,
           importance: importance || 5,
           session_id,
-          project,
+          project: identity.project,
+          project_id: identity.project_id,
+          display_name: identity.project,
+          workspace_path: identity.workspace_path,
           scope,
           tags,
           related_ids,
@@ -3599,19 +3613,69 @@ def register(ctx):
     {
       query: z.string().max(500).describe("Current user task or prompt to retrieve context for"),
       project: z.string().max(255).optional().describe("Optional project name filter"),
+      project_id: z.string().max(255).optional().describe("Optional canonical project ID; normally resolved from the workspace"),
       limit: z.number().min(1).max(10).optional().default(5).describe("Max memories/genes to return (default: 5)"),
+      minRelevanceScore: z.number().min(0).max(10).optional().describe("Optional minimum relevance score threshold for Genome context filtering"),
     },
-    async ({ query, project, limit }) => {
+    async ({ query, project, project_id, limit, minRelevanceScore }) => {
       const auth = await checkAuth();
-      await logActivity(auth, "brain_context", { query: query.substring(0, 100), project, limit });
+      const identity = resolveMemoryToolIdentity(project, project_id);
+      await logActivity(auth, "brain_context", { query_chars: query.length, project: identity.project, project_id: identity.project_id, limit, minRelevanceScore });
       try {
-        const result = await loadBrainContext({ query, project, limit });
-        return { content: [{ type: "text" as const, text: formatBrainContext(result) }] };
+        const result = await loadBrainContext({ query, project: identity.project, project_id: identity.project_id, display_name: identity.project, workspace_path: identity.workspace_path, trace_id: randomUUID(), limit });
+        return { content: [{ type: "text" as const, text: formatBrainContext(result, { query, minRelevanceScore }) }] };
       } catch (err: unknown) {
         return {
           content: [{ type: "text" as const, text: `Failed to load brain context: ${err instanceof Error ? err.message : String(err)}` }],
           isError: true,
         };
+      }
+    }
+  );
+
+  // Explicit bootstrap for MCP hosts that do not support lifecycle context injection.
+  server.tool(
+    "memory_bootstrap",
+    "Fetch the latest verified checkpoint for this project and return it as an explicit MCP tool response. This does not automatically inject context into the host; the client or agent can decide how to use the returned untrusted historical evidence.",
+    {
+      project: z.string().max(2_048).optional().describe("Optional workspace path or legacy display name; defaults to the current workspace"),
+      project_id: z.string().max(255).optional().describe("Optional canonical project ID; normally resolved from the workspace"),
+    },
+    async ({ project, project_id }) => {
+      const auth = await checkAuth();
+      const identity = resolveMemoryToolIdentity(project, project_id);
+      const traceId = randomUUID();
+      await logActivity(auth, "memory_bootstrap", { project_id: identity.project_id });
+      console.error(`[CodeAtlas memory] bootstrap_attempt trace_id=${traceId} project_id=${identity.project_id}`);
+      const resultEnvelope = (status: "ready" | "empty" | "error" | "unavailable", retrievalStatus: string, context = "", reason?: string) => ({
+        status,
+        retrieval_status: retrievalStatus,
+        project_id: identity.project_id,
+        delivery: "mcp_tool_response",
+        automatic_injection: false,
+        ...(reason ? { reason } : {}),
+        context,
+      });
+      if (!process.env.CODEATLAS_API_URL || !process.env.CODEATLAS_API_KEY) {
+        console.error(`[CodeAtlas memory] retrieval_error trace_id=${traceId} reason=not_configured`);
+        return { content: [{ type: "text" as const, text: JSON.stringify(resultEnvelope("unavailable", "backend_error", "", "not_configured"), null, 2) }] };
+      }
+      try {
+        const result = await loadBrainContext({ query: "", project: identity.project, project_id: identity.project_id, display_name: identity.project, workspace_path: identity.workspace_path, trace_id: traceId });
+        if (result.checkpointStatus === "ok") {
+          const context = formatBrainContext(result, { maxChars: 6_000 });
+          console.error(`[CodeAtlas memory] bootstrap_returned trace_id=${traceId} project_id=${identity.project_id} delivery=mcp_tool_response`);
+          return { content: [{ type: "text" as const, text: JSON.stringify(resultEnvelope("ready", "ok", context), null, 2) }] };
+        }
+        if (result.checkpointStatus === "empty") {
+          console.error(`[CodeAtlas memory] retrieval_empty trace_id=${traceId} project_id=${identity.project_id}`);
+          return { content: [{ type: "text" as const, text: JSON.stringify(resultEnvelope("empty", "empty"), null, 2) }] };
+        }
+        console.error(`[CodeAtlas memory] retrieval_error trace_id=${traceId} project_id=${identity.project_id}`);
+        return { content: [{ type: "text" as const, text: JSON.stringify(resultEnvelope("error", result.checkpointStatus ?? "backend_error", "", "checkpoint_unavailable"), null, 2) }] };
+      } catch {
+        console.error(`[CodeAtlas memory] retrieval_error trace_id=${traceId} project_id=${identity.project_id}`);
+        return { content: [{ type: "text" as const, text: JSON.stringify(resultEnvelope("error", "backend_error", "", "checkpoint_unavailable"), null, 2) }] };
       }
     }
   );

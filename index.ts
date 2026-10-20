@@ -24,12 +24,21 @@ try {
 }
 
 // ── CLI command routing ──────────────────────────────────────────────
-import { isCLICommand, runCLI } from "./src/cli/commands.js";
+// Load environment before importing CLI modules so module-level config sees it.
+dotenv.config();
+try {
+  const globalEnvPath = path.join(os.homedir(), ".codeatlas", ".env");
+  if (fs.existsSync(globalEnvPath)) dotenv.config({ path: globalEnvPath, override: false });
+} catch {
+  // Ignore errors reading global config.
+}
 
-const _cmd = process.argv[2];
-if (isCLICommand(process.argv)) {
-  await runCLI();
-  process.exit(0);
+if (process.argv[2]) {
+  const { isCLICommand, runCLI } = await import("./src/cli/commands.js");
+  if (isCLICommand(process.argv)) {
+    await runCLI();
+    process.exit(0);
+  }
 }
 // ──────────────────────────────────────────────────────────────────────
 
@@ -111,11 +120,11 @@ console.error = (...args: any[]) => {
 };
 
 // Import Presentation Adapters
-import { server } from "./src/presentation/mcpServer.js";
+const { server } = await import("./src/presentation/mcpServer.js");
 
 // Import Domain / Application Services
-import { checkAuth } from "./src/services/authService.js";
-import {
+const { checkAuth } = await import("./src/services/authService.js");
+const {
   getStats,
   discoverProjects,
   loadAnalysis,
@@ -125,20 +134,8 @@ import {
   getWorkspaceFromAncestors,
   isSystemIdeDirectory,
   discoverGitSubProjects
-} from "./src/services/projectService.js";
-import { startWatcher, stopWatcher, isIndexingEnabledForProject, watcher } from "./src/services/watcherService.js";
-
-// Load environment variables
-dotenv.config();
-// Also load from global config if it exists
-try {
-  const globalEnvPath = path.join(os.homedir(), ".codeatlas", ".env");
-  if (fs.existsSync(globalEnvPath)) {
-    dotenv.config({ path: globalEnvPath, override: false }); // Do not override if already set
-  }
-} catch (e) {
-  // Ignore errors reading global config
-}
+} = await import("./src/services/projectService.js");
+const { startWatcher, stopWatcher, isIndexingEnabledForProject, watcher } = await import("./src/services/watcherService.js");
 
 // Start server
 async function main() {

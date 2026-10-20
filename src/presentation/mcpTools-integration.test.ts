@@ -4,21 +4,27 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
-
-// Import tools registration
-const { registerTools } = await import("./mcpServer.js");
+import * as http from "node:http";
 
 const TMP_DIR = path.join(os.tmpdir(), "codeatlas-tool-test-" + Date.now());
 const PROJECT_DIR = path.join(TMP_DIR, "test-mcp-project");
+const originalHome = process.env.HOME;
+const testHome = path.join(TMP_DIR, "home");
+fs.mkdirSync(testHome, { recursive: true });
+process.env.HOME = testHome;
+// Import after isolating config paths so registration cannot touch an operator registry.
+const { registerTools } = await import("./mcpServer.js");
 
 describe("CodeAtlas MCP Tools - Strict Activation & Quality Tests", () => {
   let server: McpServer;
   let tools: Record<string, any>;
   let originalCodeatlasApiUrl: string | undefined;
+  let originalCodeatlasApiKey: string | undefined;
 
   before(async () => {
     // Disable cloud sync by clearing API config so it falls back cleanly to local-only
     originalCodeatlasApiUrl = process.env.CODEATLAS_API_URL;
+    originalCodeatlasApiKey = process.env.CODEATLAS_API_KEY;
     delete process.env.CODEATLAS_API_URL;
     delete process.env.CODEATLAS_API_KEY;
 
@@ -48,6 +54,8 @@ console.log(add(1, 2));
   after(() => {
     fs.rmSync(TMP_DIR, { recursive: true, force: true });
     if (originalCodeatlasApiUrl) process.env.CODEATLAS_API_URL = originalCodeatlasApiUrl;
+    if (originalCodeatlasApiKey === undefined) delete process.env.CODEATLAS_API_KEY; else process.env.CODEATLAS_API_KEY = originalCodeatlasApiKey;
+    if (originalHome === undefined) delete process.env.HOME; else process.env.HOME = originalHome;
   });
 
   const expectedToolNames = [
@@ -59,11 +67,11 @@ console.log(add(1, 2));
     "code_search", "get_callers", "get_callees", "impact_analysis", "project_context", "run_script",
     "git_changes", "setup_second_brain", "check_second_brain_status", "manage_adr", "get_code_snippet",
     "index_coverage", "detect_code_similarities", "export_team_artifact", "sync_skills_inventory",
-    "brain_context", "route_task"
+    "brain_context", "memory_bootstrap", "route_task"
   ];
 
-  it("should have all 38 expected tools registered and cleanly activated", () => {
-    assert.strictEqual(Object.keys(tools).length, 38, "Expected exactly 38 registered tools");
+  it("should have all 39 expected tools registered and cleanly activated", () => {
+    assert.strictEqual(Object.keys(tools).length, 39, "Expected exactly 39 registered tools");
     for (const [name, tool] of Object.entries(tools)) {
       assert.ok(expectedToolNames.includes(name), `Unexpected tool registered: ${name}`);
       assert.ok(tool.description, `Tool ${name} must have a description`);
@@ -331,6 +339,51 @@ console.log(add(1, 2));
     it("brain_context grabs context", async () => {
       const res = await tools["brain_context"].handler({ project: PROJECT_DIR, query: "test" });
       assert.ok(res.content?.[0]?.text);
+    });
+
+    it("memory_bootstrap returns explicit status without claiming automatic injection", async () => {
+      const res = await tools["memory_bootstrap"].handler({ project: PROJECT_DIR });
+      const parsed = JSON.parse(res.content[0].text);
+      assert.equal(parsed.delivery, "mcp_tool_response");
+      assert.equal(parsed.automatic_injection, false);
+      assert.equal(parsed.status, "unavailable");
+      assert.match(parsed.project_id, /^project_[a-f0-9]{64}$/);
+    });
+
+    it("memory_bootstrap returns a project-matched checkpoint as a tool response, without claiming host injection", async () => {
+      const server = http.createServer((_request, response) => {
+        response.setHeader("Content-Type", "application/json");
+        response.end(JSON.stringify({
+          success: true, retrieval_status: "ok",
+          checkpoint: {
+            id: "checkpoint-mcp", project_id: process.env.CODEATLAS_PROJECT_ID || "", session_id: "prior-session",
+            active_task: "Resume actual integration task", completed: [], decisions: ["keep tenant scope"], blockers: [], next_actions: ["verify output"],
+            source_event_ids: ["event-source"], source_session_ids: ["prior-session"], created_at: new Date().toISOString(),
+          },
+        }));
+      });
+      await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+      const address = server.address() as any;
+      const previousUrl = process.env.CODEATLAS_API_URL;
+      const previousKey = process.env.CODEATLAS_API_KEY;
+      const previousProjectId = process.env.CODEATLAS_PROJECT_ID;
+      process.env.CODEATLAS_API_URL = `http://127.0.0.1:${address.port}`;
+      process.env.CODEATLAS_API_KEY = "test-memory-bootstrap-key";
+      process.env.CODEATLAS_PROJECT_ID = "project_bootstrap_fixture";
+      try {
+        const res = await tools["memory_bootstrap"].handler({ project: PROJECT_DIR });
+        const parsed = JSON.parse(res.content[0].text);
+        assert.equal(parsed.status, "ready");
+        assert.equal(parsed.retrieval_status, "ok");
+        assert.equal(parsed.automatic_injection, false);
+        assert.match(parsed.context, /Resume actual integration task/);
+        assert.match(parsed.context, /event-source/);
+      } finally {
+        if (previousUrl === undefined) delete process.env.CODEATLAS_API_URL; else process.env.CODEATLAS_API_URL = previousUrl;
+        if (previousKey === undefined) delete process.env.CODEATLAS_API_KEY; else process.env.CODEATLAS_API_KEY = previousKey;
+        if (previousProjectId === undefined) delete process.env.CODEATLAS_PROJECT_ID; else process.env.CODEATLAS_PROJECT_ID = previousProjectId;
+        await new Promise<void>((resolve) => server.close(() => resolve()));
+      }
     });
   });
 });

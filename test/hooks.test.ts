@@ -51,6 +51,32 @@ describe("bash hook scripts", () => {
     assert.ok(result.stdout.includes("Parser uses ESTree"));
   });
 
+  it("brain-context.sh launches a configured JavaScript CLI with Node", () => {
+    const file = path.join(HOOKS_DIR, "brain-context.sh");
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), "codeatlas-context-cli-"));
+    const cli = path.join(home, "native-cli.js");
+    const output = path.join(home, "received.json");
+    fs.writeFileSync(cli, `require("node:fs").writeFileSync(process.env.CAPTURE_OUTPUT, JSON.stringify({ args: process.argv.slice(2) }));`);
+
+    try {
+      const result = spawnSync("bash", [file], {
+        encoding: "utf8",
+        input: "",
+        env: {
+          PATH: process.env.PATH ?? "",
+          HOME: home,
+          CAPTURE_OUTPUT: output,
+          CODEATLAS_CLI_PATH: cli,
+          CODEATLAS_INJECT_BRAIN_CONTEXT: "1",
+        },
+      });
+      assert.strictEqual(result.status, 0, result.stderr);
+      assert.deepStrictEqual(JSON.parse(fs.readFileSync(output, "utf8")), { args: ["brain-context"] });
+    } finally {
+      fs.rmSync(home, { recursive: true, force: true });
+    }
+  });
+
   it("brain-save.sh skips read-only tools without contacting API", async () => {
     const file = path.join(HOOKS_DIR, "brain-save.sh");
     const home = fs.mkdtempSync(path.join(os.tmpdir(), "codeatlas-brain-save-"));
@@ -95,35 +121,29 @@ describe("bash hook scripts", () => {
     assert.strictEqual(result.stdout.trim(), "");
   });
 
-  it("brain-save.sh processes input in test mode", () => {
+  it("brain-save.sh forwards hook input to the configured native CLI", () => {
     const file = path.join(HOOKS_DIR, "brain-save.sh");
     const home = fs.mkdtempSync(path.join(os.tmpdir(), "codeatlas-brain-save-"));
-    const project = "/workspace/demo-project";
-    const projectFolder = path.join(home, ".claude", "projects", "-workspace-demo-project");
-    const sessionId = `session-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-    const sessionFile = path.join(projectFolder, `${sessionId}.jsonl`);
-    fs.mkdirSync(projectFolder, { recursive: true });
-    fs.writeFileSync(sessionFile, [
-      JSON.stringify({ type: "user", sessionId, message: { role: "user", content: "Please remember this important project decision for future work." } }),
-      JSON.stringify({ type: "assistant", sessionId, model: "test-model", message: { role: "assistant", content: "I will record this project decision in CodeAtlas memory." } }),
-    ].join("\n") + "\n");
+    const cli = path.join(home, "native-cli.js");
+    const output = path.join(home, "received.json");
+    fs.writeFileSync(cli, `process.stdin.setEncoding("utf8");let input="";process.stdin.on("data",x=>input+=x);process.stdin.on("end",()=>require("fs").writeFileSync(process.env.CAPTURE_OUTPUT,JSON.stringify({args:process.argv.slice(2),input})));`);
 
     try {
-      // Test that brain-save.sh can process input in test mode without errors
+      const hookInput = JSON.stringify({ hook_event_name: "PostToolUse", session_id: "session-bridge", tool_name: "Bash", tool_response: { stdout: "OK" } });
       const result = spawnSync("bash", [file], {
         encoding: "utf8",
-        input: JSON.stringify({ cwd: project, session_id: sessionId, tool_name: "Edit" }),
+        input: hookInput,
         env: {
           PATH: process.env.PATH ?? "",
           HOME: home,
-          CODEATLAS_API_URL: "http://127.0.0.1:9999", // Fake URL for test mode
-          CODEATLAS_API_KEY: "test-key",
-          CODEATLAS_TEST_MODE: "1",
+          CODEATLAS_CLI_PATH: cli,
+          CAPTURE_OUTPUT: output,
         },
       });
       
       assert.strictEqual(result.status, 0, result.stderr);
       assert.strictEqual(result.stdout.trim(), "");
+      assert.deepStrictEqual(JSON.parse(fs.readFileSync(output, "utf8")), { args: ["hook", "brain-save"], input: hookInput });
     } finally {
       fs.rmSync(home, { recursive: true, force: true });
     }

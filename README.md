@@ -122,6 +122,8 @@ Add to `settings.json`:
 ### Connect to Zed (MCP context server)
 Zed has no Claude-style hooks, so the Second Brain hooks are exposed as MCP tools instead.
 
+For Claude hook setup, safe diagnostics, rollback controls, and the explicit `memory_bootstrap` tool for hosts without injection hooks, see [Memory pipeline operations](./docs/MEMORY_PIPELINE.md).
+
 **Option A — automatic setup:**
 ```bash
 codeatlas-enterprise setup zed
