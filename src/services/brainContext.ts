@@ -213,6 +213,7 @@ export function formatBrainContext(
 async function fetchJson(url: string, apiKey: string, fetcher: typeof fetch, traceId?: string): Promise<Record<string, unknown>> {
   const resp = await fetcher(url, {
     headers: { "x-api-key": apiKey, "User-Agent": "codeatlas-enterprise/2.0", ...(traceId ? { "X-Request-Id": traceId } : {}) },
+    redirect: "error",
     signal: AbortSignal.timeout(3_000),
   });
   if (!resp.ok) throw new DreamRetrievalError([401, 403].includes(resp.status) ? "auth_error" : "backend_error", `CodeAtlas context request failed: status ${resp.status}`);
@@ -257,7 +258,7 @@ async function fetchLatestCheckpoint(baseUrl: string, apiKey: string, projectId:
   const url = new URL("/api/dreams/checkpoints/latest", baseUrl);
   url.searchParams.set("project_id", projectId);
   try {
-    const response = await fetcher(url, { headers: { "x-api-key": apiKey, "User-Agent": "codeatlas-enterprise/2.0", ...(traceId ? { "X-Request-Id": traceId } : {}) }, signal: AbortSignal.timeout(3_000) });
+    const response = await fetcher(url, { headers: { "x-api-key": apiKey, "User-Agent": "codeatlas-enterprise/2.0", ...(traceId ? { "X-Request-Id": traceId } : {}) }, redirect: "error", signal: AbortSignal.timeout(3_000) });
     if (!response.ok) return { status: [401, 403].includes(response.status) ? "auth_error" : "backend_error", checkpoint: null };
     let body: unknown;
     try { body = await response.json(); } catch { return { status: "backend_error", checkpoint: null }; }

@@ -35,6 +35,17 @@ test("validates transcript paths for workspaces containing spaces and Unicode", 
   assert.equal(await validateClaudeTranscriptPath({ transcriptPath: transcript, sessionId: "session-unicode", cwd, projectsRoot: projects }), transcript);
 });
 
+test("reads transcript rows from a descendant of an authorized workspace", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "claude-transcript-child-")); roots.push(root);
+  const workspace = path.join(root, "workspace");
+  const child = path.join(workspace, "packages", "api");
+  const file = path.join(root, "session-child.jsonl");
+  await mkdir(child, { recursive: true });
+  await writeFile(file, `${JSON.stringify({ type: "user", sessionId: "session-child", cwd: child, message: { content: "remember child workspace" } })}\n`);
+  const result = await readClaudeTranscript({ transcriptPath: file, sessionId: "session-child", projectId: "project_1", cursor: null, authorizedCwds: [workspace] });
+  assert.deepEqual(result.events.map((event) => event.content), ["[USER]\nremember child workspace"]);
+});
+
 test("reads only complete text messages and derives stable IDs from source offsets", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "claude-transcript-")); roots.push(root);
   const file = path.join(root, "session-1.jsonl");

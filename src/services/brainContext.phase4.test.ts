@@ -48,12 +48,14 @@ test("SessionStart checkpoint retrieval uses canonical identity even with an emp
   process.env.CODEATLAS_API_KEY = "fixture-key";
   const urls: string[] = [];
   const requestHeaders: Headers[] = [];
+  const redirectModes: Array<RequestRedirect | undefined> = [];
   let semanticQueries = 0;
   const result = await loadBrainContext({ query: "", project_id: "project_canonical", project: "legacy-display", trace_id: "trace-session-start" }, {
     queryDreams: async () => { semanticQueries++; return []; },
     fetcher: async (url, init) => {
       urls.push(String(url));
       requestHeaders.push(new Headers(init?.headers));
+      redirectModes.push(init?.redirect);
       return new Response(JSON.stringify({ success: true, retrieval_status: "ok", checkpoint }), { status: 200, headers: { "Content-Type": "application/json" } });
     },
   });
@@ -63,6 +65,7 @@ test("SessionStart checkpoint retrieval uses canonical identity even with an emp
   assert.equal(new URL(urls[0]!).pathname, "/api/dreams/checkpoints/latest");
   assert.equal(new URL(urls[0]!).searchParams.get("project_id"), "project_canonical");
   assert.equal(requestHeaders[0]!.get("x-request-id"), "trace-session-start");
+  assert.equal(redirectModes[0], "error");
 });
 
 test("prompt retrieval preserves newlines and Unicode while scoping semantic queries", async () => {

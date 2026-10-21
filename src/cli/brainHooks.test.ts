@@ -93,6 +93,26 @@ describe("Claude hook event decoding", () => {
     }
   });
 
+  it("preserves ordinary authentication prose while redacting explicit credential assignments", () => {
+    const result = decodeClaudeHookEvent({ hook_event_name: "PostToolUse", tool_name: "Bash", tool_response: { stdout: "Fix the auth bug; rotate the secret weekly. password=private-value" } });
+    assert.equal(result.status, "capture");
+    if (result.status === "capture") {
+      assert.match(result.content, /Fix the auth bug; rotate the secret weekly/);
+      assert.doesNotMatch(result.content, /private-value/);
+    }
+  });
+
+  it("filters sensitive file paths without dropping ordinary auth-related edits or commands", () => {
+    const edit = decodeClaudeHookEvent({ hook_event_name: "PostToolUse", tool_name: "Edit", tool_input: { file_path: "/repo/auth.ts", new_string: "const secret = rotateWeekly();" }, tool_response: { stdout: "updated" } });
+    assert.equal(edit.status, "capture");
+    const proseCommand = decodeClaudeHookEvent({ hook_event_name: "PostToolUse", tool_name: "Bash", tool_input: { command: "grep secret src" }, tool_response: { stdout: "match" } });
+    assert.equal(proseCommand.status, "capture");
+    const sensitivePath = decodeClaudeHookEvent({ hook_event_name: "PostToolUse", tool_name: "Edit", tool_input: { file_path: "/repo/.env" }, tool_response: { stdout: "updated" } });
+    assert.deepEqual(sensitivePath, { status: "filtered", reason: "sensitive_source" });
+    const sensitiveCommand = decodeClaudeHookEvent({ hook_event_name: "PostToolUse", tool_name: "Bash", tool_input: { command: "cat .env" }, tool_response: { stdout: "value" } });
+    assert.deepEqual(sensitiveCommand, { status: "filtered", reason: "sensitive_source" });
+  });
+
   it("redacts long-lived and temporary AWS access key IDs before capture", () => {
     const result = decodeClaudeHookEvent({
       hook_event_name: "PostToolUse",

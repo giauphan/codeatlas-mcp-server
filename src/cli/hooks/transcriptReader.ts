@@ -144,7 +144,11 @@ export async function readClaudeTranscript(args: {
         const rowCwd = typeof record.cwd === "string" ? record.cwd : undefined;
         if (rowCwd && allowedCwds.length) {
           const normalizedCwd = await realpath(rowCwd).catch(() => path.resolve(rowCwd));
-          if (!allowedCwds.includes(normalizedCwd)) { lineOffset += lineBytes; continue; }
+          const insideAuthorizedRoot = allowedCwds.some((root) => {
+            const relative = path.relative(root, normalizedCwd);
+            return relative === "" || (!relative.startsWith("..") && !path.isAbsolute(relative));
+          });
+          if (!insideAuthorizedRoot) { lineOffset += lineBytes; continue; }
         }
         const content = extractMessageText(record);
         if (content) {

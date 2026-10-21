@@ -82,16 +82,16 @@ CODEATLAS_API_URL=http://localhost:8080 CODEATLAS_API_KEY=your_api_key_here pnpm
 
 ---
 
-## 📡 MCP Tools (30+)
+## 📡 MCP Tools (39)
 
 | Category | Tools |
 |---|---|
-| **Code Analysis** | `analyze_project`, `code_search`, `file_info` |
-| **AST** | `parse_file`, `find_symbol`, `get_dependencies` |
-| **Graphs** | `dependency_graph`, `call_graph` |
-| **Security** | `scan_vulnerabilities` |
+| **Code Analysis** | `analyze`, `list_projects`, `get_project_structure`, `get_insights`, `code_search`, `search_entities`, `get_file_entities`, `get_code_snippet`, `index_coverage`, `project_context` |
+| **Dependencies & graphs** | `get_dependencies`, `get_callers`, `get_callees`, `impact_analysis`, `generate_system_flow`, `generate_feature_flow_diagram`, `trace_feature_flow` |
+| **Security** | `scan_enterprise_vulnerabilities`, `detect_architectural_smells` |
 | **Cloud** | `save_dream_memory`, `query_dream_memories`, `sync_dreams` |
-| **Skills** | `search_skills`, `get_skill`, `install_skill` |
+| **Second Brain** | `brain_context`, `memory_bootstrap`, `sync_system_memory`, `get_system_memory`, `search_genome`, `get_gene`, `scan_immune_genes`, `save_immune_gene`, `setup_second_brain`, `check_second_brain_status` |
+| **Workspace & utilities** | `run_script`, `git_changes`, `manage_adr`, `detect_code_similarities`, `export_team_artifact`, `sync_skills_inventory`, `route_task` |
 
 ### Example: Connect to Claude Desktop
 Add to `claude-desktop-config.json`:
@@ -109,12 +109,15 @@ Add to `claude-desktop-config.json`:
 }
 ```
 
-### Example: Connect to Cursor/VSCode (SSE)
+### Example: Connect to Cursor/VSCode (stdio)
 Add to `settings.json`:
 ```json
 {
-  "mcp.sse": {
-    "codeatlas": "npx codeatlas-mcp-server"
+  "mcpServers": {
+    "codeatlas": {
+      "command": "npx",
+      "args": ["-y", "codeatlas-mcp-server"]
+    }
   }
 }
 ```
@@ -161,7 +164,7 @@ CodeAtlas MCP Server is designed with a local-first architecture and several sec
 | Variable | Description | Default |
 |---|---|---|
 | `CODEATLAS_API_KEY` | Secret key to connect to CodeAtlas Cloud services for AI memory and scan features. | (none) |
-| `CODEATLAS_API_URL` | Target URL for CodeAtlas Cloud. Validated via allowlists to prevent credential exfiltration. | `https://api.codeatlas.ai` |
+| `CODEATLAS_API_URL` | Target URL for CodeAtlas Cloud. Validated via allowlists to prevent credential exfiltration. | (none) |
 | `CODEATLAS_ALLOW_CUSTOM_URL` | Set to `true` to allow sending credentials to self-hosted or unlisted destinations. Required for private network deployments. | `false` |
 | `CODEATLAS_SCAN_AI_KEY` | Key for deep AI security scanning using an external LLM. | (none) |
 | `CODEATLAS_SCAN_AI_URL` | Endpoint for deep AI security scanning. | (none) |

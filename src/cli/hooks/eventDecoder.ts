@@ -64,7 +64,7 @@ export function redactSensitiveContent(content: string): string {
     .replace(/\b(?:sk-[A-Za-z0-9_-]{12,}|gh[pousr]_[A-Za-z0-9]{20,}|api_test_[A-Za-z0-9_-]+|(?:AKIA|ASIA)[A-Z0-9]{16})\b/g, "[REDACTED_SECRET]")
     .replace(/\bBearer\s+[A-Za-z0-9._~+\/-]+=*/gi, "Bearer [REDACTED_SECRET]")
     .replace(new RegExp(`(["']?(?:${credentialField})["']?\\s*:\\s*)(?:"[^"\\r\\n]*"|'[^'\\r\\n]*'|[^\\s,;}&]+)`, "gi"), "$1\"[REDACTED_SECRET]\"")
-    .replace(new RegExp(`\\b(${credentialField})\\s*(?:[:=]|\\s)\\s*["']?[^\\s,;}'"]+["']?`, "gi"), "$1=[REDACTED_SECRET]");
+    .replace(new RegExp(`\\b(${credentialField})\\s*[:=]\\s*["']?[^\\s,;}'"]+["']?`, "gi"), "$1=[REDACTED_SECRET]");
 }
 
 const DEFAULT_DENIED_TOOLS = new Set(["read", "grep", "glob", "find", "webfetch", "websearch", "todowrite", "listagents", "taskoutput"]);
@@ -74,12 +74,34 @@ function csvSet(value: string | undefined): Set<string> {
   return new Set((value ?? "").split(",").map((part) => part.trim().toLowerCase()).filter(Boolean));
 }
 
-function hasSensitiveSource(value: unknown, depth = 0): boolean {
+const PATH_LIKE_INPUT_KEYS = new Set(["file_path", "path", "notebook_path"]);
+
+function hasSensitivePath(value: unknown, depth = 0): boolean {
   if (depth > 6 || value == null) return false;
   if (typeof value === "string") return SENSITIVE_SOURCE.test(value);
-  if (Array.isArray(value)) return value.some((item) => hasSensitiveSource(item, depth + 1));
-  if (isObject(value)) return Object.values(value).some((item) => hasSensitiveSource(item, depth + 1));
+  if (Array.isArray(value)) return value.some((item) => hasSensitivePath(item, depth + 1));
+  if (isObject(value)) return Object.values(value).some((item) => hasSensitivePath(item, depth + 1));
   return false;
+}
+
+function commandHasSensitivePath(command: unknown): boolean {
+  if (typeof command !== "string") return false;
+  return command.split(/[\s"'`]+/).some((token) => {
+    const normalized = token.replace(/^[([{]+|[\])},;:.]+$/g, "");
+    const pathLike = normalized.includes("/") || normalized.includes("\\") || normalized.startsWith(".") || /\.(?:pem|key|json)$/i.test(normalized);
+    return pathLike && SENSITIVE_SOURCE.test(normalized);
+  });
+}
+
+function hasSensitiveSource(value: unknown, depth = 0): boolean {
+  if (depth > 6 || value == null || typeof value !== "object") return false;
+  if (Array.isArray(value)) return value.some((item) => hasSensitiveSource(item, depth + 1));
+  return Object.entries(value).some(([key, item]) =>
+    (PATH_LIKE_INPUT_KEYS.has(key.toLowerCase()) && hasSensitivePath(item)) ||
+    (key.toLowerCase() === "command" && commandHasSensitivePath(item)) ||
+    (isObject(item) && hasSensitiveSource(item, depth + 1)) ||
+    (Array.isArray(item) && hasSensitiveSource(item, depth + 1)),
+  );
 }
 
 function boundedEvidence(value: string, limit: number): string {
