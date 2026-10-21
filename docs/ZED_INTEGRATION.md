@@ -4,8 +4,6 @@ CodeAtlas runs as a local MCP server over stdio. Zed connects to it as a context
 
 ## Set up
 
-The package's `setup zed` helper currently writes `npx -y codeatlas-mcp-server` into Zed settings, but the package publishes multiple binary names and no executable named `codeatlas-mcp-server`. Use the manual entry below until the helper's generated command is corrected.
-
 Open the Command Palette and run `zed: open settings file`. Merge this context
 server entry into the existing `context_servers` object, then restart Zed.
 The shape follows [Zed's custom MCP server configuration](https://zed.dev/docs/ai/mcp#as-custom-servers):

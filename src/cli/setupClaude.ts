@@ -97,10 +97,11 @@ export async function cmdSetupZed(): Promise<void> {
   if (process.env.CODEATLAS_API_URL) env.CODEATLAS_API_URL = process.env.CODEATLAS_API_URL;
   ctxServers["codeatlas-mcp-server"] = {
     command: "npx",
-    args: ["-y", "codeatlas-mcp-server"],
+    args: ["--yes", "--package=codeatlas-mcp-server", "codeatlas-mcp"],
     env,
   };
 
+  fs.mkdirSync(getZedConfigDir(), { recursive: true });
   fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2), "utf-8");
   console.log(`  ${ok()} Registered context server in ${settingsPath}`);
 

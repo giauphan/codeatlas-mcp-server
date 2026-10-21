@@ -57,10 +57,10 @@ pnpm install
 
 ### 2. Configure
 ```bash
-# Copy env template
+# Copy the optional local environment template. This file is ignored by Git.
 cp .env.example .env
 
-# Edit .env (Oracle DB optional for persistent memory)
+# Edit .env
 # Cloud features require both variables; no default URL is used
 # Set CODEATLAS_API_URL to your CodeAtlas API base URL
 # Set CODEATLAS_API_KEY to your CodeAtlas API key
@@ -101,8 +101,9 @@ Add to `claude-desktop-config.json`:
     "codeatlas": {
       "command": "npx",
       "args": [
-        "-y",
-        "codeatlas-mcp-server"
+        "--yes",
+        "--package=codeatlas-mcp-server",
+        "codeatlas-mcp"
       ]
     }
   }
@@ -116,7 +117,7 @@ Add to `settings.json`:
   "mcpServers": {
     "codeatlas": {
       "command": "npx",
-      "args": ["-y", "codeatlas-mcp-server"]
+      "args": ["--yes", "--package=codeatlas-mcp-server", "codeatlas-mcp"]
     }
   }
 }
@@ -139,8 +140,11 @@ This writes a `codeatlas` entry into Zed's `context_servers` (passing `CODEATLAS
   "context_servers": {
     "codeatlas": {
       "command": "npx",
-      "args": ["-y", "codeatlas-mcp-server"],
-      "env": { "CODEATLAS_API_KEY": "your_api_key_here" }
+      "args": ["--yes", "--package=codeatlas-mcp-server", "codeatlas-mcp"],
+      "env": {
+        "CODEATLAS_API_URL": "https://api.codeatlas.ai",
+        "CODEATLAS_API_KEY": "your_api_key_here"
+      }
     }
   }
 }
@@ -155,7 +159,7 @@ Then in Zed's Agent Panel, call the `brain_context` tool at the start of a task 
 
 CodeAtlas MCP Server is designed with a local-first architecture and several security hardening measures to protect your credentials and codebase data:
 
-- **No Disk Persistence**: Credentials like `CODEATLAS_API_KEY` are kept entirely in-memory and are **never** persisted to `.env` files or disk. You must supply your key via environment variables.
+- **Credential Storage**: Set `CODEATLAS_API_KEY` in the process environment to avoid storing it in a file. If you configure it in `.env` or an MCP client setting, the key is stored on disk; protect that file and keep it out of version control.
 - **Strict Destination Validation**: When connecting to cloud features, the destination AI and backend URLs are strictly validated. Credentials can only flow to trusted official domains (`*.codeatlas.ai`, `opencode.ai`) or local addresses (`localhost`, `127.0.0.1`).
 - **Telemetry & Logging**: Potential credential leaks are sanitized and redacted from all console and error logs.
 
