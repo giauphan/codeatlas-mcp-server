@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { spawnSync } from "node:child_process";
+import { resolveExecutable } from "../utils/commandPath.js";
 
 export interface ProjectIdentity {
   project_id: string;
@@ -12,7 +13,9 @@ export interface ProjectIdentity {
 }
 
 function getCanonicalProjectRoot(workspacePath: string): { root: string; source: ProjectIdentity["identity_source"] } {
-  const git = spawnSync("git", ["-C", workspacePath, "rev-parse", "--git-common-dir"], {
+  let gitExecutable: string;
+  try { gitExecutable = resolveExecutable("git"); } catch { return { root: fs.realpathSync(workspacePath), source: "workspace_path" }; }
+  const git = spawnSync(gitExecutable, ["-C", workspacePath, "rev-parse", "--git-common-dir"], {
     encoding: "utf8",
     timeout: 1_000,
   });
@@ -21,7 +24,7 @@ function getCanonicalProjectRoot(workspacePath: string): { root: string; source:
     if (path.basename(commonDir) === ".git") {
       return { root: fs.realpathSync(path.dirname(commonDir)), source: "git_common_dir" };
     }
-    const topLevel = spawnSync("git", ["-C", workspacePath, "rev-parse", "--show-toplevel"], {
+    const topLevel = spawnSync(gitExecutable, ["-C", workspacePath, "rev-parse", "--show-toplevel"], {
       encoding: "utf8",
       timeout: 1_000,
     });

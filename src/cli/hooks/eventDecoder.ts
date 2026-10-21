@@ -87,7 +87,7 @@ function hasSensitivePath(value: unknown, depth = 0): boolean {
 function commandHasSensitivePath(command: unknown): boolean {
   if (typeof command !== "string") return false;
   return command.split(/[\s"'`]+/).some((token) => {
-    const normalized = token.replace(/^[([{]+|[\])},;:.]+$/g, "");
+    const normalized = token.replace(/^[([{]+/, "").replace(/[\])},;:.]+$/, "");
     const pathLike = normalized.includes("/") || normalized.includes("\\") || normalized.startsWith(".") || /\.(?:pem|key|json)$/i.test(normalized);
     return pathLike && SENSITIVE_SOURCE.test(normalized);
   });

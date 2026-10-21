@@ -38,6 +38,7 @@ import {
 import { saveDreamMemory, queryDreamMemories, DreamMemoryResult } from "../services/dreamingService.js";
 import { loadBrainContext, formatBrainContext } from "../services/brainContext.js";
 import { resolveProjectIdentity } from "../services/projectIdentity.js";
+import { resolveExecutable } from "../utils/commandPath.js";
 import { routeTask } from "../cli/taskRouter.js";
 import { CodeAnalyzer } from "../analyzer/parser.js";
 import { SecurityScanner } from "../securityScanner.js";
@@ -2334,7 +2335,7 @@ export function registerTools(server: McpServer) {
           finalArgs.push(...parsedArgs);
         }
 
-        const result = cp.spawnSync("npm", finalArgs, {
+        const result = cp.spawnSync(resolveExecutable("npm"), finalArgs, {
           timeout: maxTime * 1000,
           shell: false, // Security: explicit shell false
           maxBuffer: 1024 * 1024,
@@ -2422,7 +2423,7 @@ export function registerTools(server: McpServer) {
         // Security: Cap maxBuffer to 5MB to prevent DoS via excessive memory consumption
         const safeMaxBuffer = Math.min(maxBuffer || 1024 * 1024, 5 * 1024 * 1024);
 
-        const res = cp.spawnSync("git", ["--no-pager", ...args], { cwd: resolvedDir, encoding: "utf-8", shell: false, maxBuffer: safeMaxBuffer });
+        const res = cp.spawnSync(resolveExecutable("git"), ["--no-pager", ...args], { cwd: resolvedDir, encoding: "utf-8", shell: false, maxBuffer: safeMaxBuffer });
         if (res.error) throw res.error;
         if (res.status !== 0) throw new Error(res.stderr?.toString() || "Git command failed");
         return res.stdout.toString();

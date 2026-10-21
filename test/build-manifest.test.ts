@@ -1,9 +1,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync, existsSync, copyFileSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync, existsSync, copyFileSync, symlinkSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
+import { verifyBuildManifest } from '../scripts/build-manifest.js';
 
 const scripts = path.resolve(import.meta.dirname, '../scripts');
 function fixture(): string {
@@ -41,6 +42,29 @@ test('release validation rejects compiled output changed after build manifest', 
     writeFileSync(path.join(root, 'dist/index.js'), 'export const version = "tampered";');
     assert.notEqual(run('verify-build.js', root).status, 0, 'Modified JS must block release');
   } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('release validation does not follow symlinks outside the build tree', () => {
+  const root = fixture();
+  const outside = path.join(root, 'outside.js');
+  writeFileSync(outside, 'export const secret = true;');
+  try {
+    symlinkSync(outside, path.join(root, 'dist', 'outside.js'));
+    assert.equal(run('copy-hooks.js', root).status, 0);
+    const manifest = JSON.parse(readFileSync(path.join(root, 'dist', 'build-manifest.json'), 'utf8'));
+    assert.equal(Object.hasOwn(manifest.artifact_sha256, 'outside.js'), false);
+    assert.equal(run('verify-build.js', root).status, 0);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('release validation rejects a dist argument that escapes its root', () => {
+  const root = fixture();
+  const outside = path.join(path.dirname(root), 'outside-build');
+  mkdirSync(outside, { recursive: true });
+  writeFileSync(path.join(outside, 'build-manifest.json'), '{}');
+  try {
+    assert.throws(() => verifyBuildManifest('../outside-build', root), /outside build root/);
+  } finally { rmSync(root, { recursive: true, force: true }); rmSync(outside, { recursive: true, force: true }); }
 });
 
 test('hook packaging copies runtime assets and keeps TypeScript sources out of dist', () => {

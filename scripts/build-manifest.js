@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { existsSync, readdirSync, readFileSync, statSync, writeFileSync, renameSync } from 'node:fs';
+import { existsSync, lstatSync, readdirSync, readFileSync, realpathSync, writeFileSync, renameSync } from 'node:fs';
 import { join, relative, resolve } from 'node:path';
 
 const MANIFEST = 'build-manifest.json';
@@ -9,10 +9,18 @@ function hash(file) {
 }
 
 function filesUnder(directory) {
-  if (!existsSync(directory)) return [];
+  let directoryInfo;
+  try { directoryInfo = lstatSync(directory); } catch (error) {
+    if (error?.code === 'ENOENT') return [];
+    throw error;
+  }
+  if (directoryInfo.isSymbolicLink() || !directoryInfo.isDirectory()) return [];
   return readdirSync(directory).sort().flatMap(name => {
     const file = join(directory, name);
-    return statSync(file).isDirectory() ? filesUnder(file) : [file];
+    const entry = lstatSync(file);
+    if (entry.isSymbolicLink()) return [];
+    if (entry.isDirectory()) return filesUnder(file);
+    return entry.isFile() ? [file] : [];
   });
 }
 
@@ -41,11 +49,16 @@ export function writeBuildManifest(root = process.cwd()) {
 }
 
 export function verifyBuildManifest(dist = 'dist', root = process.cwd()) {
-  const directory = resolve(root, dist);
+  const canonicalRoot = realpathSync(root);
+  const directory = realpathSync(resolve(canonicalRoot, dist));
+  const relativeDirectory = relative(canonicalRoot, directory);
+  if (relativeDirectory === '..' || relativeDirectory.startsWith(`..${process.platform === 'win32' ? '\\' : '/'}`) || relativeDirectory.startsWith('/')) {
+    throw new Error('Build directory resolves outside build root');
+  }
   const file = join(directory, MANIFEST);
   if (!existsSync(file)) throw new Error('Build manifest missing; run npm run build before release');
   const manifest = JSON.parse(readFileSync(file, 'utf8'));
   if (manifest.schema_version !== 1 || !manifest.source_sha256 || !manifest.artifact_sha256) throw new Error('Invalid build manifest; rebuild required');
-  if (JSON.stringify(sourceHashes(root)) !== JSON.stringify(manifest.source_sha256)) throw new Error('Sources differ from the compiled build; run npm run build');
+  if (JSON.stringify(sourceHashes(canonicalRoot)) !== JSON.stringify(manifest.source_sha256)) throw new Error('Sources differ from the compiled build; run npm run build');
   if (JSON.stringify(artifactHashes(directory)) !== JSON.stringify(manifest.artifact_sha256)) throw new Error('Compiled artifacts differ from build manifest; rebuild required');
 }

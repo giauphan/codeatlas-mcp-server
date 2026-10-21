@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import { chmod, mkdir, open, readFile, readdir, rename, rm, stat, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -143,7 +143,7 @@ async function persistInboxBatch(directory: string, events: SessionIngestInput[]
   const serialized = JSON.stringify(batch);
   const digest = createHash("sha256").update(serialized).digest("hex");
   const destination = path.join(inbox, `${String(batch.created_at).padStart(16, "0")}-${digest}.json`);
-  const temp = `${destination}.${process.pid}.${Math.random().toString(16).slice(2)}.tmp`;
+  const temp = `${destination}.${process.pid}.${randomBytes(16).toString("hex")}.tmp`;
   const handle = await open(temp, "wx", 0o600);
   try { await handle.writeFile(serialized); await handle.sync(); } finally { await handle.close(); }
   await rename(temp, destination);

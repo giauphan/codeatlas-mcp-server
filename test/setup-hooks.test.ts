@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync, symlinkSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
@@ -82,6 +82,22 @@ test("installer refuses unreadable settings without replacing security policy", 
     const result = spawnSync("python3", [path.resolve("src/cli/hooks/update-settings.py"), settingsPath], { env: { ...process.env, HOME: root }, encoding: "utf8" });
     assert.notEqual(result.status, 0);
     assert.equal(readFileSync(settingsPath, "utf8"), original);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("installer refuses hook asset symlinks instead of overwriting their targets", () => {
+  const root = mkdtempSync(path.join(os.tmpdir(), "codeatlas-hooks-symlink-"));
+  const home = path.join(root, "home");
+  const claudeDir = path.join(home, ".claude");
+  const hooksDir = path.join(claudeDir, "hooks");
+  const outside = path.join(root, "outside.sh");
+  mkdirSync(hooksDir, { recursive: true });
+  writeFileSync(outside, "preserve me\n");
+  symlinkSync(outside, path.join(hooksDir, "brain-save.sh"));
+  try {
+    const result = spawnSync(process.execPath, [path.resolve("scripts/setup-hooks.js")], { env: { ...process.env, HOME: home }, encoding: "utf8" });
+    assert.notEqual(result.status, 0);
+    assert.equal(readFileSync(outside, "utf8"), "preserve me\n");
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 

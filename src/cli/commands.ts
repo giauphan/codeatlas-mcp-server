@@ -226,7 +226,7 @@ export function summarizeClaudeHookRoutes(settings: unknown): Record<ClaudeHookE
         routes.add(`${implementation}:${hookName}`);
       }
     }
-    summary[eventName] = [...routes].sort();
+    summary[eventName] = [...routes].sort((left, right) => left.localeCompare(right));
   }
   return summary;
 }
