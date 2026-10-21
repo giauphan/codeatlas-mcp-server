@@ -17,6 +17,7 @@ import * as readline from "readline";
 import { getResolvedApiKey } from "../services/projectService.js";
 import { getApiUrl } from "../utils/envUtils.js";
 import { checkSpawnResult } from "../utils/processUtils.js";
+import { resolveExecutable } from "../utils/commandPath.js";
 import { resolveProjectIdentity } from "../services/projectIdentity.js";
 import {
   getHomePath,
@@ -275,19 +276,21 @@ export function getMemoryPipelineRuntimeDiagnostics(): MemoryPipelineRuntimeDiag
     try { packageVersion = JSON.parse(fs.readFileSync(packagePath, "utf8")).version ?? "unknown"; } catch { /* keep unknown */ }
   }
 
-  const commandLookup = spawnSync("which", ["codeatlas"], { encoding: "utf8", timeout: 1_000 });
-  const pathCommand = commandLookup.status === 0 ? commandLookup.stdout.trim() : "unavailable";
+  let pathCommand = "unavailable";
+  try { pathCommand = resolveExecutable("codeatlas"); } catch { /* CLI is not installed on PATH. */ }
   let pathCommandRealpath = "unavailable";
   if (pathCommand !== "unavailable") {
     try { pathCommandRealpath = fs.realpathSync(pathCommand); } catch { pathCommandRealpath = pathCommand; }
   }
   const builtCliPath = packagePath ? path.join(path.dirname(packagePath), "dist", "index.js") : "unavailable";
-  const gitResult = packagePath
-    ? spawnSync("git", ["-C", path.dirname(packagePath), "rev-parse", "--short", "HEAD"], { encoding: "utf8", timeout: 1_000 })
-    : undefined;
+  let gitResult: ReturnType<typeof spawnSync> | undefined;
+  if (packagePath) {
+    try { gitResult = spawnSync(resolveExecutable("git"), ["-C", path.dirname(packagePath), "rev-parse", "--short", "HEAD"], { encoding: "utf8", timeout: 1_000 }); }
+    catch { /* Git is not installed on PATH. */ }
+  }
 
   return {
-    gitCommit: gitResult?.status === 0 ? gitResult.stdout.trim() : "unavailable",
+    gitCommit: gitResult?.status === 0 ? String(gitResult.stdout).trim() : "unavailable",
     nodeVersion: process.version,
     packageVersion,
     cliEntryPath: entryPath,
