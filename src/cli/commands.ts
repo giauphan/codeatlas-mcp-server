@@ -14,6 +14,8 @@ import { createHash, randomUUID } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import * as readline from "readline";
+import { getResolvedApiKey } from "../services/projectService.js";
+import { getApiUrl } from "../utils/envUtils.js";
 import { checkSpawnResult } from "../utils/processUtils.js";
 import { resolveProjectIdentity } from "../services/projectIdentity.js";
 import {
@@ -63,17 +65,17 @@ export function ask(query: string): Promise<string> {
 }
 
 export async function cloudFetch(method: string, path_: string, body?: any): Promise<{ ok: boolean; status: number; data: any }> {
-  if (!API_URL) {
+  if (!process.env.CODEATLAS_API_URL) {
     return { ok: false, status: 0, data: { error: "CODEATLAS_API_URL not set" } };
   }
-  const url = `${API_URL.replace(/\/+$/, "")}${path_}`;
   const headers: Record<string, string> = {
     "User-Agent": "codeatlas-enterprise-cli/2.0",
     "Content-Type": "application/json",
   };
-  const apiKey = process.env.CODEATLAS_API_KEY;
+  const apiKey = getResolvedApiKey();
   if (apiKey) headers["x-api-key"] = apiKey;
   try {
+    const url = `${getApiUrl()}${path_}`;
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 6000);
     const resp = await fetch(url, {
@@ -81,6 +83,7 @@ export async function cloudFetch(method: string, path_: string, body?: any): Pro
       headers,
       body: body ? JSON.stringify(body) : undefined,
       signal: controller.signal,
+      redirect: "error",
     });
     clearTimeout(timeoutId);
     let data: any;
@@ -362,7 +365,7 @@ export function getHooksDoctorJson(): Record<string, unknown> {
       resolved_command_path: runtime.pathCommandRealpath,
       registration: routes,
     },
-    endpoint: { url_present: Boolean(process.env.CODEATLAS_API_URL), key_present: Boolean(process.env.CODEATLAS_API_KEY) },
+    endpoint: { url_present: Boolean(process.env.CODEATLAS_API_URL), key_present: Boolean(getResolvedApiKey()) },
     project_identity: identity,
     last_outcomes: readMemoryPipelineOutcomes(),
     pipeline_metrics: readMemoryPipelineMetrics(),
@@ -617,7 +620,7 @@ export function checkFeaturesDiff(): {
     astParsers: ["TypeScript", "JavaScript", "Python", "PHP"],
     adrCount,
     localMode: !process.env.CODEATLAS_API_URL,
-    cloudSync: Boolean(process.env.CODEATLAS_API_URL && process.env.CODEATLAS_API_KEY),
+    cloudSync: Boolean(process.env.CODEATLAS_API_URL && getResolvedApiKey()),
     connectedClients
   };
 }
@@ -802,7 +805,7 @@ export async function cmdDoctor(): Promise<void> {
 
   // 4. Environment & Cloud Services
   console.log(`\n${bold("4. Environment & Cloud Services")}`);
-  const hasApiKey = Boolean(process.env.CODEATLAS_API_KEY);
+  const hasApiKey = Boolean(getResolvedApiKey());
   console.log(`  ${hasApiKey ? ok() : warn()} CODEATLAS_API_KEY: ${hasApiKey ? "Set" : "not set (local mode only)"}`);
   countCheck(hasApiKey ? "ok" : "warn");
 
@@ -995,7 +998,7 @@ export async function cmdBrainContext(): Promise<void> {
   const prompt = promptValue.slice(0, 2_000);
   const sessionId = typeof payload?.session_id === "string" && payload.session_id.length > 0 ? payload.session_id.slice(0, 256) : `unknown-${createHash("sha256").update(path.resolve(cwd)).digest("hex").slice(0, 16)}`;
   const traceId = randomUUID();
-  if (!process.env.CODEATLAS_API_URL || !process.env.CODEATLAS_API_KEY) {
+  if (!process.env.CODEATLAS_API_URL || !getResolvedApiKey()) {
     report({ kind: "load", status: "unavailable", reason: "not_configured", trace_id: traceId });
     return;
   }
@@ -1088,7 +1091,7 @@ export async function cmdBrainSave(): Promise<void> {
   }
 
   if (event.status === "lifecycle") {
-    if (!process.env.CODEATLAS_API_URL || !process.env.CODEATLAS_API_KEY) {
+    if (!process.env.CODEATLAS_API_URL || !getResolvedApiKey()) {
       report({ status: "unavailable", reason: "not_configured", trace_id: traceId });
       process.exit(0);
     }
@@ -1109,7 +1112,7 @@ export async function cmdBrainSave(): Promise<void> {
     process.exit(0);
   }
 
-  if (!process.env.CODEATLAS_API_URL || !process.env.CODEATLAS_API_KEY) {
+  if (!process.env.CODEATLAS_API_URL || !getResolvedApiKey()) {
     report({ status: "unavailable", reason: "not_configured", trace_id: traceId });
     process.exit(0);
   }

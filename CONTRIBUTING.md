@@ -1,74 +1,62 @@
 # Contributing to CodeAtlas MCP Server
 
-Thank you for contributing! Please read this guide before opening a PR.
+Thank you for helping improve CodeAtlas MCP Server.
 
-## Requirements
+## Requirements and setup
 
-- Node.js >= 20.0.0
-- pnpm 9 (`corepack enable && corepack prepare pnpm@9 --activate`)
+- Node.js 20 or newer.
+- npm for the install and checks used in GitHub Actions.
 
-## Setup
+From a fresh checkout:
 
 ```bash
-git clone https://github.com/giauphan/codeatlas-mcp-server.git
-cd codeatlas-mcp-server
-pnpm install
-cp .env.example .env
-# Edit .env with your credentials
-pnpm run build
-pnpm test
+npm ci
+npm run build
+npm test
 ```
 
-## Project Structure
+The package also tracks a pnpm lockfile and workspace configuration. Preserve
+both package lockfiles when changing dependencies. The `.npmrc` setting
+`install-links=false` and the checked-in braces compatibility adapter and
+vendored archive support reproducible cold installs.
 
-```
-codeatlas-mcp-server/
-├── src/
-│   ├── index.ts             # Entry point
-│   ├── cli/                 # CLI hooks (brain-context, brain-save)
-│   ├── tools/               # MCP tool implementations
-│   └── utils/               # Shared utilities
-├── dist/                    # Compiled output (git-ignored)
-├── docs/                    # Documentation
-├── .env.example             # Environment variable template
-└── package.json
-```
+The MCP server uses stdio and can run locally without a cloud service. Oracle,
+Firebase, and a separately hosted web application are not prerequisites for
+contributing to this package. Cloud-backed memory and genome functionality can
+be exercised with `CODEATLAS_API_URL` and `CODEATLAS_API_KEY` configured for the
+separate `codeatlas-platform` API.
 
-## Workflow
+## Change workflow
 
-1. Fork and create a branch with a prefix:
-   - `feat/` — new feature
-   - `fix/` — bug fix
-   - `docs/` — documentation only
-   - `refactor/` — code restructure
-   - `test/` — tests only
+1. Create a focused branch for your change.
+2. Make the change and update relevant documentation. Add or update tests for
+   behavior changes.
+3. Run appropriate local checks:
 
-2. Make changes with tests where applicable.
-
-3. Run quality gate before opening PR:
    ```bash
-   pnpm run build && pnpm test
+   npm run lint
+   npm run build
+   npm run verify-build
+   npm test
    ```
 
-4. Commit using [Conventional Commits](https://www.conventionalcommits.org/):
-   ```
-   feat: add new AST parser for Ruby
-   fix: handle null dependency graph nodes
-   docs: update MCP tools table
-   ```
+4. Use a [Conventional Commit](https://www.conventionalcommits.org/) message,
+   such as `feat: add Ruby parser`, `fix: handle empty graph nodes`, or
+   `docs: clarify local setup`.
+5. Open a pull request against `main` and review the GitHub Actions checks.
 
-5. Open a Pull Request against `main`.
+The detailed workflow dependencies and release rules are in the
+[pipeline runbook](./docs/PIPELINE.md). A documentation-only commit normally
+does not publish a package because semantic-release only creates releases for
+commits whose Conventional Commit type or breaking-change marker selects a
+release.
 
-## Code Standards
+## Code standards
 
-- TypeScript strict mode — no `any` types.
-- Meaningful variable names, no abbreviations.
-- Comments only for non-obvious logic.
-- All public functions must have return type annotations.
+- Keep TypeScript strict and avoid `any` unless needed at an external boundary.
+- Use clear names and comments for non-obvious behavior.
+- Keep public APIs and security-sensitive behavior covered by focused tests.
+- Do not commit credentials, local `.env` files, or machine-specific settings.
 
-## Questions?
-
-Open an [issue](https://github.com/giauphan/codeatlas-mcp-server/issues) or
-[discussion](https://github.com/giauphan/codeatlas-mcp-server/discussions).
-
-See [CODE_OF_CONDUCT.md](./CODE_OF_CONDUCT.md) for community standards.
+See the [Code of Conduct](./CODE_OF_CONDUCT.md) and report bugs through
+[GitHub Issues](https://github.com/giauphan/codeatlas-mcp-server/issues).

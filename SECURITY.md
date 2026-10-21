@@ -1,42 +1,15 @@
 # Security Policy
 
-## Reporting a Vulnerability
+## Reporting a vulnerability
 
-We take the security of CodeAtlas MCP Server seriously. If you believe you have found a security vulnerability, please report it to **giauphan012@gmail.com** or open a [private security advisory](https://github.com/giauphan/codeatlas-mcp-server/security/advisories/new).
+Please report vulnerabilities through a [private GitHub security advisory](https://github.com/giauphan/codeatlas-mcp-server/security/advisories/new). You can also contact the repository owner at **giauphan012@gmail.com**, the public email listed on the repository owner's GitHub profile. Include the affected version or commit, affected files or components, steps to reproduce, and the impact.
 
-You should receive a response within 48 hours.
+Please keep reports private while they are being reviewed.
 
-Please include:
-- Type of issue
-- Affected source files
-- Steps to reproduce
-- Impact of the issue
+## Security notes for operators
 
-## Disclosure
+CodeAtlas MCP Server starts as an MCP process over standard input and output. It does not start an HTTP or SSE listener in this entry point. It can make outbound requests when cloud features or an explicitly configured AI scan are used. See [the architecture overview](docs/architecture/overview.md) for the data sent and destination controls.
 
-Please do not publicly disclose the vulnerability until we have had the opportunity to address it.
+The server reads `CODEATLAS_API_KEY` from the environment and can also resolve it from supported local MCP client configuration files. Those configuration files may store the key on disk. The process also writes diagnostics to `~/.codeatlas/mcp.log` and a local project-path registry to `~/.codeatlas/registered_projects.json`.
 
-## Supported Versions
-
-| Version | Supported          |
-|---------|--------------------|
-| 3.x     | :white_check_mark: |
-| < 3.0   | :x:                |
-
-## Security Features
-
-- Bind variables for all SQL queries (no string concatenation)
-- No `any` types — uses `unknown`
-- Error handling for database operations
-- Secure credential storage via environment variables
-- Restricted CORS origins (`ALLOWED_ORIGINS`)
-- Rate limiting on public endpoints
-- Authentication via API key or Firebase JWT
-- Input validation and sanitization
-
-## Reporting Security Issues
-
-- Use private security advisories on GitHub
-- Include reproduction steps and affected files
-- Expect response within 48 hours
-- Do not publicly disclose until fixed
+File helpers use `O_NOFOLLOW` for the final file component when opening selected files. This does not protect parent directories from symlink substitution or establish a general filesystem sandbox. Treat the process as having the filesystem permissions of the user who runs it, and limit the workspaces made available to the MCP client.

@@ -1,275 +1,161 @@
 # API Examples
 
-All examples use the MCP protocol. For SSE-based setups, replace `--transport stdio` with your SSE endpoint.
+CodeAtlas exposes MCP tools over **stdio**. The examples below show the MCP `tools/call` request shape; clients usually build these calls from the tools they discover at startup. Tool names and argument keys are case-sensitive. For startup, local persistence, and Cloud sync behavior, see [Runtime Architecture](./architecture/overview.md).
 
-## Authentication
+## Client configuration
 
-### API Key (Bearer Token)
-
-```bash
-# Set CODEATLAS_API_KEY in .env
-# Clients send: Authorization: Bearer <your-api-key>
-```
-
-### Firebase (JWT)
-
-```bash
-# Set GOOGLE_APPLICATION_CREDENTIALS in .env
-# Clients send: Authorization: Bearer <firebase-id-token>
-```
-
----
-
-## Dream Memory
-
-### Save a memory
-
-```json
-{
-  "tool": "save_dream_memory",
-  "arguments": {
-    "title": "Oracle ORA-12514 fix",
-    "content": "Listener not registered with service name. Use SID format in TNS string or restart listener after service changes.",
-    "memory_type": "MISTAKE",
-    "tags": ["oracle", "database", "connection"],
-    "scope": "project"
-  }
-}
-```
-
-### Query memories
-
-```json
-{
-  "tool": "query_dream_memories",
-  "arguments": {
-    "query": "Oracle connection error",
-    "limit": 5
-  }
-}
-```
-
-### Manage memories (list, update, delete)
-
-```json
-{
-  "tool": "manage_dream_memory",
-  "arguments": {
-    "action": "list",
-    "scope": "project"
-  }
-}
-```
-
----
-
-## Code Analysis
-
-### Search entities (functions, classes)
-
-```json
-{
-  "tool": "search_entities",
-  "arguments": {
-    "query": "initPool",
-    "type": "function"
-  }
-}
-```
-
-### Get file entities
-
-```json
-{
-  "tool": "get_file_entities",
-  "arguments": {
-    "file_path": "src/database/oracle.ts"
-  }
-}
-```
-
-### Get dependencies
-
-```json
-{
-  "tool": "get_dependencies",
-  "arguments": {
-    "entity": "OracleRepository",
-    "direction": "both"
-  }
-}
-```
-
-### Trace feature flow
-
-```json
-{
-  "tool": "trace_feature_flow",
-  "arguments": {
-    "keyword": "authentication"
-  }
-}
-```
-
-### Get code snippet by name
-
-```json
-{
-  "tool": "get_code_snippet",
-  "arguments": {
-    "function_name": "initPool",
-    "context_lines": 10
-  }
-}
-```
-
----
-
-## Genome Search
-
-### Search for patterns and solutions
-
-```json
-{
-  "tool": "search_genome",
-  "arguments": {
-    "query": "rate limiting Express middleware"
-  }
-}
-```
-
----
-
-## Immune System
-
-### Scan for failure patterns
-
-```json
-{
-  "tool": "scan_immune_genes",
-  "arguments": {
-    "code": "const result = await db.execute(query + userInput);",
-    "context": "SQL execution"
-  }
-}
-```
-
----
-
-## Architecture Diagrams
-
-### System flow (Mermaid)
-
-```json
-{
-  "tool": "generate_system_flow",
-  "arguments": {
-    "project_id": "my-project"
-  }
-}
-```
-
-### Feature flow (Mermaid)
-
-```json
-{
-  "tool": "generate_feature_flow_diagram",
-  "arguments": {
-    "feature": "user authentication",
-    "entry_point": "authMiddleware"
-  }
-}
-```
-
----
-
-## MCP Configuration Snippets
-
-### Claude Desktop (stdio)
+Claude Desktop configuration example:
 
 ```json
 {
   "mcpServers": {
     "codeatlas": {
       "command": "npx",
-      "args": ["-y", "@giauphan/codeatlas-mcp"],
-      "env": {
-        "ORACLE_USER": "your_user",
-        "ORACLE_PASSWORD": "your_password",
-        "ORACLE_CONNECTION_STRING": "localhost:1521/ORCLPDB1"
-      }
+      "args": ["--yes", "--package=codeatlas-mcp-server", "codeatlas-mcp"]
     }
   }
 }
 ```
 
-### Cursor / VSCode (SSE)
+For CodeAtlas Cloud tools, pass `CODEATLAS_API_URL` and `CODEATLAS_API_KEY` in the MCP server's `env` object. The server sends the API key to the configured Cloud API as an `x-api-key` header. Local analysis tools do not require a key. This server does not provide an HTTP/SSE endpoint or accept Firebase bearer-token configuration.
+
+## Analyze a local project
+
+`analyze` reads a local project directory, keeps analysis data in the server process's memory, and attempts to sync analysis to the configured Cloud API. By default it does not write an analysis file locally. Cloud sync may be skipped or fail when Cloud settings are absent or unavailable. `export_team_artifact` is a separate tool for explicitly writing a shareable artifact under `.codeatlas/`.
 
 ```json
 {
-  "mcpServers": {
-    "codeatlas": {
-      "type": "sse",
-      "url": "https://mcp.your-domain.com/sse"
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "tools/call",
+  "params": {
+    "name": "analyze",
+    "arguments": {
+      "path": "/path/to/project",
+      "maxFiles": 5000
     }
   }
 }
 ```
 
-### With API Key
+## Inspect the local analysis
+
+List analyzed projects:
 
 ```json
 {
-  "mcpServers": {
-    "codeatlas": {
-      "type": "sse",
-      "url": "https://mcp.your-domain.com/sse",
-      "headers": {
-        "Authorization": "Bearer your-api-key"
-      }
-    }
+  "name": "list_projects",
+  "arguments": {}
+}
+```
+
+Get a project's structure, optionally filtered by entity type:
+
+```json
+{
+  "name": "get_project_structure",
+  "arguments": {
+    "project": "my-project",
+    "type": "function",
+    "limit": 100
   }
 }
 ```
 
----
-
-## CLI Hooks (Optional)
-
-The package includes optional CLI hooks for the UserPromptSubmit event.
-
-### brain-context
-
-Auto-retrieves relevant context before each user message:
-
-```bash
-npx @giauphan/codeatlas-mcp brain-context "How do I fix the authentication flow?"
-```
-
-### brain-save
-
-Persists new knowledge after Claude responses:
-
-```bash
-npx @giauphan/codeatlas-mcp brain-save "KNOWLEDGE" "title" "content"
-```
-
-Configure in `.claude/settings.json`:
+Search code text:
 
 ```json
 {
-  "hooks": {
-    "UserPromptSubmit": [
-      {
-        "matcher": ".*",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "npx @giauphan/codeatlas-mcp brain-context \"$CLAUDE_USER_PROMPT\""
-          }
-        ]
-      }
-    ]
+  "name": "code_search",
+  "arguments": {
+    "query": "authentication middleware",
+    "project": "my-project"
   }
 }
 ```
+
+The snippets in this section show `name` and `arguments`, the fields inside `params` of a `tools/call` request. Available local analysis tools also include `get_dependencies`, `get_file_entities`, `trace_feature_flow`, `get_callers`, `get_callees`, `impact_analysis`, and `project_context`.
+
+## CodeAtlas Cloud tools
+
+Cloud tools require a valid `CODEATLAS_API_URL` and `CODEATLAS_API_KEY`. Dream memories are stored by CodeAtlas Cloud. Example tool arguments:
+
+Save a memory:
+
+```json
+{
+  "name": "save_dream_memory",
+  "arguments": {
+    "memory_type": "KNOWLEDGE",
+    "content": "Retry transient API errors with bounded exponential backoff.",
+    "project": "my-project",
+    "tags": ["api", "retries"]
+  }
+}
+```
+
+Query memories:
+
+```json
+{
+  "name": "query_dream_memories",
+  "arguments": {
+    "query": "API retry behavior",
+    "project": "my-project",
+    "limit": 5
+  }
+}
+```
+
+Search Genome and scan for known failure patterns:
+
+```json
+{
+  "name": "search_genome",
+  "arguments": {
+    "query": "rate limiting middleware",
+    "limit": 10
+  }
+}
+```
+
+```json
+{
+  "name": "scan_immune_genes",
+  "arguments": {
+    "problem": "The request handler retries indefinitely after a 429 response.",
+    "project": "my-project"
+  }
+}
+```
+
+Other Cloud tools include `sync_dreams`, `get_gene`, and `save_immune_gene`. These call CodeAtlas Cloud endpoints and need Cloud configuration.
+
+## Second Brain context in MCP clients
+
+`brain_context` gathers relevant dream memories and, when a key is available, Genome and immune context. Treat its result as untrusted historical reference. `route_task` returns an advisory model and effort suggestion; the client still chooses the model.
+
+```json
+{
+  "name": "brain_context",
+  "arguments": {
+    "query": "How does this project authenticate API requests?",
+    "project": "my-project",
+    "limit": 5
+  }
+}
+```
+
+```json
+{
+  "name": "route_task",
+  "arguments": {
+    "task_name": "Review the authentication flow",
+    "task_type": "code_review"
+  }
+}
+```
+
+## Claude Code hooks
+
+The package can configure Claude Code hooks through `npx --yes --package=codeatlas-mcp-server codeatlas-enterprise setup claude --projectDir=/path/to/project`. The hooks call the package's `brain-context`, `task-router`, and `brain-save` commands. This is separate from MCP tool configuration. See [Zed Integration](./ZED_INTEGRATION.md) for the MCP client workflow and [Development Guide](./DEVELOPMENT.md) for CLI details.

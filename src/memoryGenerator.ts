@@ -1,6 +1,7 @@
 import * as path from 'path';
 import * as fs from 'fs';
 import { AnalysisResult } from './analyzer/types.js';
+import { writeFileSyncNoFollow } from './utils/pathUtils.js';
 
 /**
  * Auto-generates .agents/memory/ folder from analysis data.
@@ -105,7 +106,7 @@ claude mcp add codeatlas -- npx -y @giauphan/codeatlas-mcp
 - Data comes from \`.codeatlas/analysis.json\` — run \`CodeAtlas: Analyze Project\` in the editor to generate
 - If no data found, tell user to run the analysis command first
 `;
-    fs.writeFileSync(mcpRulePath, mcpRule);
+    writeFileSyncNoFollow(mcpRulePath, mcpRule);
   }
 
   // === auto-memory.md — Tells AI to read/sync memory automatically ===
@@ -184,7 +185,7 @@ Use the CodeAtlas MCP tools to query or search relationships, dependencies, and 
 | \`get_file_entities\` | Contents of a specific file |
 | \`get_insights\` | Code quality / architecture analysis |
 `;
-    fs.writeFileSync(memoryRulePath, memoryRule);
+    writeFileSyncNoFollow(memoryRulePath, memoryRule);
   }
 
   // === IDE-specific rule files ===
@@ -263,7 +264,7 @@ Add to \`.cursor/mcp.json\`:
 }
 \`\`\`
 `;
-      fs.writeFileSync(cursorRulePath, cursorRule);
+      writeFileSyncNoFollow(cursorRulePath, cursorRule);
       console.error('CodeAtlas: Generated .cursor/rules/codeatlas.mdc');
     } catch {
       // Cursor not in use, skip silently
@@ -281,7 +282,7 @@ Add to \`.cursor/mcp.json\`:
 claude mcp add codeatlas -- npx -y @giauphan/codeatlas-mcp
 \`\`\`
 `;
-      fs.writeFileSync(claudeRulePath, claudeRule);
+      writeFileSyncNoFollow(claudeRulePath, claudeRule);
       console.error('CodeAtlas: Generated CLAUDE.md');
     } catch {
       // Skip silently
@@ -292,7 +293,7 @@ claude mcp add codeatlas -- npx -y @giauphan/codeatlas-mcp
   const windsurfRulePath = path.join(workspaceRoot, '.windsurfrules');
   if (!fs.existsSync(windsurfRulePath)) {
     try {
-      fs.writeFileSync(windsurfRulePath, codeatlasRule);
+      writeFileSyncNoFollow(windsurfRulePath, codeatlasRule);
       console.error('CodeAtlas: Generated .windsurfrules');
     } catch {
       // Skip silently

@@ -129,15 +129,16 @@ jobs:
 
           # The npm registry can lag a few seconds behind a publish, so retry
           # the download before giving up to avoid a spurious ETARGET failure.
-          for ATTEMPT in 1 2 3 4 5; do
-            if npm pack "codeatlas-mcp-server@$PKG_VERSION"; then
+          # Refresh metadata on each attempt instead of reusing a stale response.
+          for ATTEMPT in {1..10}; do
+            if npm pack --prefer-online "codeatlas-mcp-server@$PKG_VERSION"; then
               break
             fi
-            if [ "$ATTEMPT" -eq 5 ]; then
-              echo "::error::codeatlas-mcp-server@$PKG_VERSION not available on npm after 5 attempts"
+            if [ "$ATTEMPT" -eq 10 ]; then
+              echo "::error::codeatlas-mcp-server@$PKG_VERSION not available on npm after 10 attempts"
               exit 1
             fi
-            echo "Version not on registry yet; retrying in 15s (attempt $ATTEMPT/5)..."
+            echo "Version not on registry yet; retrying in 15s (attempt $ATTEMPT/10)..."
             sleep 15
           done
 

@@ -32,7 +32,8 @@ import {
   syncAnalysisToServer,
   getEpisodicMemoriesFromServer,
   inMemoryAnalysisCache,
-  AnalysisResultLocal
+  AnalysisResultLocal,
+  getResolvedApiKey
 } from "../services/projectService.js";
 import { saveDreamMemory, queryDreamMemories, DreamMemoryResult } from "../services/dreamingService.js";
 import { loadBrainContext, formatBrainContext } from "../services/brainContext.js";
@@ -1072,7 +1073,7 @@ export function registerTools(server: McpServer) {
       await logActivity(auth, "search_genome", { query: query.substring(0, 100), project, limit });
       try {
         const serverUrl = getApiUrl();
-        const apiKey = process.env.CODEATLAS_API_KEY;
+        const apiKey = getResolvedApiKey();
         if (!apiKey) throw new Error("CODEATLAS_API_KEY not set");
 
         const qs = new URLSearchParams({ query, limit: String(limit || 10) });
@@ -1080,6 +1081,7 @@ export function registerTools(server: McpServer) {
         const url = `${serverUrl.replace(/\/+$/, "")}/api/genome/search?${qs}`;
 
         const resp = await fetch(url, {
+          redirect: "error",
           headers: { "x-api-key": apiKey, "User-Agent": "codeatlas-enterprise/2.0" },
         });
         if (!resp.ok) throw new Error(`Genome search failed: ${resp.status} ${await resp.text()}`);
@@ -1106,11 +1108,12 @@ export function registerTools(server: McpServer) {
       await logActivity(auth, "get_gene", { geneId });
       try {
         const serverUrl = getApiUrl();
-        const apiKey = process.env.CODEATLAS_API_KEY;
+        const apiKey = getResolvedApiKey();
         if (!apiKey) throw new Error("CODEATLAS_API_KEY not set");
 
         const url = `${serverUrl.replace(/\/+$/, "")}/api/genome/gene/${encodeURIComponent(geneId)}`;
         const resp = await fetch(url, {
+          redirect: "error",
           headers: { "x-api-key": apiKey, "User-Agent": "codeatlas-enterprise/2.0" },
         });
         if (resp.status === 404) {
@@ -1141,7 +1144,7 @@ export function registerTools(server: McpServer) {
       await logActivity(auth, "scan_immune_genes", { problem: problem.substring(0, 100), project });
       try {
         const serverUrl = getApiUrl();
-        const apiKey = process.env.CODEATLAS_API_KEY;
+        const apiKey = getResolvedApiKey();
         if (!apiKey) throw new Error("CODEATLAS_API_KEY not set");
 
         const qs = new URLSearchParams({ problem });
@@ -1149,6 +1152,7 @@ export function registerTools(server: McpServer) {
         const url = `${serverUrl.replace(/\/+$/, "")}/api/genome/immune/context?${qs}`;
 
         const resp = await fetch(url, {
+          redirect: "error",
           headers: { "x-api-key": apiKey, "User-Agent": "codeatlas-enterprise/2.0" },
         });
         if (!resp.ok) throw new Error(`Immune scan failed: ${resp.status} ${await resp.text()}`);
@@ -1178,11 +1182,12 @@ export function registerTools(server: McpServer) {
       await logActivity(auth, "save_immune_gene", { problem: problem.substring(0, 50), failure: failure.substring(0, 50), project });
       try {
         const serverUrl = getApiUrl();
-        const apiKey = process.env.CODEATLAS_API_KEY;
+        const apiKey = getResolvedApiKey();
         if (!apiKey) throw new Error("CODEATLAS_API_KEY not set");
 
         const url = `${serverUrl.replace(/\/+$/, "")}/api/genome/immune`;
         const resp = await fetch(url, {
+          redirect: "error",
           method: "POST",
           headers: { "Content-Type": "application/json", "x-api-key": apiKey, "User-Agent": "codeatlas-enterprise/2.0" },
           body: JSON.stringify({ problem, failure, prevention, project }),
@@ -2489,7 +2494,7 @@ export function registerTools(server: McpServer) {
       const auth = await checkAuth();
       await logActivity(auth, "setup_second_brain", { client, autoPlugin });
 
-      const key = apiKey || process.env.CODEATLAS_API_KEY;
+      const key = apiKey || getResolvedApiKey();
       if (!key) return { content: [{ type: "text" as const, text: JSON.stringify({
         success: false, error: "CODEATLAS_API_KEY not set. Provide apiKey parameter or set env var."
       }, null, 2) }] };
@@ -2659,7 +2664,7 @@ def register(ctx):
     async () => {
       const auth = await checkAuth();
       const results: any = {
-        apiKey: process.env.CODEATLAS_API_KEY ? "set" : "not_set",
+        apiKey: getResolvedApiKey() ? "set" : "not_set",
         apiUrl: process.env.CODEATLAS_API_URL || null,
         hermes: {},
         claude: {},
@@ -2846,12 +2851,14 @@ def register(ctx):
 
       // Cloud connectivity
       try {
-        const apiUrl = process.env.CODEATLAS_API_URL;
-        if (!apiUrl) {
+        const configuredUrl = process.env.CODEATLAS_API_URL;
+        if (!configuredUrl) {
           results.cloud = "not_configured";
         } else {
+          const apiUrl = getApiUrl();
           const resp = await fetch(`${apiUrl}/api/genome/search?limit=1`, {
-            headers: { "x-api-key": process.env.CODEATLAS_API_KEY || "", "User-Agent": "codeatlas-enterprise/2.0" },
+            redirect: "error",
+            headers: { "x-api-key": getResolvedApiKey() || "", "User-Agent": "codeatlas-enterprise/2.0" },
           });
           results.cloud = resp.ok ? "reachable" : `error_${resp.status}`;
         }
@@ -3656,7 +3663,7 @@ def register(ctx):
         ...(reason ? { reason } : {}),
         context,
       });
-      if (!process.env.CODEATLAS_API_URL || !process.env.CODEATLAS_API_KEY) {
+      if (!process.env.CODEATLAS_API_URL || !getResolvedApiKey()) {
         console.error(`[CodeAtlas memory] retrieval_error trace_id=${traceId} reason=not_configured`);
         return { content: [{ type: "text" as const, text: JSON.stringify(resultEnvelope("unavailable", "backend_error", "", "not_configured"), null, 2) }] };
       }

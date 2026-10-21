@@ -1,5 +1,6 @@
 import { queryDreamMemories, queryDreamMemoriesWithStatus, classifyRetrievalError, DreamRetrievalError, type DreamMemoryQueryResult, type DreamRetrievalStatus, type DreamMemoryResult } from "./dreamingService.js";
 import { getApiUrl } from "../utils/envUtils.js";
+import { getResolvedApiKey } from "./projectService.js";
 
 const ALLOWED_TYPES = new Set(["MISTAKE", "PREFERENCE", "KNOWLEDGE", "PATTERN", "SESSION_SUMMARY"]);
 
@@ -270,7 +271,7 @@ export async function loadBrainContext(input: BrainContextInput, dependencies: B
   const project = input.project || process.env.CODEATLAS_PROJECT;
   const limit = Math.min(Math.max(input.limit ?? 5, 1), 10);
   const serverUrl = getApiUrl();
-  const apiKey = process.env.CODEATLAS_API_KEY;
+  const apiKey = getResolvedApiKey();
   const fetcher = dependencies.fetcher ?? fetch;
   const queryParams = { query, project, project_id: input.project_id, display_name: input.display_name, workspace_path: input.workspace_path, request_id: input.trace_id, limit };
   const dreamRequest: Promise<DreamMemoryQueryResult> = !query ? Promise.resolve({ memories: [], retrieval_status: "empty", candidate_count: 0, returned_count: 0 })

@@ -38,6 +38,11 @@ describe("getApiUrl", () => {
     assert.strictEqual(getApiUrl(), "http://127.0.0.1:3381");
   });
 
+  it("allows IPv6 loopback for local HTTP services", () => {
+    process.env.CODEATLAS_API_URL = "http://[::1]:3381";
+    assert.strictEqual(getApiUrl(), "http://[::1]:3381");
+  });
+
   it("trims whitespace and strips trailing slashes", () => {
     process.env.CODEATLAS_API_URL = "  http://127.0.0.1:3381///  ";
     assert.strictEqual(getApiUrl(), "http://127.0.0.1:3381");

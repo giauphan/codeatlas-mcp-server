@@ -1,94 +1,34 @@
-# Pre-Push Code Quality Checks
+# Pre-push checks
 
-This repository uses Git hooks to ensure code quality before allowing pushes to the main branch.
+GitHub Actions runs checks on pushes to `main` and pull requests targeting
+`main`. The workflows have distinct jobs and dependencies; they do not all run
+the same check list. See the [pipeline runbook](../docs/PIPELINE.md) for the
+exact workflow graph and release flow.
 
-## How It Works
+## Optional local Git hook
 
-### GitHub Actions CI Checks (Automatic)
-
-The repository has GitHub Actions workflows that run on every push and pull request:
-
-- **`.github/workflows/pre-push-tests.yml`** - Runs type checking, tests, and build verification
-- **`.github/workflows/ci.yml`** - Existing CI workflow for lint, build, and test
-
-These ensure that any code pushed to `main` or in pull requests passes all quality checks.
-
-### Local Pre-Push Hook (Optional but Recommended)
-
-For local development, you can set up a Git pre-push hook that runs the same checks before allowing you to push.
-
-#### Setup Instructions
+In a regular clone (not a linked Git worktree), install the local pre-push hook
+from the repository root:
 
 ```bash
-# From the repository root directory:
 ./scripts/setup-git-hooks.sh
 ```
 
-This will:
-1. Create the `.git/hooks` directory if it doesn't exist
-2. Install the pre-push hook script
-3. Make it executable
+The hook runs these commands, in order:
 
-#### What the Hook Checks
+1. `npm run lint`
+2. `npm run build`
+3. `npm run verify-build`
+4. `npm test`
 
-1. **TypeScript Type Checking** (`npm run lint`)
-   - Ensures no TypeScript compilation errors
-   - Runs `tsc --noEmit` to check types without emitting files
+If any check fails, the hook rejects the push. To inspect full test output, run
+`npm test` directly; the hook suppresses build and test command output.
 
-2. **Build Verification** (`npm run build` + `npm run verify-build`)
-   - Builds the project to ensure it compiles
-   - Verifies the build output is valid
+The hook is installed locally and is not itself a GitHub Actions workflow.
+GitHub Actions still runs for configured pushes and pull requests if a local
+hook is absent or skipped.
 
-3. **Tests** (`npm test`)
-   - Runs the full test suite
-   - Ensures all 95+ tests pass
-
-#### Skipping the Hook
-
-If you need to push changes without running the checks (not recommended):
-
-```bash
-git push --no-verify
-```
-
-Or to temporarily disable a specific hook:
-
-```bash
-mv .git/hooks/pre-push .git/hooks/pre-push.disabled
-```
-
-## Recommendations
-
-1. **Always run the pre-push hook** to catch issues early
-2. **Fix failing tests locally** before creating pull requests
-3. **Use feature branches** for development and test thoroughly before merging to main
-4. **Review CI results** on GitHub - the workflows will run regardless of local hooks
-
-## Troubleshooting
-
-If the hook is taking too long:
-- The hook runs tests in silent mode (`> /dev/null 2>&1`) for speed
-- To see detailed output, run the commands manually:
-  ```bash
-  npm run lint
-  npm run build
-  npm run verify-build
-  npm test
-  ```
-
-If you believe the hook is malfunctioning:
-- Check the hook script at `.git/hooks/pre-push`
-- Verify it's executable: `chmod +x .git/hooks/pre-push`
-- Test it manually: `./.git/hooks/pre-push`
-
-## Integration with CI/CD
-
-The GitHub Actions workflows provide an additional safety net:
-- Even if someone uses `--no-verify`, the CI workflows will still run
-- Pull requests must pass all checks before they can be merged
-- The `pre-push-tests.yml` workflow runs the same checks as the local hook
-
-This provides defense-in-depth:
-- ✅ Local development: pre-push hook (optional)
-- ✅ GitHub push: CI workflows (automatic)
-- ✅ Pull requests: CI workflows (automatic)
+The installer writes directly to `.git/hooks/pre-push`, which works when
+`.git` is a directory in a regular clone. In a linked worktree `.git` is a
+file, so this installer does not install into the active worktree's hooks
+directory.

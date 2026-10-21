@@ -1,142 +1,85 @@
 # Development Guide
 
-## Environment Setup
+## Requirements
 
-### Prerequisites
+- Node.js 20 or newer (the package declares `>=20.0.0`). The CI build, test,
+  release, and pre-push workflow jobs currently use Node 22; CI lint uses Node
+  20.
+- npm for the commands used by CI. This repository also keeps a pnpm lockfile
+  and workspace configuration; keep both lockfiles in sync when changing
+  dependencies. `.npmrc` sets `install-links=false`, and the vendored
+  `vendor/original-unmodified-fork.tgz` plus `tools/braces-compat` adapter are
+  needed for a clean dependency install.
 
-- Node.js 20+ (recommended: 20.11.1 LTS)
-- pnpm 9 (`corepack enable && corepack prepare pnpm@9 --activate`)
-- Oracle Instant Client (for Oracle 26ai integration)
-- Firebase Admin SDK credentials
+No Oracle, Firebase, or local HTTP service is required to build and run the MCP
+server. Its MCP transport is stdio. Cloud-backed memory and genome features are
+optional and use the separate `codeatlas-platform` HTTP API.
 
-### Environment Variables
-
-| Variable | Description | Required | Default | Example |
-|----------|-------------|----------|---------|---------|
-| `PORT` | HTTP server port | Yes | 3000 | 3000 |
-| `CODEATLAS_MCP_PORT` | MCP server port | Yes | 3001 | 3001 |
-| `ORACLE_USER` | Oracle DB username | No | - | oracle_user |
-| `ORACLE_PASSWORD` | Oracle DB password | No | - | oracle_password |
-| `ORACLE_CONNECTION_STRING` | Oracle DB connection string | No | - | localhost:1521/ORCLPDB1 |
-| `GOOGLE_APPLICATION_CREDENTIALS` | Firebase Admin credentials path | No | - | /absolute/path/to/serviceAccountKey.json |
-| `NVIDIA_API_KEY` | NVIDIA API key | No | - | nvapi-xyz123 |
-| `CODEATLAS_API_KEY` | CodeAtlas API key | No | - | api_key_123 |
-| `CODEATLAS_MULTI_TENANT` | Enable multi-tenant mode | No | false | true |
-| `CODEATLAS_PROJECTS_ROOT` | Projects root directory | No | ./tenants | ./tenants |
-| `CODEATLAS_PROJECT_DIR` | Single project directory | No | - | ./my-project |
-| `ALLOWED_ORIGINS` | CORS allowed origins | No | - | http://localhost:3000,https://app.example.com |
-| `CODEATLAS_DISABLED_TOOLS` | Comma-separated disabled tools | No | - | scan_vulnerabilities,save_dream_memory |
-| `A2A_MCP_TOKEN` | Agent-to-Agent MCP token | No | - | a2a_token_456 |
-| `CRON_SETTINGS_PATH` | Cron settings file path | No | - | ./cron-settings.json |
-| `VITE_FIREBASE_PROJECT_ID` | Firebase project ID | No | - | my-firebase-project |
-| `VITE_FIREBASE_API_KEY` | Firebase API key | No | - | AIzaSyD... |
-| `VITE_FIREBASE_AUTH_DOMAIN` | Firebase auth domain | No | - | my-project.firebaseapp.com |
-| `VITE_FIREBASE_DATABASE_URL` | Firebase database URL | No | - | https://my-project.firebaseio.com |
-| `VITE_FIREBASE_STORAGE_BUCKET` | Firebase storage bucket | No | - | my-project.appspot.com |
-| `VITE_FIREBASE_MESSAGING_SENDER_ID` | Firebase sender ID | No | - | 1234567890 |
-| `VITE_FIREBASE_APP_ID` | Firebase app ID | No | - | 1:1234567890:web:abcdef123456 |
-
-### Quick Start
+## Install and run
 
 ```bash
-# Clone the repository
-pnpm install
-
-# Copy environment template
-cp .env.example .env
-
-# Edit .env with your credentials
-
-# Build the project
-pnpm run build
-
-# Start the server
-pnpm start
-
-# For development with auto-reload
-pnpm run dev
+npm ci
+npm run build
+npm start
 ```
 
-## Commands
+For development, `npm run dev` runs `index.ts` through `tsx`. Configure an MCP
+client to launch the package executable and communicate over stdio; the server
+does not open an HTTP or SSE listener.
 
-| Command | Description |
-|---------|-------------|
-| `pnpm run build` | Compile TypeScript to `dist/` |
-| `pnpm start` | Run production server |
-| `pnpm run dev` | Run development server with auto-reload |
-| `pnpm test` | Run unit tests |
-| `pnpm run db-init` | Initialize Oracle database schema |
-| `pnpm run db-migrate` | Run database migrations |
-| `pnpm run lint` | Run ESLint |
-| `pnpm run format` | Format code with Prettier |
+Cloud features are disabled unless configured. To connect them, set
+`CODEATLAS_API_URL` to the platform API base URL and provide
+`CODEATLAS_API_KEY`. During normal MCP startup, the server loads `.env` from
+the working directory and then `~/.codeatlas/.env` without overriding existing
+process variables. One-shot CLI commands are dispatched before dotenv loading,
+so export the URL and key in the launching process; the API key may also be
+resolved from supported MCP client or CodeAtlas config files. See the
+environment variable table in the [root README](../README.md). Do not put
+credentials in committed files.
 
-## Troubleshooting
+## Package scripts
 
-### Oracle Connection Issues
+| Command | Purpose |
+|---|---|
+| `npm run build` | Clean and compile production output to `dist/`, then copy runtime hooks and CLI files. |
+| `npm run verify-build` | Check `dist/` for test files, source maps, and hardcoded fallback URLs. |
+| `npm run lint` | TypeScript type-check with `tsc --noEmit`. |
+| `npm test` | Run the Node test suite through `tsx`. |
+| `npm run coverage` | Run tests with a text coverage report. The CI coverage gate is 40% lines. |
+| `npm start` | Start the compiled stdio MCP server (or handle supported one-shot CLI commands). |
+| `npm run dev` | Start the TypeScript entry point through `tsx`. |
+| `npm run setup:hooks` | Install CodeAtlas Claude hooks into the current user's Claude configuration. |
+| `npm run validate:hooks` | Validate an installed Claude hooks setup. |
 
-**Error: ORA-12506: TNS:listener does not currently know of service requested in connect descriptor**
+The `setup:hooks` command configures Claude runtime hooks. The separate
+`scripts/setup-git-hooks.sh` script installs a Git pre-push hook.
 
-1. Verify `ORACLE_CONNECTION_STRING` is correct
-2. Check Oracle listener is running: `lsnrctl status`
-3. Ensure Oracle service is registered: `lsnrctl services`
+## Checks before opening a pull request
 
-**Error: ORA-12514: TNS:listener does not currently know of SID given in connect descriptor**
-
-1. Verify `ORACLE_CONNECTION_STRING` uses SID format: `localhost:1521/ORCL`
-2. Check Oracle SID: `sqlplus / as sysdba` → `SELECT instance_name FROM v$instance;`
-
-**Error: NJS-040: unable to acquire a connection**
-
-1. Check connection pool settings in `src/database/oracle.ts`
-2. Verify Oracle user has sufficient privileges
-3. Check Oracle resource limits: `SELECT * FROM v$resource_limit;`
-
-### Firebase Authentication
-
-**Error: Firebase Admin initialization failed**
-
-1. Verify `GOOGLE_APPLICATION_CREDENTIALS` points to valid service account key
-2. Check Firebase project ID matches service account
-3. Ensure service account has proper permissions
-
-### LD_LIBRARY_PATH
-
-If you encounter Oracle Instant Client errors:
+Run the checks relevant to the change:
 
 ```bash
-export LD_LIBRARY_PATH=/path/to/instantclient:$LD_LIBRARY_PATH
+npm run lint
+npm run build
+npm run verify-build
+npm test
 ```
 
-## Dashboard Development
+CI also runs `npm pack --dry-run` to inspect package contents and enforces a
+40% line coverage threshold on the main CI workflow. The [pipeline runbook](./PIPELINE.md)
+describes the automated workflows and release behavior.
 
-```bash
-cd dashboard
-pnpm install
-pnpm run dev
-```
+An optional local Git pre-push hook can be installed with
+`./scripts/setup-git-hooks.sh`. It runs lint, build, build verification, and
+tests before a push. GitHub Actions still runs independently.
 
-## Testing
+## Code and dependency changes
 
-Run unit tests with:
+- Keep TypeScript strict and avoid adding `any` without a clear reason.
+- Add or update tests for behavior changes.
+- Preserve the `npm ci` cold-checkout path, the pnpm workspace lockfile, and
+  the local braces compatibility package when changing dependencies.
+- Use Conventional Commit messages; release automation uses them to determine
+  whether a version should be published.
 
-```bash
-pnpm test
-```
-
-For dashboard tests:
-
-```bash
-cd dashboard
-pnpm test
-```
-
-## Code Standards
-
-- TypeScript strict mode — no `any` types
-- Meaningful variable names, no abbreviations
-- Comments only for non-obvious logic
-- All public functions must have return type annotations
-
-## Contributing
-
-See [CONTRIBUTING.md](../CONTRIBUTING.md) for guidelines.
+See [Contributing](../CONTRIBUTING.md) for the pull request workflow.

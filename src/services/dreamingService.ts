@@ -1,6 +1,7 @@
 import * as https from "https";
 import * as http from "http";
 import { getResolvedApiKey } from "./projectService.js";
+import { getApiUrl } from "../utils/envUtils.js";
 
 export interface DreamMemoryInput {
   memory_type: "MISTAKE" | "PREFERENCE" | "KNOWLEDGE" | "PATTERN" | "SESSION_SUMMARY";
@@ -113,7 +114,8 @@ function parseSaveAck(data: string): DreamMemorySaveAck {
   const ack = response as Record<string, unknown>;
 
   // Compatibility for older platform versions, accepted only with a real ID.
-  if (ack.status === undefined && ack.success === true) {
+  // Early platform versions returned only an ID, before receipt fields existed.
+  if (ack.status === undefined && (ack.success === true || ack.success === undefined)) {
     const legacyId = typeof ack.id === "string" ? ack.id : typeof ack.dreamId === "string" ? ack.dreamId : "";
     if (legacyId === "__noise_blocked__") {
       return { success: true, status: "filtered", persisted: false };
@@ -169,12 +171,10 @@ export async function saveDreamMemory(params: DreamMemoryInput): Promise<DreamMe
     throw new Error("CODEATLAS_API_KEY is not set. Cannot save dream memory.");
   }
 
-  const serverUrlStr: string | undefined = process.env.CODEATLAS_API_URL;
-  if (!serverUrlStr) throw new Error("CODEATLAS_API_URL not set");
-  const serverUrl: URL = new URL(serverUrlStr);
+  const serverUrl: URL = new URL(getApiUrl());
   const payload: string = JSON.stringify(params);
   const options: https.RequestOptions = {
-    hostname: serverUrl.hostname,
+    hostname: serverUrl.hostname.replace(/^\[|\]$/g, ""),
     port: serverUrl.port || (serverUrl.protocol === "https:" ? 443 : 80),
     path: "/api/dreams/save",
     method: "POST",
@@ -265,12 +265,12 @@ export async function ingestSessionEvent(params: SessionIngestInput): Promise<Se
   }
   const apiKey = getDreamApiKey();
   if (!apiKey) throw new SessionIngestError("CODEATLAS_API_KEY is not set. Cannot ingest session event.", true, "configuration_unavailable");
-  const serverUrlStr = process.env.CODEATLAS_API_URL;
-  if (!serverUrlStr) throw new SessionIngestError("CODEATLAS_API_URL not set", true, "configuration_unavailable");
-  const serverUrl = new URL(serverUrlStr);
+  let serverUrl: URL;
+  try { serverUrl = new URL(getApiUrl()); }
+  catch (error) { throw new SessionIngestError(error instanceof Error ? error.message : "CODEATLAS_API_URL not set", true, "configuration_unavailable"); }
   const payload = JSON.stringify(params);
   const options: https.RequestOptions = {
-    hostname: serverUrl.hostname,
+    hostname: serverUrl.hostname.replace(/^\[|\]$/g, ""),
     port: serverUrl.port || (serverUrl.protocol === "https:" ? 443 : 80),
     path: "/api/dreams/ingest-session",
     method: "POST",
@@ -358,9 +358,9 @@ export async function queryDreamMemories(params: DreamMemoryQuery): Promise<Drea
 async function requestDreamMemories(params: DreamMemoryQuery): Promise<DreamMemoryQueryResult> {
   const apiKey = getDreamApiKey();
   if (!apiKey) throw new DreamRetrievalError("auth_error", "CODEATLAS_API_KEY is not set. Cannot query dream memories.");
-  const serverUrlStr = process.env.CODEATLAS_API_URL;
-  if (!serverUrlStr) throw new DreamRetrievalError("backend_error", "CODEATLAS_API_URL not set");
-  const serverUrl = new URL(serverUrlStr);
+  let serverUrl: URL;
+  try { serverUrl = new URL(getApiUrl()); }
+  catch (error) { throw new DreamRetrievalError("backend_error", error instanceof Error ? error.message : "CODEATLAS_API_URL not set"); }
   const queryParams = new URLSearchParams({ query: params.query });
   for (const field of ["project_id", "project", "display_name", "workspace_path", "scope", "memory_type"] as const) {
     if (params[field]) queryParams.set(field, params[field]);
@@ -371,7 +371,7 @@ async function requestDreamMemories(params: DreamMemoryQuery): Promise<DreamMemo
   const urlPath = "/api/dreams/query?" + queryParams.toString();
   if (urlPath.length > 8_000) throw new DreamRetrievalError("backend_error", "Query URL too long. Reduce query filters.");
   const options: https.RequestOptions = {
-    hostname: serverUrl.hostname,
+    hostname: serverUrl.hostname.replace(/^\[|\]$/g, ""),
     port: serverUrl.port || (serverUrl.protocol === "https:" ? 443 : 80),
     path: urlPath,
     method: "GET",

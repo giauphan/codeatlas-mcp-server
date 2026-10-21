@@ -96,7 +96,8 @@ export class SecurityScanner {
     // 🛡️ Ensure destination matches the intended AI provider service to prevent credential exfiltration
     try {
       const parsedUrl = new URL(aiUrl);
-      if (parsedUrl.protocol !== "https:" && parsedUrl.hostname !== "localhost" && parsedUrl.hostname !== "127.0.0.1") {
+      const isLocal = ["localhost", "127.0.0.1", "[::1]"].includes(parsedUrl.hostname);
+      if (parsedUrl.protocol !== "https:" && !(parsedUrl.protocol === "http:" && isLocal)) {
         console.warn("[SecurityScanner] Insecure AI scan URL protocol rejected");
         return findings;
       }
@@ -106,12 +107,20 @@ export class SecurityScanner {
     }
 
     try {
-      const criticalFindings = findings.filter(f => f.severity === "CRITICAL" || f.severity === "HIGH").slice(0, 5);
+      const criticalFindings: SecurityFinding[] = [];
+      for (const f of findings) {
+        if (f.severity === "CRITICAL" || f.severity === "HIGH") {
+          criticalFindings.push(f);
+          if (criticalFindings.length >= 5) break;
+        }
+      }
+
       const codeContext = criticalFindings.map(f => {
         return "[" + f.severity + "] " + f.type + ": " + f.message + " (" + f.filePath + ":" + f.line + ")";
       }).join("\n");
 
       const response = await fetch(aiUrl, {
+        redirect: "error",
         method: "POST",
         headers: { "Content-Type": "application/json", "Authorization": "Bearer " + aiKey },
         body: JSON.stringify({
