@@ -55,7 +55,8 @@ function escapeRegExp(str: string): string {
 }
 
 function resolveMemoryToolIdentity(project?: string, projectId?: string) {
-  const suppliedPath = project && fs.existsSync(path.resolve(project)) ? path.resolve(project) : undefined; // NOSONAR S6549: this local existence check only selects workspace identity; it never exposes its result to the caller.
+  const resolvedProject = project ? path.resolve(project) : undefined;
+  const suppliedPath = resolvedProject && inMemoryAnalysisCache.has(resolvedProject) ? resolvedProject : undefined;
   const workspacePath = suppliedPath ?? process.env.CODEATLAS_PROJECT_DIR ?? process.cwd();
   const displayName = suppliedPath ? process.env.CODEATLAS_PROJECT : project ?? process.env.CODEATLAS_PROJECT;
   return resolveProjectIdentity(workspacePath, projectId, displayName);
@@ -2293,6 +2294,10 @@ export function registerTools(server: McpServer) {
       // Security: Block shell metacharacters in directory path to prevent indirect command injection via cwd
       if (SHELL_METACHAR_RE.test(resolvedDir)) {
         return { content: [{ type: "text" as const, text: JSON.stringify({ error: "Security Error: Directory path contains forbidden shell metacharacters" }) }] };
+      }
+
+      if (!/^[A-Za-z0-9][A-Za-z0-9:_-]{0,254}$/.test(script)) {
+        return { content: [{ type: "text" as const, text: JSON.stringify({ error: "Invalid script name" }) }] };
       }
 
       const pkgPath = path.join(resolvedDir, "package.json");

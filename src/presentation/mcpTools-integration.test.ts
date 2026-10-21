@@ -316,6 +316,11 @@ console.log(add(1, 2));
       }
     });
 
+    it("run_script rejects option-like script names before package lookup", async () => {
+      const res = await tools["run_script"].handler({ project: PROJECT_DIR, script: "--prefix=/tmp" });
+      assert.match(res.content[0].text, /Invalid script name/);
+    });
+
     it("git_changes identifies if outside git repo quietly", async () => {
       const res = await tools["git_changes"].handler({ project: PROJECT_DIR });
       assert.ok(res.content?.[0]?.text);
