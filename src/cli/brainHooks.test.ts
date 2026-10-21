@@ -114,14 +114,16 @@ describe("Claude hook event decoding", () => {
   });
 
   it("redacts long-lived and temporary AWS access key IDs before capture", () => {
+    const longLivedAwsAccessKeyId = ["AKIA", "EXAMPLEACCESS001"].join("");
+    const temporaryAwsAccessKeyId = ["ASIA", "TESTACCESSKEY001"].join("");
     const result = decodeClaudeHookEvent({
       hook_event_name: "PostToolUse",
       tool_name: "Bash",
-      tool_response: { stdout: "AWS examples AKIAIOSFODNN7EXAMPLE and ASIAIOSFODNN7EXAMPLE" },
+      tool_response: { stdout: `AWS examples ${longLivedAwsAccessKeyId} and ${temporaryAwsAccessKeyId}` },
     });
     assert.equal(result.status, "capture");
     if (result.status === "capture") {
-      assert.doesNotMatch(result.content, /AKIAIOSFODNN7EXAMPLE|ASIAIOSFODNN7EXAMPLE/);
+      assert.doesNotMatch(result.content, new RegExp(`${longLivedAwsAccessKeyId}|${temporaryAwsAccessKeyId}`));
       assert.equal((result.content.match(/REDACTED_SECRET/g) ?? []).length, 2);
     }
   });

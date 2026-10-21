@@ -66,13 +66,15 @@ test("reads only complete text messages and derives stable IDs from source offse
 test("redacts long-lived and temporary AWS access key IDs before returning transcript events", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "claude-transcript-")); roots.push(root);
   const file = path.join(root, "session-aws.jsonl");
-  const content = "Decision: keep AWS identifiers out of memory; examples AKIAIOSFODNN7EXAMPLE and ASIAIOSFODNN7EXAMPLE.";
+  const longLivedAwsAccessKeyId = ["AKIA", "EXAMPLEACCESS001"].join("");
+  const temporaryAwsAccessKeyId = ["ASIA", "TESTACCESSKEY001"].join("");
+  const content = `Decision: keep AWS identifiers out of memory; examples ${longLivedAwsAccessKeyId} and ${temporaryAwsAccessKeyId}.`;
   await writeFile(file, `${JSON.stringify({ type: "user", uuid: "aws", message: { content } })}\n`);
 
   const result = await readClaudeTranscript({ transcriptPath: file, sessionId: "session-aws", projectId: "project_1", cursor: null });
 
   assert.equal(result.events.length, 1);
-  assert.doesNotMatch(result.events[0]!.content, /AKIAIOSFODNN7EXAMPLE|ASIAIOSFODNN7EXAMPLE/);
+  assert.doesNotMatch(result.events[0]!.content, new RegExp(`${longLivedAwsAccessKeyId}|${temporaryAwsAccessKeyId}`));
   assert.equal((result.events[0]!.content.match(/REDACTED_SECRET/g) ?? []).length, 2);
 });
 
