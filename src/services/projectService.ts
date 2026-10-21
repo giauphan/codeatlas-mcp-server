@@ -585,7 +585,7 @@ export async function scanForCodeatlasProjectsAsync(parentDir: string): Promise<
   } catch (err) {
     console.error(`[Project-Discovery] ❌ Failed async scan for .codeatlas projects: ${err}`);
   }
-  return discovered.sort();
+  return discovered.sort((left, right) => left.localeCompare(right));
 }
 
 /**
