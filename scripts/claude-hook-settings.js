@@ -17,6 +17,8 @@ function ownsRoute(hook, route) {
   const command = typeof hook === 'string' ? hook : typeof hook?.command === 'string' ? hook.command.trim() : '';
   const args = Array.isArray(hook?.args) ? hook.args : [];
   if (command === nativeCommand(route)) return true;
+  // Native routes written by earlier installs embed different node/CLI paths.
+  if (new RegExp(`[\\\\/]index\\.js["']?\\s+hook\\s+${route}\\s*$`).test(command)) return true;
   const executable = command.replaceAll('\\', '/').split('/').at(-1);
   if (/^codeatlas(?:-enterprise|-mcp)?$/.test(executable) && args.includes(route)) return true;
   if (new RegExp(`(?:^|[\\s/])codeatlas(?:-enterprise|-mcp)?\\s+(?:hook\\s+)?${route}$`).test(command)) return true;

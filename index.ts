@@ -37,7 +37,7 @@ if (process.argv[2]) {
   const { isCLICommand, runCLI } = await import("./src/cli/commands.js");
   if (isCLICommand(process.argv)) {
     await runCLI();
-    process.exit(0);
+    process.exit(process.exitCode ?? 0);
   }
 }
 // ──────────────────────────────────────────────────────────────────────

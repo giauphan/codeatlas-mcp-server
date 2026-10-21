@@ -192,6 +192,9 @@ describe("Claude hook event decoding", () => {
     const address = server.address();
     assert.ok(address && typeof address !== "string");
     fs.writeFileSync(path.join(cwd, ".env"), `CODEATLAS_API_URL=http://127.0.0.1:${address.port}\nCODEATLAS_API_KEY=synthetic-test-key\n`);
+    const eventsDir = path.join(home, ".codeatlas");
+    fs.mkdirSync(eventsDir, { recursive: true });
+    fs.writeFileSync(path.join(eventsDir, "memory-pipeline-events.jsonl"), "x".repeat(5 * 1024 * 1024 + 1));
 
     try {
       const env: NodeJS.ProcessEnv = { ...process.env, HOME: home };
@@ -227,6 +230,7 @@ describe("Claude hook event decoding", () => {
       assert.equal(received?.body.session_id, "fixture-session");
       assert.match(received?.body.content ?? "", /input: command=npm test/);
       assert.match(received?.body.content ?? "", /exit_code=0/);
+      assert.equal((received?.body.content.match(/\[Bash\]/g) ?? []).length, 1, "tool content should have one decoder-owned prefix");
       assert.doesNotMatch(received?.body.content ?? "", /synthetic-access-secret|synthetic-url-password|synthetic-private-key-material/);
       assert.match(received?.body.content ?? "", /REDACTED_PRIVATE_KEY/);
       assert.match(received?.body.project_id ?? "", /^project_[a-f0-9]{64}$/);
@@ -238,6 +242,7 @@ describe("Claude hook event decoding", () => {
       assert.equal(received?.body.tool_name, "Bash");
       assert.match(result.stderr, /save_status=acknowledged reason=tool_capture trace_id=fixture-tool-use-1/);
       const outcome = JSON.parse(fs.readFileSync(path.join(home, ".codeatlas", "memory-pipeline-events.jsonl"), "utf8").trim());
+      assert.ok(fs.existsSync(path.join(home, ".codeatlas", "memory-pipeline-events.jsonl.1")), "oversized diagnostic log should rotate");
       assert.equal(outcome.capture_received, true);
       assert.ok(Number.isFinite(outcome.duration_ms) && outcome.duration_ms >= 0);
       assert.doesNotMatch(JSON.stringify(outcome), /All tests passed|npm test|synthetic-test-key/);

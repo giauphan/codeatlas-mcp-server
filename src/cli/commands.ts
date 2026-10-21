@@ -1042,6 +1042,7 @@ export async function cmdBrainContext(): Promise<void> {
 }
 
 function reportMemoryPipelineEvent(event: { kind: "save" | "load"; status: string; reason: string; trace_id: string; project_id?: string; packet_chars?: number; duration_ms?: number; capture_received?: boolean; bootstrap_attempt?: boolean; injected?: boolean; readable?: boolean }): void {
+  const MAX_MEMORY_PIPELINE_EVENTS_BYTES = 5 * 1024 * 1024;
   const safe = {
     timestamp: new Date().toISOString(),
     kind: event.kind,
@@ -1061,6 +1062,9 @@ function reportMemoryPipelineEvent(event: { kind: "save" | "load"; status: strin
     fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
     try { fs.chmodSync(dir, 0o700); } catch { /* best effort */ }
     const file = path.join(dir, "memory-pipeline-events.jsonl");
+    try {
+      if (fs.statSync(file).size > MAX_MEMORY_PIPELINE_EVENTS_BYTES) fs.renameSync(file, `${file}.1`);
+    } catch { /* absent or unavailable diagnostics file */ }
     fs.appendFileSync(file, `${JSON.stringify(safe)}\n`, { mode: 0o600 });
     try { fs.chmodSync(file, 0o600); } catch { /* best effort */ }
   } catch { /* diagnostics must never break a host hook */ }
@@ -1121,7 +1125,7 @@ export async function cmdBrainSave(): Promise<void> {
       events: [{
         event_id: event.eventId ?? event.idempotencyKey,
         session_id: event.sessionId,
-        content: `[${event.toolName}] ${event.content}`,
+        content: event.content,
         actor_role: "TOOL",
         memory_type_hint: event.memoryType,
         tool_name: event.toolName,
