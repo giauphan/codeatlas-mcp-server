@@ -6,7 +6,7 @@ HOOKS_DIR="$CLAUDE_DIR/hooks"
 SETTINGS_JSON="$CLAUDE_DIR/settings.json"
 echo "=== CodeAtlas MCP Setup ==="
 mkdir -p "$HOOKS_DIR"
-[ -f "$SETTINGS_JSON" ] && cp "$SETTINGS_JSON" "$SETTINGS_JSON.bak-$(date +%Y%m%d)"
+[[ -f "" ]] && cp "$SETTINGS_JSON" "$SETTINGS_JSON.bak-$(date +%Y%m%d)"
 
 cat > "$HOOKS_DIR/brain-save.sh" << 'ENDOFSHELL'
 #!/bin/bash

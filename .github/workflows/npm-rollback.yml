@@ -41,23 +41,27 @@ jobs:
 
       - name: Verify target version exists on npm
         run: |
-          if ! npm view codeatlas-mcp-server@${{ inputs.stable_version }}; then
-            echo "::error::Version ${{ inputs.stable_version }} does not exist!"
+          if ! npm view "codeatlas-mcp-server@${STABLE_VERSION}"; then
+            echo "::error::Version ${STABLE_VERSION} does not exist!"
             exit 1
           fi
-          npm view codeatlas-mcp-server@${{ inputs.stable_version }} version
+          npm view "codeatlas-mcp-server@${STABLE_VERSION}" version
         env:
+          STABLE_VERSION: ${{ inputs.stable_version }}
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Promote stable version to latest
-        run: npm dist-tag add codeatlas-mcp-server@${{ inputs.stable_version }} latest
+        run: npm dist-tag add "codeatlas-mcp-server@${STABLE_VERSION}" latest
         env:
+          STABLE_VERSION: ${{ inputs.stable_version }}
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Deprecate bad version
         if: ${{ inputs.bad_version != '' }}
-        run: npm deprecate codeatlas-mcp-server@${{ inputs.bad_version }} "${{ inputs.deprecate_message }}"
+        run: npm deprecate "codeatlas-mcp-server@${BAD_VERSION}" "$DEPRECATE_MESSAGE"
         env:
+          BAD_VERSION: ${{ inputs.bad_version }}
+          DEPRECATE_MESSAGE: ${{ inputs.deprecate_message }}
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Show current npm dist-tags

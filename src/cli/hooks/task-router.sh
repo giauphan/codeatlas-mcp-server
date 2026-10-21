@@ -80,16 +80,16 @@ if echo "$LOWER_TASK_NAME" | grep -qF -e "design" -e "architecture" -e "complex"
 fi
 
 # --- 2. Auto-router: Medium Complexity / Standard Dev Tasks -> Sonnet Medium ---
-if [ "$TASK_TYPE" = "code_generation" ] || [ "$TASK_TYPE" = "code_editing" ] || [ "$TASK_TYPE" = "code_review" ] || echo "$LOWER_TASK_NAME" | grep -qF -e "implement" -e "add feature" -e "integrate" -e "develop" -e "review" -e "refactor"; then
+if [[ "$TASK_TYPE" = "code_generation" || "$TASK_TYPE" = "code_editing" || "$TASK_TYPE" = "code_review" ]] || echo "$LOWER_TASK_NAME" | grep -qF -e "implement" -e "add feature" -e "integrate" -e "develop" -e "review" -e "refactor"; then
     echo "MODEL_NAME=ag/claude-sonnet-4-6"
     echo "EFFORT=medium"
     exit 0
 fi
 
 # --- 3. Per-skill routing: parse SKILL.md frontmatter for model preference ---
-if [ "$TASK_TYPE" = "skill_invocation" ]; then
+if [[ "$TASK_TYPE" = "skill_invocation"  ]]; then
     SKILL_NAME=$(echo "$LOWER_TASK_NAME" | sed -n 's|^/skill \([a-zA-Z0-9-]\+\).*|\1|p')
-    if [ -n "$SKILL_NAME" ]; then
+    if [[ -n "$SKILL_NAME"  ]]; then
         # Directory traversal guard: only allow alphanumeric, dash, underscore
         if ! echo "$SKILL_NAME" | grep -qE '^[a-zA-Z0-9_-]+$'; then
             echo "MODEL_NAME=ag/claude-sonnet-4-6"
@@ -106,14 +106,14 @@ if [ "$TASK_TYPE" = "skill_invocation" ]; then
         fi
         SKILL_MD_PATH="${SKILLS_DIR}/${SKILL_NAME}/SKILL.md"
         # Extra guard: ensure SKILL_MD_PATH is inside SKILLS_DIR
-        if [ "${SKILL_MD_PATH#$SKILLS_DIR/}" = "${SKILL_MD_PATH}" ]; then
+        if [[ "${SKILL_MD_PATH#$SKILLS_DIR/}" = "${SKILL_MD_PATH}"  ]]; then
             echo "MODEL_NAME=ag/claude-sonnet-4-6"
             echo "EFFORT=medium"
             exit 0
         fi
-        if [ -f "$SKILL_MD_PATH" ]; then
+        if [[ -f "$SKILL_MD_PATH"  ]]; then
             PREFERRED_MODEL=$(grep -E "^(model|preferred_model)[[:space:]]*:" "$SKILL_MD_PATH" | head -n 1 | cut -d':' -f2 | tr -d ' ' | tr -d '"')
-            if [ -n "$PREFERRED_MODEL" ]; then
+            if [[ -n "$PREFERRED_MODEL"  ]]; then
                 echo "MODEL_NAME=${PREFERRED_MODEL}"
                 echo "EFFORT=high"
                 exit 0
@@ -123,14 +123,14 @@ if [ "$TASK_TYPE" = "skill_invocation" ]; then
 fi
 
 # --- 4. Cost-aware routing: Low Complexity / Quick Tasks -> cheap model ---
-if [ "$TASK_TYPE" = "qa_response" ] || [ "$TASK_TYPE" = "documentation" ] || [ "$TASK_TYPE" = "summarize" ] || [ "$TASK_TYPE" = "explain" ] || echo "$LOWER_TASK_NAME" | grep -qF -e "typo" -e "minor change" -e "read" -e "list" -e "simple" -e "what is" -e "how to" -e "find"; then
+if [[ "$TASK_TYPE" = "qa_response" || "$TASK_TYPE" = "documentation" || "$TASK_TYPE" = "summarize" || "$TASK_TYPE" = "explain" ]] || echo "$LOWER_TASK_NAME" | grep -qF -e "typo" -e "minor change" -e "read" -e "list" -e "simple" -e "what is" -e "how to" -e "find"; then
     echo "EFFORT=low"
 fi
 
 # Default fallback
-if [ "$MODEL_NAME" = "" ]; then
+if [[ "$MODEL_NAME" = ""  ]]; then
     echo "MODEL_NAME=ag/claude-sonnet-4-6"
 fi
-if [ "$EFFORT" = "" ]; then
+if [[ "$EFFORT" = ""  ]]; then
     echo "EFFORT=medium"
 fi

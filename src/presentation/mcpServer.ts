@@ -3288,7 +3288,7 @@ def register(ctx):
       // Group into clusters
       const clusters = new Map<string, string[]>();
       for (const p of topPairs) {
-        const key = [p.a.name, p.b.name].sort().join("|");
+        const key = [p.a.name, p.b.name].sort((left, right) => left.localeCompare(right)).join("|");
         if (!clusters.has(key)) clusters.set(key, [p.a.name, p.b.name]);
       }
 
