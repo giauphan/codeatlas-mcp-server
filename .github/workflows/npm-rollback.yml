@@ -51,7 +51,7 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Promote stable version to latest
-        run: npm dist-tag add "codeatlas-mcp-server@${STABLE_VERSION}" latest
+        run: npm dist-tag add "codeatlas-mcp-server@${STABLE_VERSION}" latest --ignore-scripts
         env:
           STABLE_VERSION: ${{ inputs.stable_version }}
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
