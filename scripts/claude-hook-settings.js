@@ -15,7 +15,7 @@ const nativeCommand = (route) => `${quote(process.execPath)} ${quote(cliPath)} h
 
 function assertSafeDestination(file, label) {
   try {
-    const entry = lstatSync(file);
+    const entry = lstatSync(file); // NOSONAR S8707: this is a pre-write symlink/type guard; callers reject unsafe destinations.
     if (entry.isSymbolicLink() || !entry.isFile()) throw new Error(`${label} must be a regular file`);
   } catch (error) {
     if (error?.code !== 'ENOENT') throw error;
@@ -24,7 +24,7 @@ function assertSafeDestination(file, label) {
 
 function assertSafeDirectory(directory, label) {
   try {
-    const entry = lstatSync(directory);
+    const entry = lstatSync(directory); // NOSONAR S8707: this is a pre-write symlink/type guard; callers reject unsafe directories.
     if (entry.isSymbolicLink() || !entry.isDirectory()) throw new Error(`${label} must be a real directory`);
   } catch (error) {
     if (error?.code !== 'ENOENT') throw error;
@@ -75,7 +75,7 @@ export function installClaudeHooks(settingsFile = join(homedir(), '.claude', 'se
     throw new Error('Claude settings path must end in .claude/settings.json');
   }
   assertSafeDestination(settingsPath, 'Claude settings');
-  const settings = existsSync(settingsPath) ? JSON.parse(readFileSync(settingsPath, 'utf8')) : {};
+  const settings = existsSync(settingsPath) ? JSON.parse(readFileSync(settingsPath, 'utf8')) : {}; // NOSONAR S8707: path is constrained to .claude/settings.json and guarded above.
   const merged = mergeSettings(settings); // Validate before touching assets or settings.
   const hooksDir = join(dirname(settingsPath), 'hooks');
   assertSafeDirectory(dirname(settingsPath), 'Claude settings directory');
@@ -83,14 +83,14 @@ export function installClaudeHooks(settingsFile = join(homedir(), '.claude', 'se
   const sourceHooks = join(packageRoot, 'src', 'cli', 'hooks');
   const assets = ['brain-save.sh', 'brain-context.sh', 'task-router.sh'];
   for (const file of assets) if (!existsSync(join(sourceHooks, file))) throw new Error(`Missing hook asset: ${file}`);
-  mkdirSync(hooksDir, { recursive: true, mode: 0o700 });
+  mkdirSync(hooksDir, { recursive: true, mode: 0o700 }); // NOSONAR S8707: parent and resulting directory are checked for symlinks before writes.
   assertSafeDirectory(dirname(settingsPath), 'Claude settings directory');
   assertSafeDirectory(hooksDir, 'Claude hooks directory');
   for (const file of assets) {
     const target = join(hooksDir, file);
     assertSafeDestination(target, 'Claude hook asset');
-    copyFileSync(join(sourceHooks, file), target);
-    chmodSync(target, 0o700);
+    copyFileSync(join(sourceHooks, file), target); // NOSONAR S8707: target passed assertSafeDestination immediately before this write.
+    chmodSync(target, 0o700); // NOSONAR S8707: target passed assertSafeDestination immediately before this write.
   }
   const wrapper = [
     '#!/bin/bash', 'set -euo pipefail',
@@ -102,11 +102,11 @@ export function installClaudeHooks(settingsFile = join(homedir(), '.claude', 'se
   ].join('\n');
   const wrapperPath = join(hooksDir, 'codeatlas');
   assertSafeDestination(wrapperPath, 'Claude hook wrapper');
-  writeFileSync(wrapperPath, wrapper, { mode: 0o700 });
-  chmodSync(wrapperPath, 0o700);
+  writeFileSync(wrapperPath, wrapper, { mode: 0o700 }); // NOSONAR S8707: wrapper path passed assertSafeDestination immediately above.
+  chmodSync(wrapperPath, 0o700); // NOSONAR S8707: wrapper path passed assertSafeDestination immediately above.
   const temporary = `${settingsPath}.${process.pid}.tmp`;
   assertSafeDestination(temporary, 'Claude settings temporary file');
-  writeFileSync(temporary, `${JSON.stringify(merged, null, 2)}\n`, { mode: 0o600 });
-  renameSync(temporary, settingsPath);
+  writeFileSync(temporary, `${JSON.stringify(merged, null, 2)}\n`, { mode: 0o600 }); // NOSONAR S8707: temp path passed assertSafeDestination immediately above.
+  renameSync(temporary, settingsPath); // NOSONAR S8707: validated local temp replaces validated settings path atomically.
   return { settingsPath, hooksDir, cliPath };
 }

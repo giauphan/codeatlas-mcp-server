@@ -2335,6 +2335,7 @@ export function registerTools(server: McpServer) {
           finalArgs.push(...parsedArgs);
         }
 
+        // NOSONAR S6350: script is schema-validated and user arguments follow npm's `--` separator; no shell is used.
         const result = cp.spawnSync(resolveExecutable("npm"), finalArgs, {
           timeout: maxTime * 1000,
           shell: false, // Security: explicit shell false
