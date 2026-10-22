@@ -3,7 +3,7 @@ import * as path from "path";
 import * as os from "os";
 import { fileURLToPath } from "url";
 import { bold, ok, fail, warn } from "./commands.js";
-import { getZedSettingsPath, getZedConfigDir } from "../utils/pathUtils.js";
+import { getZedSettingsPath, getZedConfigDir, writeFileSyncNoFollow } from "../utils/pathUtils.js";
 import { checkSpawnResult } from "../utils/processUtils.js";
 
 function getSettingsPath(): string {
@@ -102,7 +102,8 @@ export async function cmdSetupZed(): Promise<void> {
   };
 
   fs.mkdirSync(getZedConfigDir(), { recursive: true });
-  fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2), "utf-8");
+  // The original used "utf-8" string encoding flag which is incompatible with writeFileSyncNoFollow mode number. Default 0o600 is fine.
+  writeFileSyncNoFollow(settingsPath, JSON.stringify(settings, null, 2));
   console.log(`  ${ok()} Registered context server in ${settingsPath}`);
 
   console.log("=".repeat(50));
