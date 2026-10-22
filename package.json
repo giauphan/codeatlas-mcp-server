@@ -1,7 +1,7 @@
 {
   "name": "codeatlas-mcp-server",
   "version": "3.0.1",
-  "description": "Local-first MCP server for CodeAtlas \u2014 AST analysis, codebase intelligence, semantic memory, and A2A orchestration.",
+  "description": "Local-first MCP server for CodeAtlas — AST analysis, codebase intelligence, semantic memory, and A2A orchestration.",
   "type": "module",
   "exports": {
     ".": {
@@ -77,6 +77,7 @@
     "chokidar": "^4.0.3",
     "dotenv": "^16.4.5",
     "ignore": "^7.0.5",
+    "micromatch": "^4.0.8",
     "py-ast": "^1.9.0",
     "zod": "^3.22.4"
   },

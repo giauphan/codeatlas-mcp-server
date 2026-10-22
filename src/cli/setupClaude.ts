@@ -5,6 +5,7 @@ import { fileURLToPath } from "url";
 import { bold, ok, fail, warn } from "./commands.js";
 import { getZedSettingsPath, getZedConfigDir } from "../utils/pathUtils.js";
 import { checkSpawnResult } from "../utils/processUtils.js";
+import { writeFileSyncNoFollow } from "../utils/pathUtils.js";
 
 function getSettingsPath(): string {
   const home = os.homedir();
@@ -102,7 +103,7 @@ export async function cmdSetupZed(): Promise<void> {
   };
 
   fs.mkdirSync(getZedConfigDir(), { recursive: true });
-  fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2), "utf-8");
+  writeFileSyncNoFollow(settingsPath, JSON.stringify(settings, null, 2));
   console.log(`  ${ok()} Registered context server in ${settingsPath}`);
 
   console.log("=".repeat(50));
