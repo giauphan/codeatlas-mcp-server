@@ -36,6 +36,124 @@ import {
 
 export const API_URL = process.env.CODEATLAS_API_URL ?? "";
 
+const CLI_COMMANDS = new Set([
+  "init",
+  "setup",
+  "setup-hook",
+  "setup-hooks",
+  "validate-hook",
+  "validate-hooks",
+  "doctor",
+  "brain-context",
+  "brain-save",
+  "task-router",
+  "hook",
+  "hooks",
+  "update",
+  "--help",
+  "-h"
+]);
+
+export type CommandRoute = "cli" | "mcp" | "unknown";
+
+export function classifyCommand(argv: string[]): CommandRoute {
+  const cmd = argv[2];
+  if (!cmd) return "mcp";
+  if (CLI_COMMANDS.has(cmd)) return "cli";
+  return cmd.startsWith("--") ? "mcp" : "unknown";
+}
+
+export interface NpmUpdateCommand {
+  command: "npm";
+  args: string[];
+}
+
+interface UpdateCommandResult {
+  error?: Error;
+  status: number | null;
+  signal?: NodeJS.Signals | null;
+  stderr?: string | Buffer | null;
+}
+
+type UpdateCommandRunner = (command: string, args: string[]) => UpdateCommandResult;
+
+function parseSemver(version: string): [number, number, number] | null {
+  const match = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.exec(version.trim());
+  if (!match) return null;
+  return [Number(match[1]), Number(match[2]), Number(match[3])];
+}
+
+export function compareSemver(left: string, right: string): -1 | 0 | 1 | null {
+  const parsedLeft = parseSemver(left);
+  const parsedRight = parseSemver(right);
+  if (!parsedLeft || !parsedRight) return null;
+  for (let index = 0; index < parsedLeft.length; index++) {
+    if (parsedLeft[index] > parsedRight[index]) return 1;
+    if (parsedLeft[index] < parsedRight[index]) return -1;
+  }
+  return 0;
+}
+
+function getInstalledPackageVersion(): string {
+  const packagePaths = [
+    fileURLToPath(new URL("../../../package.json", import.meta.url)),
+    fileURLToPath(new URL("../../package.json", import.meta.url))
+  ];
+  for (const packagePath of packagePaths) {
+    try {
+      const parsed: unknown = JSON.parse(fs.readFileSync(packagePath, "utf8"));
+      if (typeof parsed === "object" && parsed !== null && "version" in parsed && typeof parsed.version === "string") {
+        return parsed.version;
+      }
+    } catch {
+      // Try the source-tree location when running in development.
+    }
+  }
+  throw new Error("Unable to determine the installed CodeAtlas version.");
+}
+
+function getLatestPackageVersion(): string {
+  const result = spawnSync("npm", ["view", "codeatlas-mcp-server@latest", "version"], {
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "pipe"]
+  });
+  if (result.error) throw result.error;
+  if (result.status !== 0 || typeof result.stdout !== "string") {
+    throw new Error("Unable to look up the CodeAtlas npm latest version.");
+  }
+  return result.stdout.trim();
+}
+
+export function getNpmUpdateCommand(): NpmUpdateCommand {
+  return { command: "npm", args: ["install", "--global", "codeatlas-mcp-server@latest"] };
+}
+
+export function runNpmUpdate(
+  run: UpdateCommandRunner = (command, args) => spawnSync(command, args, { stdio: "inherit" }),
+  getLatestVersion: () => string = getLatestPackageVersion,
+  getInstalledVersion: () => string = getInstalledPackageVersion
+): void {
+  const installedVersion = getInstalledVersion();
+  const latestVersion = getLatestVersion();
+  const comparison = compareSemver(latestVersion, installedVersion);
+  if (comparison === null) {
+    throw new Error(`Refusing npm update because the version check is invalid (installed=${installedVersion}, latest=${latestVersion}).`);
+  }
+  if (comparison <= 0) {
+    throw new Error(`The npm latest version (${latestVersion}) is not newer than installed CodeAtlas (${installedVersion}); refusing to downgrade.`);
+  }
+  const update = getNpmUpdateCommand();
+  const result = run(update.command, update.args);
+  if (result.error) throw result.error;
+  if (result.status !== 0) {
+    const detail = result.stderr ? `: ${result.stderr.toString().trim()}` : "";
+    const reason = result.status === null
+      ? `terminated by ${result.signal ?? "an unknown signal"}`
+      : `exited with status ${result.status}`;
+    throw new Error(`npm global update ${reason}${detail}`);
+  }
+}
+
 /* ── Helpers ───────────────────────────────────────────────────── */
 
 export function bold(s: string): string {
@@ -863,24 +981,7 @@ export async function cmdDoctor(): Promise<void> {
 // ──────────────────────────────────────────────────────────────────────
   
 export function isCLICommand(argv: string[]): boolean {
-  const cmd = argv[2];
-  if (!cmd) return false;
-  return [
-    "init",
-    "setup",
-    "setup-hook",
-    "setup-hooks",
-    "validate-hook",
-    "validate-hooks",
-    "doctor",
-    "brain-context",
-    "brain-save",
-    "task-router",
-    "hook",
-    "hooks",
-    "--help",
-    "-h"
-  ].includes(cmd);
+  return classifyCommand(argv) === "cli";
 }
 
 export async function runCLI(): Promise<void> {
@@ -893,6 +994,10 @@ export async function runCLI(): Promise<void> {
     await cmdBrainSave();
   } else if (cmd === "task-router") {
     await cmdTaskRouter();
+  } else if (cmd === "update") {
+    console.log("Updating CodeAtlas from npm...");
+    runNpmUpdate();
+    console.log("CodeAtlas updated successfully.");
   } else if (cmd === "hook" || cmd === "hooks") {
     const subCmd = process.argv[3];
     if (subCmd === "brain-context") {
@@ -963,6 +1068,7 @@ Commands:
   brain-context     Load Second Brain context for current task
   brain-save        Save dream memory to Second Brain
   task-router       Route task to appropriate model
+  update            Upgrade the globally installed npm package
 
 Without a command, runs the MCP server.
 `);

@@ -34,10 +34,15 @@ try {
 }
 
 if (process.argv[2]) {
-  const { isCLICommand, runCLI } = await import("./src/cli/commands.js");
-  if (isCLICommand(process.argv)) {
+  const { classifyCommand, runCLI } = await import("./src/cli/commands.js");
+  const route = classifyCommand(process.argv);
+  if (route === "cli") {
     await runCLI();
     process.exit(process.exitCode ?? 0);
+  }
+  if (route === "unknown") {
+    console.error(`Unknown command: ${process.argv[2]}. Run 'codeatlas --help' for available commands.`);
+    process.exit(1);
   }
 }
 // ──────────────────────────────────────────────────────────────────────

@@ -127,18 +127,18 @@ jobs:
           PKG_VERSION=${{ needs.release.outputs.version }}
           echo "Validating published package version: $PKG_VERSION"
 
-          # The npm registry can lag a few seconds behind a publish, so retry
-          # the download before giving up to avoid a spurious ETARGET failure.
-          # Refresh metadata on each attempt instead of reusing a stale response.
-          for ATTEMPT in {1..10}; do
+          # Registry replication can take longer than the original two-minute
+          # window. Retry the exact released version for up to five minutes,
+          # refreshing metadata on every attempt instead of using a stale cache.
+          for ATTEMPT in {1..20}; do
             if npm pack --prefer-online "codeatlas-mcp-server@$PKG_VERSION"; then
               break
             fi
-            if [ "$ATTEMPT" -eq 10 ]; then
-              echo "::error::codeatlas-mcp-server@$PKG_VERSION not available on npm after 10 attempts"
+            if [ "$ATTEMPT" -eq 20 ]; then
+              echo "::error::codeatlas-mcp-server@$PKG_VERSION not available on npm after 20 attempts"
               exit 1
             fi
-            echo "Version not on registry yet; retrying in 15s (attempt $ATTEMPT/10)..."
+            echo "Version not on registry yet; retrying in 15s (attempt $ATTEMPT/20)..."
             sleep 15
           done
 
