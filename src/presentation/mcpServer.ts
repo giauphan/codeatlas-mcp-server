@@ -1964,19 +1964,40 @@ export function registerTools(server: McpServer) {
       const visited = new Set(targetIds);
       const nodeMap = createNodeMap(nodes);
 
+      // ⚡ Bolt Optimization: Precompute reverse adjacency list to prevent O(D*E) scaling
+      // When tracking dependencies backward, only trace incoming links to the target.
+      const revAdj = new Map<string, typeof links>();
+      for (let i = 0; i < links.length; i++) {
+        const l = links[i];
+        if (l.type === "call" || l.type === "import") {
+          let list = revAdj.get(l.target);
+          if (!list) {
+            list = [];
+            revAdj.set(l.target, list);
+          }
+          list.push(l);
+        }
+      }
+
       for (let d = 1; d <= maxD; d++) {
         const next = new Set<string>();
-        for (const link of links) {
-          if ((link.type === "call" || link.type === "import") && frontier.has(link.target) && !visited.has(link.source)) {
-            visited.add(link.source);
-            next.add(link.source);
-            const srcNode = nodeMap.get(link.source);
-            const tgtName = targetNames.get(link.target) || nodeMap.get(link.target)?.label || link.target;
-            if (srcNode) {
-              if (!callers.has(link.source)) {
-                callers.set(link.source, { name: srcNode.label, type: srcNode.type, filePath: srcNode.filePath || null, line: srcNode.line || null, depth: d, via: [tgtName] });
-              } else {
-                callers.get(link.source)!.via.push(tgtName);
+        for (const target of frontier) {
+          const incomingLinks = revAdj.get(target);
+          if (!incomingLinks) continue;
+
+          for (let i = 0; i < incomingLinks.length; i++) {
+            const link = incomingLinks[i];
+            if (!visited.has(link.source)) {
+              visited.add(link.source);
+              next.add(link.source);
+              const srcNode = nodeMap.get(link.source);
+              const tgtName = targetNames.get(link.target) || nodeMap.get(link.target)?.label || link.target;
+              if (srcNode) {
+                if (!callers.has(link.source)) {
+                  callers.set(link.source, { name: srcNode.label, type: srcNode.type, filePath: srcNode.filePath || null, line: srcNode.line || null, depth: d, via: [tgtName] });
+                } else {
+                  callers.get(link.source)!.via.push(tgtName);
+                }
               }
             }
           }
@@ -2023,14 +2044,35 @@ export function registerTools(server: McpServer) {
       const visited = new Set(sourceIds);
       const nodeMap = createNodeMap(nodes);
 
+      // ⚡ Bolt Optimization: Precompute forward adjacency list to prevent O(D*E) scaling
+      // When tracking dependencies forward, only trace outgoing links from the source.
+      const fwdAdj = new Map<string, typeof links>();
+      for (let i = 0; i < links.length; i++) {
+        const l = links[i];
+        if (l.type === "call" || l.type === "import") {
+          let list = fwdAdj.get(l.source);
+          if (!list) {
+            list = [];
+            fwdAdj.set(l.source, list);
+          }
+          list.push(l);
+        }
+      }
+
       for (let d = 1; d <= maxD; d++) {
         const next = new Set<string>();
-        for (const link of links) {
-          if ((link.type === "call" || link.type === "import") && frontier.has(link.source) && !visited.has(link.target)) {
-            visited.add(link.target);
-            next.add(link.target);
-            const n = nodeMap.get(link.target);
-            if (n && !n.id.startsWith("external:")) callees.set(link.target, { name: n.label, type: n.type, filePath: n.filePath || null, line: n.line || null, depth: d });
+        for (const source of frontier) {
+          const outgoingLinks = fwdAdj.get(source);
+          if (!outgoingLinks) continue;
+
+          for (let i = 0; i < outgoingLinks.length; i++) {
+            const link = outgoingLinks[i];
+            if (!visited.has(link.target)) {
+              visited.add(link.target);
+              next.add(link.target);
+              const n = nodeMap.get(link.target);
+              if (n && !n.id.startsWith("external:")) callees.set(link.target, { name: n.label, type: n.type, filePath: n.filePath || null, line: n.line || null, depth: d });
+            }
           }
         }
         frontier = next;
@@ -2074,7 +2116,8 @@ export function registerTools(server: McpServer) {
       const callers = new Map<string, { name: string; type: string; filePath: string | null; depth: number }>();
       const callees = new Map<string, { name: string; type: string; filePath: string | null; depth: number }>();
 
-      // Build adjacency lists for fast traversal
+      // ⚡ Bolt Optimization: Precompute adjacency lists for O(V+E) graph traversal
+      // We process forward and reverse dependencies independently using BFS to correctly calculate depth levels.
       const fwdAdj = new Map<string, typeof links>();
       const revAdj = new Map<string, typeof links>();
       for (let i = 0; i < links.length; i++) {
