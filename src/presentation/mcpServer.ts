@@ -572,21 +572,28 @@ export function registerTools(server: McpServer) {
         return { content: [{ type: "text" as const, text: "No analysis data found. Run 'analyze' tool first." }] };
       }
 
-      const searchRegex = new RegExp(escapeRegExp(filePath.replace(/\\/g, "/")), 'i');
-      const matches = loaded.analysis.graph.nodes.filter((n) => {
-        const fp = (n.filePath || n.id).replace(/\\/g, "/");
-        return searchRegex.test(fp);
-      });
+      // ⚡ Bolt Optimization: Use precompiled regex with flexible slash matching to prevent O(N) string allocations during filter
+      const searchPattern = escapeRegExp(filePath.replace(/\\/g, "/")).replace(/\//g, "[\\\\/]");
+      const searchRegex = new RegExp(searchPattern, 'i');
 
       const links = loaded.analysis.graph.links;
       const nodeMap = createNodeLabelMap(loaded.analysis.graph.nodes);
 
-      // Group by file
-      const byFile = new Map<string, typeof matches>();
-      for (const n of matches) {
-        const fp = n.filePath || "unknown";
-        if (!byFile.has(fp)) byFile.set(fp, []);
-        byFile.get(fp)!.push(n);
+      // Group by file in a single pass
+      const matches: typeof loaded.analysis.graph.nodes = [];
+      const byFile = new Map<string, typeof loaded.analysis.graph.nodes>();
+      for (const n of loaded.analysis.graph.nodes) {
+        const fp = n.filePath || n.id;
+        if (searchRegex.test(fp)) {
+          matches.push(n);
+          const keyFp = n.filePath || "unknown";
+          let fileGroup = byFile.get(keyFp);
+          if (!fileGroup) {
+            fileGroup = [];
+            byFile.set(keyFp, fileGroup);
+          }
+          fileGroup.push(n);
+        }
       }
 
       let filesEntries = Array.from(byFile.entries());
@@ -1291,24 +1298,36 @@ export function registerTools(server: McpServer) {
         });
       }
 
-      const filesArray = Array.from(byFile.entries())
-        .map(([filePath, entities]) => {
-          const isExt = filePath === "external";
-          const relPath = isExt ? "external" : (path.isAbsolute(filePath) ? path.relative(loaded.projectDir, filePath) : filePath);
-          const absPath = isExt ? "external" : (path.isAbsolute(filePath) ? filePath : path.resolve(loaded.projectDir, filePath));
-          return {
-            filePath: relPath,
-            absolutePath: absPath,
-            entities,
-            hasSeedMatch: entities.some((e) => e.isSeed),
-            entityCount: entities.length,
-          };
-        })
-        .sort((a, b) => {
-          if (a.hasSeedMatch && !b.hasSeedMatch) return -1;
-          if (!a.hasSeedMatch && b.hasSeedMatch) return 1;
-          return b.entityCount - a.entityCount;
+      // ⚡ Bolt Optimization: Single O(N) pass to gather files instead of chained maps and filters
+      const filesArray: Array<{ filePath: string; absolutePath: string; entities: any[]; hasSeedMatch: boolean; entityCount: number }> = [];
+      for (const [filePath, entities] of byFile.entries()) {
+        const isExt = filePath === "external";
+        const isAbs = !isExt && path.isAbsolute(filePath);
+        const relPath = isExt ? "external" : (isAbs ? path.relative(loaded.projectDir, filePath) : filePath);
+        const absPath = isExt ? "external" : (isAbs ? filePath : path.resolve(loaded.projectDir, filePath));
+
+        let hasSeedMatch = false;
+        for (let i = 0; i < entities.length; i++) {
+          if (entities[i].isSeed) {
+            hasSeedMatch = true;
+            break;
+          }
+        }
+
+        filesArray.push({
+          filePath: relPath,
+          absolutePath: absPath,
+          entities,
+          hasSeedMatch,
+          entityCount: entities.length,
         });
+      }
+
+      filesArray.sort((a, b) => {
+        if (a.hasSeedMatch && !b.hasSeedMatch) return -1;
+        if (!a.hasSeedMatch && b.hasSeedMatch) return 1;
+        return b.entityCount - a.entityCount;
+      });
 
       // ⚡ Bolt Optimization: Single O(N) pass to gather files and readingOrder instead of chained filters and maps
       const files: typeof filesArray = [];
