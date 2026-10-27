@@ -97,3 +97,7 @@ before applying an old recommendation. Use the [README](../README.md),
 ## 2026-09-20 - Optimize graph traversal BFS using adjacency lists
 **Learning:** In heavily connected graphs or dense source representations (like an AST module or dependency tree), iterating over an entire edge list (`O(E)`) inside every depth level of a Breadth-First Search leads to a debilitating `O(D * E)` bottleneck. Because `links.filter()` loops over the *entire* collection just to check inclusion or type, repeatedly filtering links directly inside a loop magnifies this inefficiency, causing massive GC pressure and execution latency.
 **Action:** Always precompute graph relationships into a neighbor lookup structure (e.g., `Map<string, string[]>`) before starting a graph traversal. This drops the complexity from `O(D * E)` down to `O(V + E)`, drastically reducing the total number of required loop iterations.
+
+## 2026-10-24 - [Performance improvement] Optimized O(N) array filtering with string allocations during regex testing
+**Learning:** Checking for node matches by using `filter` and allocating new strings inside the loop with `.replace(/\\/g, "/")` is an O(N) operation that generates significant garbage collection overhead, particularly on large graphs.
+**Action:** Precompile a regex outside the loop that allows both backslash and forward slash (using `[\\\\/]`), completely avoiding `.replace()` on strings inside the hot loop, reducing CPU usage and GC pressure. Replaced chained array methods (`.map().sort()`) with a single pass loop and inline validation logic.
