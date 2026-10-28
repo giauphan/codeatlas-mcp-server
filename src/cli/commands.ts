@@ -31,7 +31,9 @@ import {
   getGeminiSettingsPath,
   getGeminiConfigPath,
   getCursorMcpPath,
-  getClaudeHooksDir
+  getClaudeHooksDir,
+  writeFileSyncNoFollow,
+  appendFileSyncNoFollow
 } from "../utils/pathUtils.js";
 
 export const API_URL = process.env.CODEATLAS_API_URL ?? "";
@@ -1165,7 +1167,7 @@ function writeContextLoadStatus(input: { projectId: string; sessionId: string; e
     fs.mkdirSync(directory, { recursive: true, mode: 0o700 });
     const file = path.join(directory, "context-load-status.json");
     const temp = `${file}.${process.pid}.${Date.now()}.tmp`;
-    fs.writeFileSync(temp, `${JSON.stringify({ status: "injected", project_id: input.projectId, session_id: input.sessionId, event: input.eventName, source_count: input.sourceCount })}\n`, { mode: 0o600 });
+    writeFileSyncNoFollow(temp, `${JSON.stringify({ status: "injected", project_id: input.projectId, session_id: input.sessionId, event: input.eventName, source_count: input.sourceCount })}\n`, 0o600);
     fs.renameSync(temp, file);
   } catch { /* A visible receipt must never make the host hook fail. */ }
 }
@@ -1194,7 +1196,7 @@ function reportMemoryPipelineEvent(event: { kind: "save" | "load"; status: strin
     try {
       if (fs.statSync(file).size > MAX_MEMORY_PIPELINE_EVENTS_BYTES) fs.renameSync(file, `${file}.1`);
     } catch { /* absent or unavailable diagnostics file */ }
-    fs.appendFileSync(file, `${JSON.stringify(safe)}\n`, { mode: 0o600 });
+    appendFileSyncNoFollow(file, `${JSON.stringify(safe)}\n`, 0o600);
     try { fs.chmodSync(file, 0o600); } catch { /* best effort */ }
   } catch { /* diagnostics must never break a host hook */ }
   console.error(`[CodeAtlas hook] ${event.kind}_status=${event.status} reason=${event.reason} trace_id=${event.trace_id}`);
