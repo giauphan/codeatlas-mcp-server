@@ -572,9 +572,11 @@ export function registerTools(server: McpServer) {
         return { content: [{ type: "text" as const, text: "No analysis data found. Run 'analyze' tool first." }] };
       }
 
-      const searchRegex = new RegExp(escapeRegExp(filePath.replace(/\\/g, "/")), 'i');
+      // ⚡ Bolt Optimization: Use flexible path separator in regex to avoid normalizing strings inside loop
+      const searchPattern = escapeRegExp(filePath.replace(/\\/g, "/")).replace(/\//g, "[\\\\/]");
+      const searchRegex = new RegExp(searchPattern, 'i');
       const matches = loaded.analysis.graph.nodes.filter((n) => {
-        const fp = (n.filePath || n.id).replace(/\\/g, "/");
+        const fp = n.filePath || n.id;
         return searchRegex.test(fp);
       });
 
