@@ -573,7 +573,7 @@ export function registerTools(server: McpServer) {
       }
 
       // ⚡ Bolt Optimization: Use flexible path separator in regex to avoid normalizing strings inside loop
-      const searchPattern = escapeRegExp(filePath.replace(/\\/g, () => "/")).replace(/\//g, () => "[\\\\/]");
+      const searchPattern = escapeRegExp(filePath.split("\\").join("/")).split("/").join("[\\\\/]");
       const searchRegex = new RegExp(searchPattern, 'i');
       const matches = loaded.analysis.graph.nodes.filter((n) => {
         const fp = n.filePath || n.id;
