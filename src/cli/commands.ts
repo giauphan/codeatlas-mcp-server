@@ -31,7 +31,8 @@ import {
   getGeminiSettingsPath,
   getGeminiConfigPath,
   getCursorMcpPath,
-  getClaudeHooksDir
+  getClaudeHooksDir,
+  writeFileSyncNoFollow
 } from "../utils/pathUtils.js";
 
 export const API_URL = process.env.CODEATLAS_API_URL ?? "";
@@ -1165,7 +1166,7 @@ function writeContextLoadStatus(input: { projectId: string; sessionId: string; e
     fs.mkdirSync(directory, { recursive: true, mode: 0o700 });
     const file = path.join(directory, "context-load-status.json");
     const temp = `${file}.${process.pid}.${Date.now()}.tmp`;
-    fs.writeFileSync(temp, `${JSON.stringify({ status: "injected", project_id: input.projectId, session_id: input.sessionId, event: input.eventName, source_count: input.sourceCount })}\n`, { mode: 0o600 });
+    writeFileSyncNoFollow(temp, `${JSON.stringify({ status: "injected", project_id: input.projectId, session_id: input.sessionId, event: input.eventName, source_count: input.sourceCount })}\n`, 0o600);
     fs.renameSync(temp, file);
   } catch { /* A visible receipt must never make the host hook fail. */ }
 }
