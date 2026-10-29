@@ -78,7 +78,7 @@
     "dotenv": "^16.4.5",
     "ignore": "^7.0.5",
     "py-ast": "^1.9.0",
-    "zod": "^3.22.4"
+    "zod": "^4.6.7"
   },
   "overrides": {
     "braces": "$braces"
