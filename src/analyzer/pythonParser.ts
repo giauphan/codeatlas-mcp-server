@@ -1,6 +1,9 @@
 import { parse, ASTNodeUnion, Name, Attribute } from 'py-ast';
 
 export class PythonParser {
+  // Optimization: Hoisted Set allocation out of the parsing loop to reduce GC pressure on large Python files
+  private static readonly pythonKeywords = new Set(['if', 'elif', 'while', 'for', 'def', 'class', 'with', 'assert', 'return', 'raise', 'and', 'or', 'not', 'in', 'is', 'try', 'except', 'finally']);
+
   public parseFile(filePath: string, code: string): {
     classes: { name: string; parents: string[]; line: number }[];
     functions: { name: string; line: number; indent?: number }[];
@@ -198,10 +201,9 @@ export class PythonParser {
         // 5. Detect Calls
         const callRegex = /\b([a-zA-Z_][a-zA-Z0-9_]*)\s*\(/g;
         let match;
-        const keywords = new Set(['if', 'elif', 'while', 'for', 'def', 'class', 'with', 'assert', 'return', 'raise', 'and', 'or', 'not', 'in', 'is', 'try', 'except', 'finally']);
         while ((match = callRegex.exec(codePart)) !== null) {
           const callName = match[1];
-          if (!keywords.has(callName)) {
+          if (!PythonParser.pythonKeywords.has(callName)) {
             calls.push({
               name: callName,
               line: lineNum
