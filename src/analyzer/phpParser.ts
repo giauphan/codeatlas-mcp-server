@@ -12,6 +12,10 @@ export class PhpParser {
     'finally', 'match', 'fn', 'static', 'self', 'parent'
   ]);
 
+  private static readonly phpStructuralKeywords = new Set([
+    'function', 'class', 'interface', 'trait', 'enum', 'namespace', 'use'
+  ]);
+
   /**
    * Parses PHP code to extract classes, functions, variables, imports (use), and namespace.
    */
@@ -118,7 +122,7 @@ export class PhpParser {
       while ((scMatch = standaloneCallRegex.exec(line)) !== null) {
         const name = scMatch[1];
         if (!PhpParser.phpKeywords.has(name) && 
-            !['function', 'class', 'interface', 'trait', 'enum', 'namespace', 'use'].includes(name) &&
+            !PhpParser.phpStructuralKeywords.has(name) &&
             /[^a-z]/.test(name)) {
           // Only capture PascalCase or camelCase calls (likely class/method calls)
           // Optimization: Avoid .toLowerCase().replace() string allocation for regex testing
